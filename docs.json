@@ -4,9 +4,16 @@
   "name": "HEVN",
   "description": "Documentation for HEVN products, including the CLI and REST API surfaces used by integrations.",
   "colors": {
-    "primary": "#00A3A3",
-    "light": "#32C7C7",
-    "dark": "#087777"
+    "primary": "#256FAD",
+    "light": "#3C8DCE",
+    "dark": "#1B527F"
+  },
+  "icons": {
+    "library": "lucide"
+  },
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg"
   },
   "favicon": "/favicon.svg",
   "api": {
@@ -79,13 +86,14 @@
   "navbar": {
     "links": [
       {
-        "label": "GitHub",
-        "href": "https://github.com/hevn/hevn-cli"
-      },
-      {
-        "label": "HEVN app",
-        "href": "https://app.gethevn.com"
+        "label": "Book a call",
+        "href": "https://calendly.com/hevn/hevn"
       }
-    ]
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Open app",
+      "href": "https://app.gethevn.com"
+    }
   }
 }
