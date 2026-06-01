@@ -1,0 +1,79 @@
+---
+title: "Cards and banks"
+description: "Inspect card status, card KYC links, available bank rails, and bank detail validation."
+---
+
+## Cards
+
+List cards:
+
+```bash
+hevn cards list
+hevn cards list --yaml
+```
+
+Get card availability and KYC status:
+
+```bash
+hevn cards status
+```
+
+Get a card KYC link:
+
+```bash
+hevn cards kyc-link
+hevn cards kyc-link --no-qr
+```
+
+The CLI can print a terminal QR code for KYC links unless `--no-qr` is provided.
+
+## Banks
+
+List active or requested banks:
+
+```bash
+hevn banks list
+```
+
+Show all available rails:
+
+```bash
+hevn banks list --all
+```
+
+Get details for a rail:
+
+```bash
+hevn banks details --rail uaefts_named_zand
+```
+
+## Validate bank details
+
+Validate ACH routing details:
+
+```bash
+hevn banks validate \
+  --bank-type ach \
+  --routing-number 021000021 \
+  --country US
+```
+
+Validate SWIFT details:
+
+```bash
+hevn banks validate \
+  --bank-type swift \
+  --bic DEUTDEFF \
+  --country DE
+```
+
+Validate SEPA or UAEFTS details:
+
+```bash
+hevn banks validate \
+  --bank-type sepa \
+  --iban DE89370400440532013000 \
+  --country DE
+```
+
+Validation output includes errors, warnings, and lookup data when the backend returns them.

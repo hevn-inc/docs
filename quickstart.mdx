@@ -1,47 +1,97 @@
 ---
 title: "Quickstart"
-description: "Begin with a guide on the fastest path to a successful outcome"
+description: "Install HEVN CLI, authenticate, and run your first account and balance commands."
 ---
-
-Describe how someone begins using your product. What is the first thing they need to do? Are there any prerequisites?
-
-A quickstart should take someone from zero to using your product. They'll get a quick win and a sense of what they can accomplish.
 
 ## Prerequisites
 
-Before you begin, you must have:
+Before you begin, you need:
 
-- Requirement one (for example, Node.js 18+, a free account, an API key)
-- Requirement two (for example, a compatible device, a compatible browser, a compatible operating system)
+- Python 3.11 or newer.
+- An active HEVN account.
+- `pipx` for an isolated end-user install, or Poetry for local development.
 
-## Get started
+## Install
 
-<Steps>
-  <Step title="Install">
-    Describe how to install your product or sign up.
+The recommended end-user install is `pipx`:
 
-    ```bash
-    npm install your-package
-    ```
-  </Step>
-  <Step title="Configure">
-    Describe any setup or configuration needed before first use.
+```bash
+pipx install hevn-cli
+hevn --help
+```
 
-    ```bash
-    your-cli init
-    ```
-  </Step>
-  <Step title="Run it">
-    Show the first thing a user does to see it working.
+If the package is not published to PyPI yet, install directly from GitHub:
 
-    ```bash
-    your-cli start
-    ```
-  </Step>
-</Steps>
+```bash
+pipx install "git+https://github.com/hevn/hevn-cli.git"
+pipx upgrade hevn-cli
+```
 
-<Tip>
-  Give people a way to get help. This could be a link to a support page, a chat with a customer support agent, or a forum for your product.
+For local development:
 
-  Example: Need help? Reach out to us at [support@yourcompany.com](mailto:support@yourcompany.com).
-</Tip>
+```bash
+poetry install
+poetry run hevn --help
+```
+
+## Authenticate
+
+Run the browser login flow:
+
+```bash
+hevn login
+```
+
+The CLI opens HEVN, waits for a local callback, saves your app API key, and prints the config path. If you are on a remote machine or do not want the browser to open automatically, use:
+
+```bash
+hevn login --no-open
+```
+
+## Confirm your account
+
+Check the active account:
+
+```bash
+hevn account get
+```
+
+List accounts in machine-readable form:
+
+```bash
+hevn account list --yaml
+```
+
+Check MCP balance and allowance:
+
+```bash
+hevn balance
+```
+
+## First useful workflow
+
+Create an email contact and transfer USDC:
+
+```bash
+hevn contacts new --type email --name "Vendor" --email vendor@example.com
+hevn contacts list --yaml
+hevn transfer contact --contact-id <contact-id> --amount 25 --memo "Thanks"
+```
+
+Pay an invoice by id:
+
+```bash
+hevn transfer --invoice-id <invoice-id> --memo "Invoice payment"
+```
+
+## Log out
+
+Clear saved local credentials:
+
+```bash
+hevn logout
+```
+
+<Warning>
+  `hevn logout` removes saved HEVN CLI credential fields from the local config file. It does not delete your HEVN account or revoke unrelated credentials.
+</Warning>

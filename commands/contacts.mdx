@@ -1,0 +1,102 @@
+---
+title: "Contacts"
+description: "Create, list, update, and delete email, crypto, and bank contacts."
+---
+
+Contacts are reusable payout destinations. The CLI supports three contact types:
+
+- `email`
+- `crypto`
+- `bank`
+
+## List contacts
+
+```bash
+hevn contacts list
+hevn contacts list --yaml
+hevn contacts list --limit 500 --offset 0 --json
+```
+
+YAML output normalizes contact records for agents and scripts.
+
+## Email contacts
+
+Create an email contact:
+
+```bash
+hevn contacts new \
+  --type email \
+  --name "Vendor" \
+  --email vendor@example.com
+```
+
+## Crypto contacts
+
+Create an on-chain contact:
+
+```bash
+hevn contacts new \
+  --type crypto \
+  --name "Treasury wallet" \
+  --wallet-address 0x0000000000000000000000000000000000000000 \
+  --chain base \
+  --currency USDC
+```
+
+Optionally attach a linked email:
+
+```bash
+hevn contacts new \
+  --type crypto \
+  --wallet-address 0x0000000000000000000000000000000000000000 \
+  --chain base \
+  --currency USDC \
+  --email wallet-owner@example.com
+```
+
+## Bank contacts
+
+Bank contacts require an account holder type:
+
+```bash
+hevn contacts new \
+  --type bank \
+  --bank-type sepa \
+  --account-holder-type business \
+  --account-holder-business-name "Vendor GmbH" \
+  --bank-name "Example Bank" \
+  --iban DE89370400440532013000 \
+  --country DE \
+  --currency EUR
+```
+
+Supported bank account types:
+
+| Type | Typical fields |
+| --- | --- |
+| `sepa` | `--iban`, `--country`, `--currency`, optional `--bic` |
+| `ach` | `--account-number`, `--routing-number`, `--country`, `--currency` |
+| `swift` | `--account-number`, `--bic`, `--country`, `--currency` |
+| `uaefts` | `--iban`, optional `--bic` |
+
+## Update metadata
+
+Existing contact payment details cannot be replaced. You can update contact metadata such as name and relationship:
+
+```bash
+hevn contacts new \
+  --contact-id <contact-id> \
+  --name "Updated name" \
+  --relationship external
+```
+
+## Delete a contact
+
+```bash
+hevn contacts delete <contact-id>
+hevn contacts delete --contact-id <contact-id> --yes
+```
+
+<Warning>
+  Delete operations prompt for confirmation unless `--yes` is provided.
+</Warning>

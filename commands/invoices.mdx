@@ -1,0 +1,123 @@
+---
+title: "Invoices"
+description: "List, create, upload, decline, batch, and pay HEVN invoices."
+---
+
+## List invoices and bills
+
+List all invoices:
+
+```bash
+hevn invoice list
+hevn invoice list --yaml
+```
+
+List incoming bills for the current account:
+
+```bash
+hevn bills
+hevn bills --yaml
+```
+
+## Get an invoice
+
+```bash
+hevn invoice get <invoice-id>
+hevn invoice get --invoice-id <invoice-id> --yaml
+```
+
+Use the public invoice endpoint:
+
+```bash
+hevn invoice get <invoice-id> --public
+```
+
+## Create an invoice
+
+Interactive flow:
+
+```bash
+hevn invoice new
+```
+
+Non-interactive flow:
+
+```bash
+hevn invoice new \
+  --contractor-email vendor@example.com \
+  --contractor-name Vendor \
+  --client-email you@example.com \
+  --client-name "Your Company" \
+  --item "Consulting:1:100" \
+  --due-date 2026-06-01
+```
+
+Items can be provided as repeatable `--item` flags:
+
+```bash
+hevn invoice new \
+  --contractor-email vendor@example.com \
+  --item "Design:2:150" \
+  --item '{"name":"Review","quantity":1,"price":75}'
+```
+
+Or as a JSON array:
+
+```bash
+hevn invoice new \
+  --contractor-email vendor@example.com \
+  --items '[{"name":"Consulting","quantity":1,"price":"100"}]'
+```
+
+## Upload an incoming invoice
+
+Upload an invoice PDF or document and create an incoming invoice record:
+
+```bash
+hevn invoice upload-incoming \
+  --path ./invoice.pdf \
+  --contractor-email vendor@example.com \
+  --items '[{"name":"Consulting","quantity":1,"price":"100"}]'
+```
+
+Uploaded documents are cached in the local config so a path can later resolve to its document id.
+
+## Create from contract
+
+```bash
+hevn invoice new \
+  --contract-id <contract-id> \
+  --period-start 2026-06-01 \
+  --add-item "Extra support:1:250"
+```
+
+The current user's address is required for contract invoice creation.
+
+## Batch invoicing
+
+```bash
+hevn invoice batch \
+  --contract '{"contractId":"<contract-id>","period":0,"memo":"May payroll","items":[{"name":"Monthly services","quantity":1,"price":"5000"}]}' \
+  --yaml
+```
+
+Or pass an array:
+
+```bash
+hevn invoice batch \
+  --contracts-json '[{"contractId":"<contract-id>","period":0,"items":[{"name":"Services","quantity":1,"price":"5000"}]}]'
+```
+
+## Decline an invoice
+
+```bash
+hevn invoice decline --invoice-id <invoice-id> --yes --yaml
+```
+
+## Pay an invoice
+
+Invoice payment is handled by the transfer command:
+
+```bash
+hevn transfer --invoice-id <invoice-id> --memo "Invoice payment"
+```

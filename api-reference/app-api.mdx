@@ -1,0 +1,329 @@
+---
+title: "App API"
+description: "Authenticated REST endpoints used by HEVN CLI AppApi."
+---
+
+`AppApi` uses app authentication. See [Authentication](/api-reference/authentication) for header details.
+
+## Account and profile
+
+| Method | Endpoint | CLI surface | Purpose |
+| --- | --- | --- | --- |
+| `GET` | `/user` | `hevn account get`, `hevn profile get` | Load the current user profile. |
+| `PUT` | `/user/kyc` | `hevn profile set` | Update profile and KYC profile fields. |
+| `POST` | `/user/kyc_link` | `hevn account kyc` | Create or fetch a KYC link. |
+| `GET` | `/user/kyc/status` | `hevn account kyc --status` | Fetch KYC status for a provider. |
+| `GET` | `/balance` | `hevn account list` | Fetch app balance accounts. |
+
+KYC status query:
+
+```http
+GET /user/kyc/status?provider=swipelux
+```
+
+Profile update example:
+
+```json
+{
+  "firstName": "Ada",
+  "lastName": "Lovelace",
+  "entityName": "Example Ltd",
+  "address": {
+    "streetAddress": "1 Example Street",
+    "city": "London",
+    "country": "GB",
+    "zip": "SW1A1AA"
+  }
+}
+```
+
+## Contacts
+
+| Method | Endpoint | CLI surface | Purpose |
+| --- | --- | --- | --- |
+| `GET` | `/user/contacts` | `hevn contacts list` | List contacts. |
+| `POST` | `/user/contact` | `hevn contacts new` | Create a contact. |
+| `PATCH` | `/user/contacts/{contact_id}` | `hevn contacts new --contact-id ...` | Update contact metadata. |
+| `DELETE` | `/user/contacts/{contact_id}` | `hevn contacts delete` | Delete a contact. |
+| `POST` | `/user/contact/bank/validate` | `hevn banks validate` | Validate bank account details. |
+
+List contacts query:
+
+```http
+GET /user/contacts?limit=100&offset=0
+```
+
+Email contact payload:
+
+```json
+{
+  "name": "Vendor",
+  "relationship": "external",
+  "account": {
+    "accountType": "email",
+    "email": "vendor@example.com"
+  }
+}
+```
+
+On-chain contact payload:
+
+```json
+{
+  "name": "Treasury wallet",
+  "relationship": "external",
+  "account": {
+    "accountType": "onchain",
+    "email": "owner@example.com",
+    "walletAddress": "0x0000000000000000000000000000000000000000",
+    "chainId": "base",
+    "currency": "USDC"
+  }
+}
+```
+
+Bank validation payload:
+
+```json
+{
+  "bankType": "sepa",
+  "country": "DE",
+  "bankName": "Example Bank",
+  "iban": "DE89370400440532013000",
+  "bic": "DEUTDEFF",
+  "routingNumber": null
+}
+```
+
+## Documents
+
+| Method | Endpoint | CLI surface | Purpose |
+| --- | --- | --- | --- |
+| `POST` | `/documents/upload` | `hevn invoice upload-incoming`, `hevn contracts new --document-path` | Upload an invoice or contract document. |
+
+Document upload payload:
+
+```json
+{
+  "base64": "<base64-document-bytes>",
+  "type": "invoice",
+  "name": "invoice",
+  "originName": "invoice.pdf",
+  "context": "invoice"
+}
+```
+
+For contracts, the CLI sends `type: "contract"` and `context: "contract"`.
+
+## Invoices
+
+| Method | Endpoint | CLI surface | Purpose |
+| --- | --- | --- | --- |
+| `GET` | `/documents/contracts/invoices` | `hevn invoice list`, `hevn bills` | List invoices. |
+| `GET` | `/documents/contracts/invoices/{invoice_id}` | `hevn invoice get` | Fetch invoice details. |
+| `POST` | `/documents/contracts/invoices` | `hevn invoice new` | Create an invoice. |
+| `POST` | `/documents/contracts/invoices/uploaded` | `hevn invoice upload-incoming` | Create an invoice from an uploaded document. |
+| `PUT` | `/documents/contracts/invoices/{invoice_id}` | `hevn invoice decline` | Update invoice state. |
+| `POST` | `/documents/contracts/{contract_id}/create-invoice` | `hevn invoice new --contract-id` | Create an invoice from a contract. |
+| `POST` | `/documents/contracts/invoices/batch_invoicing` | `hevn invoice batch` | Generate invoices for multiple contracts. |
+
+Create invoice payload example:
+
+```json
+{
+  "currency": "USD",
+  "contractorEmail": "vendor@example.com",
+  "contractorDisplayName": "Vendor",
+  "clientEmail": "client@example.com",
+  "clientDisplayName": "Client Company",
+  "clientAddress": {
+    "streetAddress": "1 Example Street",
+    "city": "London",
+    "country": "GB",
+    "zip": "SW1A1AA"
+  },
+  "items": [
+    {
+      "name": "Consulting",
+      "quantity": 1,
+      "price": 100
+    }
+  ],
+  "invoicePrefix": "INV",
+  "onchain": true,
+  "dueDate": "2026-06-01"
+}
+```
+
+Create from contract payload example:
+
+```json
+{
+  "contractorAddress": {
+    "streetAddress": "1 Example Street",
+    "city": "London",
+    "country": "GB",
+    "zip": "SW1A1AA"
+  },
+  "invoicePrefix": "INV",
+  "periodStart": "2026-06-01",
+  "addItems": [
+    {
+      "name": "Extra support",
+      "quantity": 1,
+      "price": 250
+    }
+  ]
+}
+```
+
+Batch invoicing payload:
+
+```json
+[
+  {
+    "contractId": "contract_123",
+    "period": 0,
+    "memo": "May payroll",
+    "items": [
+      {
+        "name": "Monthly services",
+        "quantity": 1,
+        "price": "5000"
+      }
+    ]
+  }
+]
+```
+
+## Contracts
+
+| Method | Endpoint | CLI surface | Purpose |
+| --- | --- | --- | --- |
+| `GET` | `/documents/contracts` | `hevn contracts list`, `hevn contractors list` | List contracts. |
+| `GET` | `/documents/contracts/{contract_id}` | `hevn contracts get` | Fetch a contract. |
+| `GET` | `/documents/contracts/{contract_id}/preview` | `hevn contracts preview` | Preview resolved contract fields and document text. |
+| `GET` | `/documents/contracts/templates` | `hevn contracts generate`, `hevn hire` | List available contract templates. |
+| `POST` | `/documents/contracts` | `hevn contracts new`, `hevn contracts generate`, `hevn hire` | Create a contract. |
+| `PATCH` | `/documents/contracts/{contract_id}` | `hevn contracts update` | Update contract fields and schedule. |
+| `POST` | `/documents/contracts/{contract_id}/pause` | `hevn contracts pause` | Pause a contract. |
+| `POST` | `/documents/contracts/{contract_id}/approve` | `hevn contracts approve` | Approve a contract. |
+| `PUT` | `/documents/contracts/{contract_id}/payment_methods` | `hevn contracts payment-methods` | Replace contract payment methods. |
+| `DELETE` | `/documents/contracts/{contract_id}` | `hevn contracts delete` | Delete a contract. |
+
+Create contract payload example:
+
+```json
+{
+  "contractorEmail": "contractor@example.com",
+  "type": "default_contractor",
+  "fields": {
+    "amount": "5000",
+    "currency": "USD",
+    "jobTitle": "Engineer",
+    "scopeDescription": "Full-time engineering work"
+  },
+  "period": "monthly",
+  "activationAt": "2026-05-01T00:00:00Z",
+  "label": "contractor@example.com - Contractor Agreement",
+  "priorityMethods": ["internal"],
+  "requireSignature": false
+}
+```
+
+Payment methods payload:
+
+```json
+{
+  "paymentMethods": [
+    {
+      "accountType": "email",
+      "email": "contractor@example.com"
+    }
+  ]
+}
+```
+
+## Transactions
+
+| Method | Endpoint | CLI surface | Purpose |
+| --- | --- | --- | --- |
+| `GET` | `/transactions` | `hevn transfer list`, `hevn pending-deposits` | List transactions. |
+
+Transaction query parameters used by the CLI:
+
+```http
+GET /transactions?limit=50&offset=0&type=ach,fedwire&status=pending&incomeOnly=true&bankAccountId=bank_123
+```
+
+## Banks and quotes
+
+| Method | Endpoint | CLI surface | Purpose |
+| --- | --- | --- | --- |
+| `GET` | `/banks` | `hevn banks list`, bank payout selection | List banks and available rails. |
+| `POST` | `/banks/activate` | Bank payout flow | Activate bank rails. |
+| `POST` | `/balance/payin/quote` | `hevn deposit` | Create crypto deposit quote. |
+| `POST` | `/banks/payin/quote` | `hevn deposit --from bank` | Create bank pay-in quote. |
+| `POST` | `/banks/payin/quote/submit` | `hevn deposit --from bank` | Submit bank pay-in quote. |
+| `POST` | `/balance/payout/quote` | `hevn transfer contact` for bank contacts | Create payout quote. |
+
+Pay-in quote payload:
+
+```json
+{
+  "amount": 100,
+  "currency": "USDC",
+  "originChainId": "base"
+}
+```
+
+Bank pay-in quote payload:
+
+```json
+{
+  "amount": 100,
+  "bankAccountId": "bank_123",
+  "memo": "Funding treasury"
+}
+```
+
+Payout quote payload:
+
+```json
+{
+  "contactId": "contact_123",
+  "amount": 25,
+  "bankAccountId": "bank_123"
+}
+```
+
+## Cards
+
+| Method | Endpoint | CLI surface | Purpose |
+| --- | --- | --- | --- |
+| `GET` | `/cards` | `hevn cards list`, `hevn cards status` | List cards and card readiness state. |
+| `POST` | `/cards` | Hidden `hevn cards issue` | Create a card. |
+| `GET` | `/cards/{card_id}` | Card-specific internal wrapper | Fetch a card. |
+| `POST` | `/cards/{card_id}/details` | Card-specific internal wrapper | Request card details. |
+| `PUT` | `/cards/{card_id}/label` | Card-specific internal wrapper | Update card label. |
+| `PUT` | `/cards/{card_id}/limit` | Card-specific internal wrapper | Update card limit. |
+| `POST` | `/cards/{card_id}/freeze` | Card-specific internal wrapper | Freeze a card. |
+| `POST` | `/cards/{card_id}/unfreeze` | Card-specific internal wrapper | Unfreeze a card. |
+| `POST` | `/cards/kyc/link` | `hevn cards kyc-link` | Create or fetch card KYC link. |
+| `POST` | `/cards/pre-approve` | Card list KYC prompt, hidden `pre-approve` | Prepare card KYC or check card prerequisites. |
+
+Create card payload:
+
+```json
+{
+  "format": "virtual"
+}
+```
+
+Update label payload:
+
+```json
+{
+  "label": "Team card"
+}
+```

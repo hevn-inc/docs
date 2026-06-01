@@ -1,0 +1,64 @@
+---
+title: "REST API overview"
+description: "REST endpoints used internally by HEVN CLI."
+---
+
+This section has two API reference layers:
+
+- **Generated API Reference** is powered by the live HEVN OpenAPI schema from `https://api.hevn.finance/openapi.json` and enables Mintlify's endpoint pages, request examples, and interactive API Playground.
+- **CLI wrapper notes** live in the CLI tab and document the REST endpoints that the current CLI calls through `src/hevn_cli/api/*`.
+
+## Base URL
+
+The generated OpenAPI reference uses:
+
+```bash
+https://api.hevn.finance
+```
+
+The CLI builds requests from the configured API base URL:
+
+```bash
+https://api.hevn.finance/api/v1
+```
+
+The base URL can be selected through `HEVN_ENV`, saved login config, or `HEVN_BASE_URL`.
+
+```bash
+export HEVN_ENV=prod
+export HEVN_BASE_URL=https://api.hevn.finance/api/v1
+```
+
+## API clients
+
+| Client | Source | Auth mode | Used for |
+| --- | --- | --- | --- |
+| `AppApi` | `src/hevn_cli/api/app.py` | App API key or legacy bearer token | Account, profile, contacts, invoices, contracts, banks, cards, quotes, transactions |
+| `McpApi` | `src/hevn_cli/api/mcp.py` | App API key as MCP key | MCP balance and transfers |
+| `PublicApi` | `src/hevn_cli/api/public.py` | Public | FX rates and public invoices |
+
+## Request behavior
+
+All requests:
+
+- send `Accept: application/json`,
+- use a 60 second HTTP timeout,
+- send query parameters only when their values are not `None`,
+- parse non-empty responses as JSON,
+- raise a CLI `HevnError` for HTTP status codes `>= 400`.
+
+When `--debug` or `HEVN_DEBUG=1` is enabled, error output can include the generated curl command.
+
+## Common response handling
+
+The CLI does not enforce a shared response schema across endpoints. It passes backend JSON through to command formatters and to `--json` / `--yaml` output.
+
+For integration code, use the endpoint-specific objects returned by the backend and treat fields shown in command output as convenience projections rather than exhaustive schemas.
+
+## Endpoint index
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key-round" href="/api-reference/authentication">
+    Header modes, login config, and idempotency headers.
+  </Card>
+</CardGroup>

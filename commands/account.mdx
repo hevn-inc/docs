@@ -1,0 +1,69 @@
+---
+title: "Account and profile"
+description: "Inspect the active HEVN account, update profile fields, and manage KYC status."
+---
+
+## Account summary
+
+Show the active account:
+
+```bash
+hevn account get
+```
+
+List account state, auth state, balances, and MCP allowance:
+
+```bash
+hevn account list --yaml
+```
+
+`profile` is an alias for `account`, so these commands are equivalent:
+
+```bash
+hevn account get
+hevn profile get
+```
+
+## Update profile
+
+Update identity or address fields:
+
+```bash
+hevn profile set \
+  --first-name Ada \
+  --last-name Lovelace \
+  --street-address "1 Example Street" \
+  --city London \
+  --country GB \
+  --zip SW1A1AA
+```
+
+Business accounts can set an entity name:
+
+```bash
+hevn profile set --entity-name "Example Ltd"
+```
+
+At least one profile field is required.
+
+## KYC
+
+Get a KYC link or status:
+
+```bash
+hevn account kyc
+hevn account kyc --status
+hevn account kyc --provider align --status
+```
+
+The default provider is `swipelux`. Supported provider values are passed through to the HEVN backend.
+
+## Status
+
+Use the top-level status command for a compact health check:
+
+```bash
+hevn status
+```
+
+Use `--json` or `--yaml` when integrating account status into automation.

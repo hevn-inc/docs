@@ -1,0 +1,145 @@
+---
+title: "Contracts"
+description: "Upload existing contracts, generate HEVN templates, preview, approve, update, pause, and manage payment methods."
+---
+
+## List and inspect contracts
+
+```bash
+hevn contracts list
+hevn contracts list --yaml
+hevn contracts get <contract-id>
+hevn contracts preview --id <contract-id> --yaml
+```
+
+Print rendered contract body when previewing:
+
+```bash
+hevn contracts preview --id <contract-id> --document
+```
+
+## Contract statuses
+
+Common statuses:
+
+```text
+pending_approval_by_contractor
+pending_approval_by_client
+active
+completed
+cancelled
+paused
+```
+
+## Upload an existing contract
+
+Use `contracts new` when you already have a contract file and want to attach it as an active contract:
+
+```bash
+hevn contracts new \
+  --contractor-email contractor@example.com \
+  --document-path ./contract.pdf \
+  --amount 1000 \
+  --currency USD \
+  --period monthly \
+  --activation-at 2026-07-10 \
+  --yaml
+```
+
+You can attach a previously uploaded document id:
+
+```bash
+hevn contracts new \
+  --client-email client@example.com \
+  --document-id <document-id> \
+  --type custom \
+  --field contractorName="Your Company" \
+  --field clientName="Counterparty"
+```
+
+`contracts new` creates the contract with `status=active` and does not start the signing flow.
+
+## Generate a HEVN contract
+
+Use `contracts generate` when HEVN should generate the contract from a backend template:
+
+```bash
+hevn contracts generate \
+  --contractor-email contractor@example.com \
+  --type default_contractor \
+  --amount 1000 \
+  --currency USD \
+  --period monthly \
+  --activation-at 2026-05-01 \
+  --yaml
+```
+
+Generated contract types must start with `default_`. Use `contracts new` for uploaded existing contracts.
+
+## Hire shortcut
+
+`hevn hire` is a shortcut for generating a `default_contractor` contract:
+
+```bash
+hevn hire \
+  --contractor-email contractor@example.com \
+  --job-title "Engineer" \
+  --scope-description "Full-time engineering work" \
+  --amount 5000 \
+  --currency USD \
+  --period monthly \
+  --start-date 2026-05-01 \
+  --yaml
+```
+
+Preview and approve:
+
+```bash
+hevn contracts preview --id <contract-id> --yaml
+hevn contracts --id <contract-id> approve --yaml
+```
+
+## Update terms and schedule
+
+Contract creators can edit terms and invoice schedule:
+
+```bash
+hevn contracts update \
+  --id <contract-id> \
+  --period monthly \
+  --activation-at 2026-07-10 \
+  --field 'paymentTerms=Payment on the 10th for the previous month' \
+  --yaml
+```
+
+Use `--activation-at` as the recurring invoice anchor date.
+
+## Payment methods
+
+Set contract payment methods with repeatable JSON objects:
+
+```bash
+hevn contracts payment-methods \
+  --id <contract-id> \
+  --payment-method '{"accountType":"email","email":"contractor@example.com"}' \
+  --yaml
+```
+
+Or pass a JSON array:
+
+```bash
+hevn contracts payment-methods \
+  --id <contract-id> \
+  --payment-methods-json '[{"accountType":"email","email":"contractor@example.com"}]'
+```
+
+## Pause and delete
+
+```bash
+hevn contracts pause --id <contract-id>
+hevn contracts delete --id <contract-id> --yes
+```
+
+<Warning>
+  Before creating a contract from a file, determine which party is the current HEVN user. Use `--contractor-email` when the current user is the client, and `--client-email` when the current user is the contractor.
+</Warning>

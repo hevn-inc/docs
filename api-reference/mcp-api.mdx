@@ -1,0 +1,102 @@
+---
+title: "MCP API"
+description: "MCP REST endpoints used by HEVN CLI for balance and transfers."
+---
+
+`McpApi` uses the saved app API key as `X-API-Key` and requires an app id for transfer endpoints.
+
+## Balance
+
+```http
+GET /mcp/get_balance
+```
+
+CLI surface:
+
+```bash
+hevn balance
+```
+
+Purpose:
+
+- returns the MCP wallet email,
+- returns the MCP wallet address,
+- returns USDC balance,
+- returns remaining allowance.
+
+## Submit transfer
+
+```http
+POST /apps/{app_id}/transfer
+```
+
+CLI surfaces:
+
+```bash
+hevn transfer --invoice-id <invoice-id>
+hevn transfer email vendor@example.com 25
+hevn transfer contact <contact-id> 25
+hevn transfer contact --contact-id <contact-id> --quote-id <quote-id>
+```
+
+Headers:
+
+```http
+X-API-Key: hvn_...
+Accept: application/json
+Idempotency-Key: <optional-stable-operation-id>
+```
+
+Invoice transfer payload:
+
+```json
+{
+  "invoiceId": "inv_123",
+  "memo": "Invoice payment"
+}
+```
+
+Contact transfer payload:
+
+```json
+{
+  "contactId": "contact_123",
+  "amount": 25,
+  "memo": "Thanks"
+}
+```
+
+Payout quote transfer payload:
+
+```json
+{
+  "quoteId": "quote_123",
+  "memo": "Bank payout"
+}
+```
+
+At least one of `contactId`, `invoiceId`, or `quoteId` is required.
+
+## Transfer history
+
+```http
+GET /apps/{app_id}/transfers
+```
+
+Query parameters:
+
+| Parameter | Type | Purpose |
+| --- | --- | --- |
+| `limit` | integer | Maximum number of transfers to return. |
+| `offset` | integer | Pagination offset. |
+| `idempotency_key` | string | Filter or look up by idempotency key. |
+
+Example:
+
+```http
+GET /apps/app_123/transfers?limit=50&offset=0&idempotency_key=op_123
+```
+
+<Note>
+  The current CLI exposes transaction history through `hevn transfer list`, which uses the app `/transactions` endpoint. The MCP transfer history wrapper exists in `McpApi` for direct internal use.
+</Note>

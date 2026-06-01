@@ -1,0 +1,95 @@
+---
+title: "Authentication"
+description: "Authentication modes and headers used by HEVN CLI REST calls."
+---
+
+The CLI uses three auth modes: app, MCP, and public.
+
+## App API key mode
+
+Most authenticated endpoints use `AppApi`, which builds headers from `HEVN_API_KEY` or saved login config.
+
+Preferred header:
+
+```http
+X-Api-Key: hvn_...
+Accept: application/json
+device-id: hevn-cli
+device-type: cli
+device-name: HEVN CLI
+```
+
+Set it manually:
+
+```bash
+export HEVN_API_KEY="hvn_..."
+export HEVN_API_KEY_HEADER="X-Api-Key"
+```
+
+Or use browser login:
+
+```bash
+hevn login
+```
+
+`hevn login` stores the app API key, app id, header mode, and optional base URL in the local CLI config.
+
+## Legacy bearer mode
+
+Legacy bearer tokens are supported by setting the header to `Authorization`:
+
+```bash
+export HEVN_API_KEY="<token>"
+export HEVN_API_KEY_HEADER="Authorization"
+```
+
+If the key does not start with `Bearer`, the CLI sends:
+
+```http
+Authorization: Bearer <token>
+```
+
+## MCP auth mode
+
+MCP endpoints use the app API key as `X-API-Key`:
+
+```http
+X-API-Key: hvn_...
+Accept: application/json
+```
+
+MCP transfer endpoints also require an app id. It comes from:
+
+1. `HEVN_APP_ID`
+2. saved `app_id` from `hevn login`
+
+## Idempotency
+
+MCP transfer writes can include:
+
+```http
+Idempotency-Key: <stable-operation-id>
+```
+
+CLI example:
+
+```bash
+hevn transfer contact \
+  --contact-id <contact-id> \
+  --amount 25 \
+  --idempotency-key <stable-operation-id>
+```
+
+## Public mode
+
+`PublicApi` sends only:
+
+```http
+Accept: application/json
+```
+
+It is used for FX rates and public invoice lookup.
+
+<Warning>
+  Debug output may include authentication headers. Redact debug logs before sharing them.
+</Warning>

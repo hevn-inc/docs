@@ -1,0 +1,110 @@
+---
+title: "Configuration"
+description: "Configure HEVN environments, API credentials, output formats, and debug behavior."
+---
+
+## Config file
+
+By default, HEVN CLI stores local configuration at:
+
+```text
+~/.config/hevn-cli/config.json
+```
+
+Override the config path with:
+
+```bash
+export HEVN_CLI_CONFIG="/path/to/config.json"
+```
+
+The config file is written with restrictive file permissions when possible.
+
+## Environments
+
+Select an environment globally:
+
+```bash
+export HEVN_ENV="prod"
+```
+
+Or per command:
+
+```bash
+hevn --env dev account get
+hevn --env local login
+```
+
+Built-in environments:
+
+| Environment | Site URL | API URL |
+| --- | --- | --- |
+| `prod` | `https://app.gethevn.com` | `https://api.hevn.finance/api/v1` |
+| `dev` | `https://app-beta.hevn.finance` | `https://dev-api.hevn.finance/api/v1` |
+| `local` | `http://localhost:8081` | Local or configured development API |
+
+You can also override URLs directly:
+
+```bash
+export HEVN_BASE_URL="https://api.hevn.finance/api/v1"
+export HEVN_SITE_URL="https://app.gethevn.com"
+```
+
+## API keys
+
+The preferred auth path is:
+
+```bash
+hevn login
+```
+
+This saves:
+
+- `api_key`
+- `api_key_header`
+- `app_id`
+- `base_url`, when returned by the login callback
+
+For automation, set credentials through environment variables:
+
+```bash
+export HEVN_API_KEY="hvn_..."
+export HEVN_API_KEY_HEADER="X-Api-Key"
+export HEVN_APP_ID="<app-id>"
+```
+
+Legacy bearer-token mode:
+
+```bash
+export HEVN_API_KEY="<jwt-or-token>"
+export HEVN_API_KEY_HEADER="Authorization"
+```
+
+If `HEVN_API_KEY_HEADER` is `Authorization` and the key does not start with `Bearer`, the CLI adds the `Bearer` prefix automatically.
+
+## Output formats
+
+Human output is optimized for terminal use with Rich tables and panels. For scripts and agents, prefer JSON or YAML:
+
+```bash
+hevn contacts list --json
+hevn invoice list --yaml
+hevn contracts preview --id <contract-id> --yaml
+```
+
+## Debugging
+
+Use `--debug` to include invocation and curl details in error output:
+
+```bash
+hevn --debug invoice get <invoice-id>
+```
+
+Or set:
+
+```bash
+export HEVN_DEBUG=1
+```
+
+<Warning>
+  Debug output can include sensitive headers and request payloads. Avoid sharing raw debug logs without redaction.
+</Warning>

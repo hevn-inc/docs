@@ -1,0 +1,120 @@
+---
+title: "Money movement"
+description: "Check balances, create deposit quotes, inspect transactions, and send MCP transfers."
+---
+
+## Balance
+
+Show MCP wallet balance and remaining allowance:
+
+```bash
+hevn balance
+hevn balance --yaml
+```
+
+Show the broader app account balance through account commands:
+
+```bash
+hevn account list --yaml
+```
+
+## FX rates
+
+Fetch a public FX rate to USD:
+
+```bash
+hevn rate EUR
+hevn rate --currency AED --yaml
+```
+
+## Crypto deposits
+
+Create a deposit quote:
+
+```bash
+hevn deposit 100 usdc base
+```
+
+Equivalent option form:
+
+```bash
+hevn deposit --amount 100 --currency usdc --chain base
+```
+
+The result may include a deposit address and memo. Send funds only to the returned deposit details.
+
+## Bank deposits
+
+For pooled ACH or wire bank accounts:
+
+```bash
+hevn deposit \
+  --from bank \
+  --bank-id <bank-account-id> \
+  --amount 100 \
+  --memo "Funding treasury"
+```
+
+Check pending bank deposits:
+
+```bash
+hevn pending-deposits
+hevn pending-deposits --bank-id <bank-account-id> --yaml
+```
+
+## Pay an invoice
+
+```bash
+hevn transfer --invoice-id <invoice-id> --memo "Invoice payment"
+```
+
+The command loads invoice details and submits an MCP transfer.
+
+## Transfer by email
+
+```bash
+hevn transfer email vendor@example.com 25 --memo "Thanks"
+```
+
+If an email contact does not exist, the CLI creates one before submitting the transfer.
+
+## Transfer to a contact
+
+Send to an email or internal contact:
+
+```bash
+hevn transfer contact <contact-id> 25 --memo "Thanks"
+```
+
+Send to a bank contact through a payout quote:
+
+```bash
+hevn transfer contact \
+  --contact-id <contact-id> \
+  --amount 25 \
+  --bank-account-id <bank-account-id> \
+  --yes \
+  --memo "Bank payout"
+```
+
+Use an existing quote:
+
+```bash
+hevn transfer contact \
+  --contact-id <contact-id> \
+  --quote-id <quote-id> \
+  --memo "Bank payout"
+```
+
+## Transactions
+
+List recent transactions:
+
+```bash
+hevn transfer list
+hevn transfer list --limit 100 --offset 0 --yaml
+```
+
+<Note>
+  Write commands generate an idempotency key automatically when one is not supplied. Pass `--idempotency-key` when replay protection must be controlled by your own system.
+</Note>

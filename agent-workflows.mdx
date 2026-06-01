@@ -1,0 +1,78 @@
+---
+title: "Agent workflows"
+description: "Guidance for AI agents and scripts that operate HEVN CLI safely."
+---
+
+HEVN CLI is designed to be usable by humans and automation. Agents should prefer explicit flags, structured output, and confirmation-free commands only when the user's intent is clear.
+
+## Use structured output
+
+Prefer YAML or JSON for reads:
+
+```bash
+hevn profile get --yaml
+hevn contacts list --yaml
+hevn contracts preview --id <contract-id> --yaml
+```
+
+## Read before writing
+
+For money movement and contract operations, load the relevant resource first:
+
+```bash
+hevn profile get --yaml
+hevn contacts list --yaml
+hevn invoice get <invoice-id> --yaml
+hevn contracts preview --id <contract-id> --yaml
+```
+
+Then perform the write with explicit ids and amounts.
+
+## Contract role selection
+
+When creating a contract from a document, determine which party is the current HEVN user:
+
+```bash
+hevn profile get --yaml
+```
+
+Then compare the current user against the parties in the document.
+
+- If the current user is the client, pass the counterparty as `--contractor-email`.
+- If the current user is the contractor, pass the counterparty as `--client-email`.
+
+The email flag always identifies the counterparty's role, not the current user's role.
+
+<Warning>
+  Do not assume the current HEVN user is always the client. Many contract workflows have the current user acting as the contractor.
+</Warning>
+
+## Avoid invented data
+
+If a document does not contain the counterparty's email, ask the user. Do not invent emails, addresses, tax ids, bank details, invoice dates, or amounts.
+
+## Use idempotency for transfers
+
+For payment automation, pass your own idempotency key:
+
+```bash
+hevn transfer contact \
+  --contact-id <contact-id> \
+  --amount 25 \
+  --idempotency-key <stable-operation-id> \
+  --yaml
+```
+
+## Confirmation flags
+
+Use `--yes` only when the user or upstream workflow has already approved the action:
+
+```bash
+hevn transfer contact --contact-id <contact-id> --amount 25 --yes
+hevn invoice decline --invoice-id <invoice-id> --yes
+hevn contracts delete --id <contract-id> --yes
+```
+
+## Debug safely
+
+`--debug` can include curl commands and authentication details. Use it for local troubleshooting, but redact before storing or sharing logs.

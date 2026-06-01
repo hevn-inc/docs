@@ -1,0 +1,55 @@
+---
+title: "Public API"
+description: "Unauthenticated REST endpoints used by HEVN CLI PublicApi."
+---
+
+`PublicApi` sends only `Accept: application/json`.
+
+## FX rate
+
+```http
+GET /utils/rates/{currency}
+```
+
+CLI surface:
+
+```bash
+hevn rate EUR
+hevn rate --currency AED --yaml
+```
+
+Path parameters:
+
+| Parameter | Type | Purpose |
+| --- | --- | --- |
+| `currency` | string | Currency code to price against USD. |
+
+Example response fields consumed by the CLI:
+
+```json
+{
+  "usdRate": "1.08",
+  "bankTransfer": "1.08",
+  "card": "1.10"
+}
+```
+
+## Public invoice
+
+```http
+GET /public/invoices/{invoice_id}
+```
+
+CLI surface:
+
+```bash
+hevn invoice get <invoice-id> --public
+```
+
+Path parameters:
+
+| Parameter | Type | Purpose |
+| --- | --- | --- |
+| `invoice_id` | string | Public invoice id. |
+
+The CLI renders the returned invoice with the same invoice formatter used for authenticated invoice reads.
