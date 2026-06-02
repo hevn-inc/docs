@@ -1,9 +1,9 @@
 ---
 title: "MCP API"
-description: "MCP REST endpoints used by HEVN CLI for balance and transfers."
+description: "App-scoped transfer endpoints used by HEVN CLI balance and transfer commands."
 ---
 
-`McpApi` uses the saved app API key as `X-API-Key` and requires an app id for transfer endpoints.
+`McpApi` reuses the same configured HEVN API key as the rest of the CLI. Transfer endpoints no longer require an app id; the backend resolves the owning app from the calling API key.
 
 ## Balance
 
@@ -24,10 +24,29 @@ Purpose:
 - returns USDC balance,
 - returns remaining allowance.
 
+## API-key introspection
+
+```http
+GET /apps/me
+```
+
+CLI surface:
+
+```bash
+hevn whoami
+```
+
+Purpose:
+
+- returns the user name and email,
+- returns the owning app id and app name,
+- returns granted API-key scopes,
+- returns balance and remaining spend limit.
+
 ## Submit transfer
 
 ```http
-POST /apps/{app_id}/transfer
+POST /apps/transfer
 ```
 
 CLI surfaces:
@@ -42,10 +61,12 @@ hevn transfer contact --contact-id <contact-id> --quote-id <quote-id>
 Headers:
 
 ```http
-X-API-Key: hvn_...
+Authorization: Bearer hvn_...
 Accept: application/json
 Idempotency-Key: <optional-stable-operation-id>
 ```
+
+If the CLI is configured with `HEVN_API_KEY_HEADER=X-Api-Key`, the same request uses `X-Api-Key: hvn_...` instead.
 
 Invoice transfer payload:
 
@@ -80,7 +101,7 @@ At least one of `contactId`, `invoiceId`, or `quoteId` is required.
 ## Transfer history
 
 ```http
-GET /apps/{app_id}/transfers
+GET /apps/transfers
 ```
 
 Query parameters:
@@ -94,9 +115,13 @@ Query parameters:
 Example:
 
 ```http
-GET /apps/app_123/transfers?limit=50&offset=0&idempotency_key=op_123
+GET /apps/transfers?limit=50&offset=0&idempotency_key=op_123
 ```
 
 <Note>
   The current CLI exposes transaction history through `hevn transfer list`, which uses the app `/transactions` endpoint. The MCP transfer history wrapper exists in `McpApi` for direct internal use.
 </Note>
+
+## Legacy routes
+
+Older API specs exposed `POST /apps/{app_id}/transfer`. The current CLI does not call that route and does not read `HEVN_APP_ID`.

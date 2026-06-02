@@ -51,7 +51,7 @@ export HEVN_SITE_URL="https://app.gethevn.com"
 
 ## API keys
 
-The preferred auth path is:
+The preferred interactive auth path is:
 
 ```bash
 hevn login
@@ -61,34 +61,72 @@ This saves:
 
 - `api_key`
 - `api_key_header`
-- `app_id`
 - `base_url`, when returned by the login callback
 
-For automation, set credentials through environment variables:
+For automation, either save a key directly:
+
+```bash
+hevn login --api-key hvn_...
+hevn login --api-key hvn_... --api-key-header X-Api-Key
+hevn login --api-key hvn_... --api-base-url https://api.example.com/api/v1
+```
+
+or set credentials through environment variables:
 
 ```bash
 export HEVN_API_KEY="hvn_..."
-export HEVN_API_KEY_HEADER="X-Api-Key"
-export HEVN_APP_ID="<app-id>"
-```
-
-Legacy bearer-token mode:
-
-```bash
-export HEVN_API_KEY="<jwt-or-token>"
+# Optional. Defaults to Authorization.
 export HEVN_API_KEY_HEADER="Authorization"
 ```
 
-If `HEVN_API_KEY_HEADER` is `Authorization` and the key does not start with `Bearer`, the CLI adds the `Bearer` prefix automatically.
+`Authorization` mode adds a `Bearer` prefix automatically when the key does not already start with one. Use `X-Api-Key` only when your backend deployment requires that header:
+
+```bash
+export HEVN_API_KEY_HEADER="X-Api-Key"
+```
+
+The CLI no longer uses `HEVN_APP_ID`; transfer endpoints derive the owning app from the API key.
 
 ## Output formats
 
-Human output is optimized for terminal use with Rich tables and panels. For scripts and agents, prefer JSON or YAML:
+Human output is optimized for terminal use with Rich tables and panels. For scripts and agents, prefer JSON or YAML. You can set output globally:
+
+```bash
+hevn --json contacts list
+hevn --yaml invoice list
+export HEVN_OUTPUT_FORMAT=yaml
+```
+
+or per command:
 
 ```bash
 hevn contacts list --json
 hevn invoice list --yaml
 hevn contracts preview --id <contract-id> --yaml
+```
+
+Structured success output is wrapped as `ok`, `data`, `meta`, and `warnings`. Structured error output is wrapped as `ok`, `errorCode`, `errorType`, `error`, and `exitCode`.
+
+## Automation controls
+
+Use non-interactive mode to refuse prompts and return structured `INTERACTIVE_REQUIRED` errors when a required flag is missing:
+
+```bash
+hevn --non-interactive --yaml contacts new --type email
+```
+
+Use dry-run mode to preflight mutating HTTP calls without sending the request:
+
+```bash
+hevn --dry-run transfer --invoice-id <invoice-id> --memo "Invoice payment"
+```
+
+Inspect the full CLI contract for agents and scripts:
+
+```bash
+hevn --schema
+hevn --schema --yaml
+hevn agent-skill
 ```
 
 ## Debugging

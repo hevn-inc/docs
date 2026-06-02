@@ -1,9 +1,9 @@
 ---
 title: "HEVN CLI"
-description: "Install, authenticate, and operate HEVN payments, invoices, contracts, cards, and MCP transfers from the command line."
+description: "Install, authenticate, and operate HEVN payments, invoices, contracts, cards, and app-scoped transfers from the command line."
 ---
 
-HEVN CLI is a standalone command-line wrapper for the HEVN backend API and MCP transfer endpoints. It is built for operators, finance teams, developers, and AI agents that need scriptable access to HEVN account data and payment workflows.
+HEVN CLI is a standalone command-line wrapper for the HEVN backend API and app-scoped transfer endpoints. It is built primarily for AI agents and automation that need scriptable access to HEVN account data and payment workflows, while still providing human-readable terminal output for operators, finance teams, and developers.
 
 <CardGroup cols={2}>
   <Card title="Quickstart" icon="rocket" href="/quickstart">
@@ -11,6 +11,9 @@ HEVN CLI is a standalone command-line wrapper for the HEVN backend API and MCP t
   </Card>
   <Card title="Configuration" icon="settings-2" href="/configuration">
     Configure environments, API keys, output formats, and debugging.
+  </Card>
+  <Card title="Agent workflows" icon="bot" href="/agent-workflows">
+    Load the agent skill, inspect the CLI manifest, and run workflows safely.
   </Card>
   <Card title="Money movement" icon="arrow-right-left" href="/commands/money-movement">
     Check balances, create deposit quotes, pay invoices, and transfer to contacts.
@@ -27,8 +30,9 @@ HEVN CLI is a standalone command-line wrapper for the HEVN backend API and MCP t
 - Create contacts for email, crypto, and fiat payout destinations.
 - Create invoices manually, from uploaded invoice documents, or from contracts.
 - Generate HEVN contracts from templates or upload existing signed contracts.
-- Move USDC through MCP by invoice, email recipient, contact, or payout quote.
-- Emit human-readable tables or machine-readable JSON/YAML for automation.
+- Move USDC by invoice, email recipient, contact, or payout quote.
+- Emit human-readable tables or machine-readable JSON/YAML envelopes for automation.
+- Print an agent-readable command manifest with `hevn --schema`.
 
 ## Command shape
 
@@ -44,23 +48,29 @@ Common global options:
 hevn --env dev account get
 hevn --base-url https://api.example.com/api/v1 account get
 hevn --debug transfer --invoice-id <invoice-id>
+hevn --dry-run transfer --invoice-id <invoice-id>
+hevn --non-interactive --yaml contacts list
 ```
 
-Most read and write commands also support:
+Most read and write commands also support command-local output flags:
 
 ```bash
 --json
 --yaml
 ```
 
-Use these flags for scripts, agent tools, CI jobs, and data extraction.
+Use these flags for scripts, agent tools, CI jobs, and data extraction. In JSON/YAML mode, successful command output is wrapped as `ok`, `data`, `meta`, and `warnings`; error output is wrapped as `ok`, `errorCode`, `errorType`, `error`, and `exitCode`.
 
 ## Authentication model
 
-`hevn login` opens the HEVN app in a browser, creates or selects an app, issues an app API key, and saves it in your local HEVN CLI config. App API keys use the `X-Api-Key` header for the backend API and `X-API-Key` for MCP transfer endpoints.
+`hevn login` opens the HEVN app in a browser, creates or selects an app, issues an app API key, and saves it in your local HEVN CLI config. Automation can save a key directly:
 
-Legacy bearer tokens are still supported through `HEVN_API_KEY` with `Authorization`, but app API keys are the preferred path.
+```bash
+hevn login --api-key hvn_...
+```
+
+One `hvn_...` API key is used for every authenticated endpoint, including transfers. The default header is `Authorization: Bearer hvn_...`; set `HEVN_API_KEY_HEADER=X-Api-Key` only when your backend deployment requires that header.
 
 <Note>
-  MCP transfer commands require an app API key and an app id. Run `hevn login` first unless your automation sets both values explicitly.
+  Transfer commands no longer require an app id. The backend resolves the owning app from the API key.
 </Note>

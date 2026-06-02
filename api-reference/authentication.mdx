@@ -3,16 +3,16 @@ title: "Authentication"
 description: "Authentication modes and headers used by HEVN CLI REST calls."
 ---
 
-The CLI uses three auth modes: app, MCP, and public.
+The CLI uses one HEVN API key for authenticated app and transfer endpoints, plus a public mode for unauthenticated reads.
 
-## App API key mode
+## HEVN API key mode
 
-Most authenticated endpoints use `AppApi`, which builds headers from `HEVN_API_KEY` or saved login config.
+Authenticated endpoints build headers from `HEVN_API_KEY` or saved login config.
 
-Preferred header:
+Default header:
 
 ```http
-X-Api-Key: hvn_...
+Authorization: Bearer hvn_...
 Accept: application/json
 device-id: hevn-cli
 device-type: cli
@@ -23,49 +23,50 @@ Set it manually:
 
 ```bash
 export HEVN_API_KEY="hvn_..."
-export HEVN_API_KEY_HEADER="X-Api-Key"
+# Optional. Defaults to Authorization.
+export HEVN_API_KEY_HEADER="Authorization"
 ```
 
-Or use browser login:
+Use browser login:
 
 ```bash
 hevn login
 ```
 
-`hevn login` stores the app API key, app id, header mode, and optional base URL in the local CLI config.
-
-## Legacy bearer mode
-
-Legacy bearer tokens are supported by setting the header to `Authorization`:
+or direct API-key login for automation:
 
 ```bash
-export HEVN_API_KEY="<token>"
-export HEVN_API_KEY_HEADER="Authorization"
+hevn login --api-key hvn_...
+hevn login --api-key hvn_... --api-key-header X-Api-Key
 ```
 
-If the key does not start with `Bearer`, the CLI sends:
+`hevn login` stores the API key, header mode, and optional base URL in the local CLI config.
 
-```http
-Authorization: Bearer <token>
+## Alternate X-Api-Key mode
+
+Some deployments require `X-Api-Key` instead of `Authorization`:
+
+```bash
+export HEVN_API_KEY="hvn_..."
+export HEVN_API_KEY_HEADER="X-Api-Key"
 ```
 
-## MCP auth mode
+The CLI reuses whichever header was configured for all authenticated endpoints, including transfers.
 
-MCP endpoints use the app API key as `X-API-Key`:
+## Non-interactive auth
 
-```http
-X-API-Key: hvn_...
-Accept: application/json
+In CI and other non-interactive environments, avoid browser login and pass a key directly:
+
+```bash
+hevn login --api-key hvn_...
+HEVN_API_KEY=hvn_... hevn whoami --yaml
 ```
 
-MCP transfer endpoints also require an app id. It comes from:
-
-1. `HEVN_APP_ID`
-2. saved `app_id` from `hevn login`
+If interactive login is attempted in non-interactive mode, the CLI exits with `AUTH_REQUIRED` and reports the supported auth methods.
 
 ## Idempotency
 
-MCP transfer writes can include:
+Transfer and deposit writes can include:
 
 ```http
 Idempotency-Key: <stable-operation-id>
@@ -78,6 +79,14 @@ hevn transfer contact \
   --contact-id <contact-id> \
   --amount 25 \
   --idempotency-key <stable-operation-id>
+```
+
+## API-key introspection
+
+Use `whoami` to inspect the active API key, owning app, scopes, balance, and remaining spend limit:
+
+```bash
+hevn whoami --yaml
 ```
 
 ## Public mode

@@ -13240,8 +13240,8 @@
           "apps",
           "apps-transfer"
         ],
-        "summary": "Send USDC from app.smartWalletAddress, signed by the api-key EOA. Requires X-Api-Key with scope including 'apps-transfer'.",
-        "description": "Resolve recipient + amount from context, then spend USDC from the\napp's smart wallet via the user's SpendPermission.\n\nMirrors the body of ``POST /mcp/transfer``; the only differences are\nthe auth model (new ``api_keys`` instead of ``mcp_api_keys``) and the\nspender wallet (shared ``app.smart_wallet_address`` instead of per-key).",
+        "summary": "Legacy app-id transfer route",
+        "description": "Resolve recipient + amount from context, then spend USDC from the\napp's smart wallet via the user's SpendPermission.\n\nMirrors the body of ``POST /mcp/transfer``; the only differences are\nthe auth model (new ``api_keys`` instead of ``mcp_api_keys``) and the\nspender wallet (shared ``app.smart_wallet_address`` instead of per-key).\n\nDeprecated for HEVN CLI usage: current CLI calls POST /apps/transfer and the backend resolves the app from the API key.",
         "operationId": "transfer_api_v1_apps__app_id__transfer_post",
         "security": [
           {
@@ -13316,7 +13316,8 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true
       }
     },
     "/api/v1/user/devices": {
@@ -20397,6 +20398,233 @@
           }
         }
       }
+    },
+    "/api/v1/apps/me": {
+      "get": {
+        "tags": [
+          "apps"
+        ],
+        "summary": "Introspect the current API key",
+        "description": "Return the user identity, owning app, granted scopes, balance, and remaining spend limit for the configured API key. Used by `hevn whoami`.",
+        "operationId": "me_api_v1_apps_me_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "X-Api-Key"
+            },
+            "description": "Alternative API key header. Use Authorization Bearer by default, or X-Api-Key when that header mode is configured."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppsMeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/apps/transfer": {
+      "post": {
+        "tags": [
+          "apps",
+          "apps-transfer"
+        ],
+        "summary": "Send USDC from the app resolved by the API key",
+        "description": "Resolve recipient and amount from context, then spend USDC through the app associated with the calling API key. This is the app-id-free transfer route used by the current HEVN CLI.",
+        "operationId": "transfer_api_v1_apps_transfer_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "X-Api-Key"
+            },
+            "description": "Alternative API key header. Use Authorization Bearer by default, or X-Api-Key when that header mode is configured."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppTransferContext"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppTransferResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/apps/transfers": {
+      "get": {
+        "tags": [
+          "apps",
+          "apps-transfer"
+        ],
+        "summary": "List transfers for the app resolved by the API key",
+        "description": "List app-scoped transfers for the app associated with the calling API key. This is the app-id-free transfer history route used by the current HEVN CLI wrapper.",
+        "operationId": "list_transfers_api_v1_apps_transfers_get",
+        "parameters": [
+          {
+            "name": "idempotency_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency Key"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "X-Api-Key"
+            },
+            "description": "Alternative API key header. Use Authorization Bearer by default, or X-Api-Key when that header mode is configured."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/McpTransactionResponse"
+                  },
+                  "title": "Response List Transfers Api V1 Apps Transfers Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -21590,7 +21818,7 @@
         },
         "type": "object",
         "title": "AppTransferContext",
-        "description": "Body of POST /apps/{app_id}/transfer.\n\nExactly one of ``contactId`` / ``quoteId`` / ``invoiceId`` MUST be set\n(mirrors the /mcp/transfer body). ``amount`` is required when\n``contactId`` is the dispatch path; otherwise it's derived from the\nreferenced invoice / quote."
+        "description": "Body of POST /apps/transfer.\n\nExactly one of ``contactId`` / ``quoteId`` / ``invoiceId`` MUST be set\n(mirrors the /mcp/transfer body). ``amount`` is required when\n``contactId`` is the dispatch path; otherwise it's derived from the\nreferenced invoice / quote."
       },
       "AppTransferResponse": {
         "properties": {
@@ -38666,6 +38894,71 @@
         ],
         "title": "ChatResponse",
         "description": "User-facing chat."
+      },
+      "AppsMeResponse": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "balance": {
+            "type": "number",
+            "title": "Balance",
+            "default": 0
+          },
+          "spendLimit": {
+            "type": "number",
+            "title": "Spendlimit",
+            "default": 0
+          },
+          "appId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appid"
+          },
+          "appName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appname"
+          },
+          "scope": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "title": "Scope",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "title": "AppsMeResponse",
+        "description": "Introspection response for the API key used by HEVN CLI whoami. Includes user identity, owning app, scopes, balance, and remaining spend limit."
       }
     },
     "securitySchemes": {
@@ -38673,6 +38966,12 @@
         "type": "http",
         "scheme": "bearer",
         "x-default": "Bearer <token>"
+      },
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-key",
+        "description": "Alternative HEVN API key header. The CLI defaults to Authorization Bearer unless configured with HEVN_API_KEY_HEADER=X-Api-Key."
       }
     }
   },

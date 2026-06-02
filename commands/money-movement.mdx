@@ -1,11 +1,11 @@
 ---
 title: "Money movement"
-description: "Check balances, create deposit quotes, inspect transactions, and send MCP transfers."
+description: "Check balances, create deposit quotes, inspect transactions, and send app-scoped transfers."
 ---
 
 ## Balance
 
-Show MCP wallet balance and remaining allowance:
+Show transfer wallet balance and remaining allowance:
 
 ```bash
 hevn balance
@@ -68,7 +68,7 @@ hevn pending-deposits --bank-id <bank-account-id> --yaml
 hevn transfer --invoice-id <invoice-id> --memo "Invoice payment"
 ```
 
-The command loads invoice details and submits an MCP transfer.
+The command loads invoice details and submits an app-scoped transfer. The backend resolves the owning app from the configured API key; no app id is required.
 
 ## Transfer by email
 

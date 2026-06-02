@@ -1,18 +1,43 @@
 ---
 title: "Agent workflows"
-description: "Guidance for AI agents and scripts that operate HEVN CLI safely."
+description: "Primary operating guide for AI agents and scripts that use HEVN CLI safely."
 ---
 
-HEVN CLI is designed to be usable by humans and automation. Agents should prefer explicit flags, structured output, and confirmation-free commands only when the user's intent is clear.
+HEVN CLI is designed primarily for AI agents and automation, with human terminal output as a convenience layer. Agents should prefer explicit flags, structured output, non-interactive execution, and confirmation-free commands only when the user's intent is clear.
+
+## Discover the CLI contract
+
+Before planning or executing a HEVN workflow, load the packaged agent guide:
+
+```bash
+hevn agent-skill
+```
+
+This command prints the current `CLAUDE.md` operating guide shipped with the CLI. Agents must read it first because it contains workflow-specific instructions that are more detailed than the command manifest.
+
+Then load the machine-readable manifest:
+
+```bash
+hevn --schema
+```
+
+The schema includes commands, global options, auth methods, output envelopes, danger levels, idempotency support, and stable error codes.
 
 ## Use structured output
 
-Prefer YAML or JSON for reads:
+Prefer YAML or JSON for reads and automation. In structured mode, successful output is wrapped in `ok`, `data`, `meta`, and `warnings`; errors include `errorCode`, `errorType`, `error`, and `exitCode`.
 
 ```bash
+hevn --yaml whoami
 hevn profile get --yaml
 hevn contacts list --yaml
 hevn contracts preview --id <contract-id> --yaml
+```
+
+Use `--non-interactive` or `--no-input` when prompts must be forbidden:
+
+```bash
+hevn --non-interactive --yaml contacts list
 ```
 
 ## Read before writing
@@ -61,6 +86,12 @@ hevn transfer contact \
   --amount 25 \
   --idempotency-key <stable-operation-id> \
   --yaml
+```
+
+Use `--dry-run` for mutating commands when you need to inspect the would-be request before sending it:
+
+```bash
+hevn --dry-run transfer --invoice-id <invoice-id> --memo "Invoice payment"
 ```
 
 ## Confirmation flags

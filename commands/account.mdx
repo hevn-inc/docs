@@ -11,6 +11,13 @@ Show the active account:
 hevn account get
 ```
 
+Introspect the active API key, owning app, scopes, balance, and spend limit:
+
+```bash
+hevn whoami
+hevn whoami --yaml
+```
+
 List account state, auth state, balances, and MCP allowance:
 
 ```bash
@@ -57,6 +64,10 @@ hevn account kyc --provider align --status
 ```
 
 The default provider is `swipelux`. Supported provider values are passed through to the HEVN backend.
+
+## KYB
+
+There is no dedicated KYB flow in the CLI today. KYB endpoints are present in the REST OpenAPI schema for direct API integrations, but `hevn` currently exposes profile/KYC commands only.
 
 ## Status
 

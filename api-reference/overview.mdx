@@ -33,8 +33,8 @@ export HEVN_BASE_URL=https://api.hevn.finance/api/v1
 
 | Client | Source | Auth mode | Used for |
 | --- | --- | --- | --- |
-| `AppApi` | `src/hevn_cli/api/app.py` | App API key or legacy bearer token | Account, profile, contacts, invoices, contracts, banks, cards, quotes, transactions |
-| `McpApi` | `src/hevn_cli/api/mcp.py` | App API key as MCP key | MCP balance and transfers |
+| `AppApi` | `src/hevn_cli/api/app.py` | HEVN API key | Account, profile, contacts, invoices, contracts, banks, cards, quotes, transactions |
+| `McpApi` | `src/hevn_cli/api/mcp.py` | Same HEVN API key | Balance, API-key introspection, and app-scoped transfers |
 | `PublicApi` | `src/hevn_cli/api/public.py` | Public | FX rates and public invoices |
 
 ## Request behavior
@@ -42,6 +42,7 @@ export HEVN_BASE_URL=https://api.hevn.finance/api/v1
 All requests:
 
 - send `Accept: application/json`,
+- send the configured API key for authenticated clients,
 - use a 60 second HTTP timeout,
 - send query parameters only when their values are not `None`,
 - parse non-empty responses as JSON,
@@ -49,9 +50,11 @@ All requests:
 
 When `--debug` or `HEVN_DEBUG=1` is enabled, error output can include the generated curl command.
 
+Mutating HTTP methods (`POST`, `PUT`, `PATCH`, `DELETE`) are intercepted by `--dry-run` / `HEVN_DRY_RUN=1` before the network call is made.
+
 ## Common response handling
 
-The CLI does not enforce a shared response schema across endpoints. It passes backend JSON through to command formatters and to `--json` / `--yaml` output.
+The CLI does not enforce a shared backend response schema across endpoints. It passes backend JSON through to command formatters and wraps `--json` / `--yaml` command output in a CLI envelope.
 
 For integration code, use the endpoint-specific objects returned by the backend and treat fields shown in command output as convenience projections rather than exhaustive schemas.
 
