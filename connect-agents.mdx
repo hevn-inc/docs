@@ -1,0 +1,125 @@
+---
+title: "Connect AI coding agents"
+description: "Expose the HEVN CLI to Claude Code, Codex, Cursor, and other MCP agents with a single install command."
+---
+
+HEVN CLI ships a built-in [Model Context Protocol](https://modelcontextprotocol.io)
+server. It exposes every CLI command as an MCP tool, so any MCP-speaking coding
+agent can act on your HEVN account directly — checking balances, creating
+invoices, sending transfers — without bespoke per-agent integrations or pasted
+instructions.
+
+`hevn mcp install` registers that server in every agent it detects on your
+machine, in one command.
+
+## Supported agents
+
+| Agent | Config file |
+| --- | --- |
+| Claude Code | `~/.claude.json` |
+| Claude Desktop | `claude_desktop_config.json` (OS-specific location) |
+| Cursor | `~/.cursor/mcp.json` |
+| Windsurf | `~/.codeium/windsurf/mcp_config.json` |
+| Codex CLI | `~/.codex/config.toml` |
+
+## Install
+
+Authenticate once, then install:
+
+```bash
+hevn login        # the MCP server reuses this credential
+hevn mcp install  # register hevn in every detected agent
+```
+
+Restart the agent and ask it something like "what's my HEVN balance?". A read
+runs immediately; a transfer or delete is flagged so the agent asks you to
+confirm first.
+
+Check what was detected and installed:
+
+```bash
+hevn mcp list
+```
+
+## How it works
+
+- **One adapter, many agents.** Every supported agent speaks MCP, so a single
+  server reaches all of them. The installer knows where each agent stores its
+  config (`mcpServers` JSON for most, a `[mcp_servers.hevn]` table for Codex)
+  and writes the entry in place, preserving everything else.
+- **The agent learns hevn automatically.** The packaged agent guide
+  (`hevn agent-skill`) is served as the MCP server's instructions, and each
+  tool carries the command's schema and help. You don't configure prompts per
+  agent.
+- **Reuses the CLI verbatim.** A tool call shells out to `hevn` with
+  `--json --non-interactive`, so authentication, dry-run previews, idempotency,
+  and the structured `{ok, …}` envelope behave exactly as they do on the
+  command line.
+- **Danger levels drive confirmation.** Each command's danger level becomes an
+  MCP annotation: reads are marked read-only, while `mutate`, `destructive`, and
+  `money` commands are flagged so the host prompts for approval. Transfers
+  remain bounded by your on-chain spend permission regardless of the agent.
+
+## Authentication
+
+By default no API key is written into agent configs. `hevn mcp serve` reads the
+credential saved by `hevn login`, just like every other CLI command, so your key
+stays in one place.
+
+If a tool call comes back with `AUTH_REQUIRED` or `AUTH_INVALID` (no key yet, or
+an expired one), the agent can sign you in itself: it calls the **`login`** tool,
+which opens your browser to HEVN and saves the new credential locally — the
+server runs on your machine, so the browser flow works just like `hevn login`.
+Pass `api_key` to that tool to save an existing `hvn_` key instead of opening a
+browser. There is also a **`logout`** tool to clear the saved credential.
+
+Use `--with-key` to embed the current `HEVN_API_KEY` in each config when you
+need a self-contained setup (for example, a different machine or user):
+
+```bash
+hevn mcp install --with-key
+```
+
+<Warning>
+  `--with-key` writes your API key into each agent's config file in plaintext.
+  Prefer the default (`hevn login`) on shared machines.
+</Warning>
+
+## Targeting and removal
+
+```bash
+hevn mcp install --client cursor          # target one agent (repeatable)
+hevn mcp install --client cursor --client codex
+hevn mcp install --all                    # also write configs for agents not detected
+hevn mcp uninstall                        # remove the hevn server from detected agents
+hevn mcp uninstall --client cursor        # remove from a specific agent
+```
+
+## Manual configuration
+
+`hevn mcp install` is just a convenience over the standard MCP server config. To
+wire an agent up by hand, add an `stdio` server that runs `hevn mcp serve`:
+
+```json
+{
+  "mcpServers": {
+    "hevn": {
+      "command": "hevn",
+      "args": ["mcp", "serve"]
+    }
+  }
+}
+```
+
+For Codex (TOML):
+
+```toml
+[mcp_servers.hevn]
+command = "hevn"
+args = ["mcp", "serve"]
+```
+
+<Note>
+  Use an absolute path to `hevn` (for example `/opt/homebrew/bin/hevn`) if your
+  agent launches with a minimal `PATH`. `hevn mcp install` resolves this for you.
+</Note>

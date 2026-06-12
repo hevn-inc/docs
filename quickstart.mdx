@@ -7,31 +7,39 @@ description: "Install HEVN CLI, authenticate, and run your first account and bal
 
 Before you begin, you need:
 
-- Python 3.11 or newer.
 - An active HEVN account.
-- `pipx` for an isolated end-user install, or Poetry for local development.
+- `pipx` (Python 3.11+) or Homebrew for an isolated end-user install.
 
 ## Install
 
-The recommended end-user install is `pipx`:
+### pipx (recommended)
+
+`pipx` installs the CLI from PyPI into its own isolated environment:
 
 ```bash
 pipx install hevn-cli
 hevn --help
 ```
 
-If the package is not published to PyPI yet, install directly from GitHub:
+Upgrade to the latest published release:
 
 ```bash
-pipx install "git+https://github.com/hevn/hevn-cli.git"
 pipx upgrade hevn-cli
 ```
 
-For local development:
+### Homebrew
+
+On macOS and Linux you can install from the HEVN tap:
 
 ```bash
-poetry install
-poetry run hevn --help
+brew install hevn-inc/tap/hevn-cli
+hevn --help
+```
+
+The tap is the formula source, so the first command both taps and installs. Upgrade with:
+
+```bash
+brew upgrade hevn-cli
 ```
 
 ## Authenticate
