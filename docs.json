@@ -82,12 +82,12 @@
           {
             "group": "Core workflows",
             "pages": [
-              "commands/account",
-              "commands/contacts",
-              "commands/money-movement",
-              "commands/invoices",
-              "commands/contracts",
-              "commands/cards-banks"
+              "cli/commands/account",
+              "cli/commands/contacts",
+              "cli/commands/money-movement",
+              "cli/commands/invoices",
+              "cli/commands/contracts",
+              "cli/commands/cards-banks"
             ]
           },
           {
@@ -156,6 +156,30 @@
     {
       "source": "/development",
       "destination": "/cli/development"
+    },
+    {
+      "source": "/commands/account",
+      "destination": "/cli/commands/account"
+    },
+    {
+      "source": "/commands/contacts",
+      "destination": "/cli/commands/contacts"
+    },
+    {
+      "source": "/commands/money-movement",
+      "destination": "/cli/commands/money-movement"
+    },
+    {
+      "source": "/commands/invoices",
+      "destination": "/cli/commands/invoices"
+    },
+    {
+      "source": "/commands/contracts",
+      "destination": "/cli/commands/contracts"
+    },
+    {
+      "source": "/commands/cards-banks",
+      "destination": "/cli/commands/cards-banks"
     }
   ]
 }
