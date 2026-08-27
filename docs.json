@@ -131,11 +131,5 @@
       "label": "Open app",
       "href": "https://app.gethevn.com"
     }
-  },
-  "redirects": [
-    {
-      "source": "/index",
-      "destination": "/cli"
-    }
-  ]
+  }
 }
