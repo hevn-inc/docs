@@ -32,12 +32,46 @@
   "navigation": {
     "tabs": [
       {
+        "tab": "General",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "general/what-is-hevn",
+              "general/architecture"
+            ]
+          },
+          {
+            "group": "Custody & wallets",
+            "pages": [
+              "general/privy-wallets",
+              "general/smart-wallets",
+              "general/shared-access"
+            ]
+          },
+          {
+            "group": "Money movement",
+            "pages": [
+              "general/deposits-and-payouts",
+              "general/cross-chain"
+            ]
+          },
+          {
+            "group": "Security",
+            "pages": [
+              "general/authentication",
+              "general/security-model"
+            ]
+          }
+        ]
+      },
+      {
         "tab": "CLI",
         "groups": [
           {
             "group": "Get started",
             "pages": [
-              "index",
+              "cli",
               "quickstart",
               "agent-workflows",
               "connect-agents",
@@ -96,5 +130,11 @@
       "label": "Open app",
       "href": "https://app.gethevn.com"
     }
-  }
+  },
+  "redirects": [
+    {
+      "source": "/index",
+      "destination": "/cli"
+    }
+  ]
 }

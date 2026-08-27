@@ -1,0 +1,82 @@
+---
+title: "Architecture"
+description: "How HEVN combines Privy key management, Base smart wallets, and a metadata-only platform API into a non-custodial payment system."
+---
+
+HEVN is built as four independent layers. Each layer has a strictly limited set of powers, and the layers that HEVN operates can never reach the layer where money lives.
+
+```mermaid
+flowchart LR
+    subgraph Identity
+        A["Email / Google account"]
+    end
+    subgraph Keys["Key layer (Privy)"]
+        B["Privy embedded wallet<br/>(EOA, user-controlled)"]
+    end
+    subgraph Funds["Funds layer (Base)"]
+        C["Base Smart Wallet<br/>(ERC-4337, HEVN account)"]
+        D["USDC balance"]
+    end
+    subgraph Platform["Platform layer (HEVN)"]
+        E["HEVN API + JWT<br/>contacts, invoices, bank details"]
+    end
+    A -->|"authenticates"| B
+    B -->|"sole owner"| C
+    C --- D
+    B -.->|"signed message → JWT"| E
+```
+
+## Layer 1 — Identity: email
+
+The root of every HEVN account is the user's email address (or the Google account behind it). There are no seed phrases to write down and no browser extensions to install. If you control the email, you control the account; if you don't, you can't touch it.
+
+## Layer 2 — Keys: Privy embedded wallet
+
+Authentication with that email through [Privy](https://docs.privy.io/wallets/overview/embedded) gives the user a **self-custodial embedded wallet** — an EOA whose private key is split with Shamir's Secret Sharing and reassembled only inside the user's own session, backed by trusted execution environments (TEEs). Neither Privy nor HEVN ever sees the key.
+
+The mapping from email to Privy wallet is deterministic: one email ↔ one wallet. Details in [Key management with Privy](/general/privy-wallets).
+
+## Layer 3 — Funds: Base Smart Wallet
+
+HEVN does not operate on the Privy EOA directly. Instead, each Privy wallet is the **sole owner** of an [ERC-4337 smart contract wallet](https://docs.base.org/base-account/overview/what-is-base-account) on Base. This smart wallet *is* the HEVN account:
+
+- All balances are held here, as USDC on Base.
+- All deposit details (crypto addresses, virtual bank details) resolve to this address.
+- Its address is computed deterministically (via `CREATE2`) from the owner key, so it is known before it is ever deployed onchain.
+
+Why a smart wallet instead of the raw EOA:
+
+1. **Gasless USDC** — an ERC-4337 paymaster sponsors gas, so users transact in USDC without ever holding ETH.
+2. **Multi-user access** — the wallet's `MultiOwnable` contract lets the user grant and revoke additional owners onchain. See [Shared account access](/general/shared-access).
+3. **Deterministic addresses** — counterfactual deployment means send-by-email is safe even for recipients who haven't signed up yet.
+
+Details in [Base smart wallets](/general/smart-wallets).
+
+## Layer 4 — Platform: HEVN API
+
+The user proves control of their Privy wallet by signing a message (standard web3 login). HEVN verifies the signature and issues its own JWT.
+
+<Warning>
+  The HEVN JWT **cannot move money**. It only authorizes platform features: contact books, invoices, contracts, bank detail issuance, KYC, statements, analytics. Spending funds always requires a fresh signature from a wallet owner key.
+</Warning>
+
+Details in [Authentication](/general/authentication).
+
+## The deterministic chain
+
+Every link in `email → Privy wallet → smart wallet` is deterministic. Consequences:
+
+- **Send by email is safe.** HEVN computes the recipient's future smart wallet address from their email and sends funds directly there. No custody, no escrow, no claim step where HEVN holds the money.
+- **Nothing to lose.** The account can always be re-derived from the email identity; there is no state that exists only on one device.
+- **Verifiable.** Anyone can check onchain that a given smart wallet is owned by a given Privy address, and audit every transaction on [Base](https://basescan.org).
+
+## Who can do what
+
+| Action | User (email + Privy) | HEVN platform | Banking partner | 1Click / NEAR Intents |
+| --- | --- | --- | --- | --- |
+| Spend funds from the smart wallet | ✅ (signature required) | ❌ | ❌ | ❌ |
+| Add / remove wallet owners | ✅ (onchain) | ❌ | ❌ | ❌ |
+| Freeze or seize the balance | ❌ nobody can | ❌ | ❌ | ❌ |
+| Create invoices, contacts, bank details | ✅ via JWT | issues on request | — | — |
+| Execute a fiat payout | initiates & funds | orchestrates metadata | receives to one-time address, pays out fiat | — |
+| Swap cross-chain | initiates & funds | requests quote | — | executes via one-time deposit address |

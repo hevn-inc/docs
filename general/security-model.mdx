@@ -1,0 +1,61 @@
+---
+title: "Security model"
+description: "A summary of HEVN's trust boundaries: what each party can do, what happens in failure scenarios, and how to protect your account."
+---
+
+HEVN's security posture follows from one design decision: **the platform never holds keys or funds**. Everything else — the [Privy key layer](/general/privy-wallets), the [Base smart wallet](/general/smart-wallets), [one-time payout addresses](/general/deposits-and-payouts), [1Click passive deposits](/general/cross-chain) — exists to keep that invariant true on every flow.
+
+## Custody matrix
+
+| Asset | Where it lives | Who controls it |
+| --- | --- | --- |
+| Private key | Sharded (Shamir) across the user's session and Privy's TEE infrastructure; never assembled outside a TEE | User only |
+| USDC balance | The user's smart wallet contract on Base | Onchain owners only (the user, plus anyone they [explicitly added](/general/shared-access)) |
+| Bank details, invoices, contacts | HEVN backend | HEVN, scoped by the user's JWT / API keys |
+| Funds in a fiat payout | Banking partner's one-time address, then bank rails | Banking partner, for that payout only |
+| Funds in a cross-chain swap | 1Click settlement layer, per one-time quote | NEAR Intents protocol, for that swap only |
+
+## Failure scenarios
+
+<AccordionGroup>
+  <Accordion title="HEVN is fully compromised or disappears">
+    Funds are unaffected. No HEVN system holds a wallet key or an owner role. An attacker with full control of HEVN's backend could read and tamper with metadata (invoices, contacts, bank detail records) but could not sign a single wallet operation. The wallet itself remains accessible through Privy and standard Base tooling — it is an ordinary onchain smart wallet.
+  </Accordion>
+  <Accordion title="A HEVN JWT or API key leaks">
+    The attacker gets the platform surface for the affected app: reading data, editing metadata, and — if that app was granted transfer scope — acting within that grant until revoked. Revoke the key/app immediately. The wallet key itself is never exposed. See [Authentication](/general/authentication).
+  </Accordion>
+  <Accordion title="Privy has an outage">
+    An outage delays signing (you temporarily can't authorize new operations) but cannot cause loss: funds sit in your onchain wallet, and no one else gains any capability during the outage.
+  </Accordion>
+  <Accordion title="Your email account is compromised">
+    This is the critical scenario. Without wallet MFA, whoever controls your email can complete Privy authentication and unlock the wallet. With [wallet MFA](/general/privy-wallets#wallet-mfa-passkeys-and-otp) enrolled, email access alone is not enough — every key operation also requires your passkey or OTP code. Enable MFA and protect the email account itself — see below.
+  </Accordion>
+  <Accordion title="You lose your device">
+    Nothing is lost. The account is fully re-derivable from your email identity: sign in on any device, complete Privy auth, and your wallet is available. There is no device-only secret and no seed phrase.
+  </Accordion>
+  <Accordion title="A teammate with shared access goes rogue">
+    The blast radius depends on the access mode ([Shared account access](/general/shared-access)). A **full owner** can spend the entire balance — grant that only to people you trust with all of it. A **limited spender** is capped by the onchain spend permission: worst case, they drain the remaining allowance for the current period, nothing more. Either way, remove the owner or revoke the permission onchain; once confirmed, their key is cryptographically inert for this wallet.
+  </Accordion>
+  <Accordion title="A cross-chain swap fails mid-flight">
+    1Click's intent lifecycle includes automatic settlement tracking and refunds; failed or expired intents return funds to the sender. See [Cross-chain deposits & withdrawals](/general/cross-chain).
+  </Accordion>
+</AccordionGroup>
+
+## Protect your email
+
+Your email (or Google account) is the root of your HEVN identity. Recommended baseline:
+
+- Enable **[wallet MFA](/general/privy-wallets#wallet-mfa-passkeys-and-otp)** — a passkey or authenticator-app OTP required for every wallet operation, so a compromised mailbox alone cannot move funds.
+- Enable **2FA** on the mailbox — preferably hardware security keys or passkeys, not SMS.
+- Use a mailbox provider with strong account-recovery hygiene; lock down recovery phone numbers and backup addresses.
+- For business accounts, use a dedicated, access-controlled mailbox rather than a personal one.
+
+## Contract and infrastructure assurances
+
+- The smart wallet contracts are Coinbase's open-source [Smart Wallet](https://github.com/coinbase/smart-wallet) (audit reports in the repository), running unmodified on Base under the canonical [ERC-4337 EntryPoint](https://eips.ethereum.org/EIPS/eip-4337).
+- Key management inherits Privy's security model: Shamir's Secret Sharing plus TEEs with attestation. See [Privy security](https://www.privy.io/security).
+- Every money movement is a public Base transaction, independently verifiable on [Basescan](https://basescan.org) — statements in HEVN are projections of onchain truth, not the source of it.
+
+## Reporting
+
+If you believe you've found a security issue in HEVN, contact the team through [app.gethevn.com](https://app.gethevn.com) or your account manager. Please do not open public issues for vulnerabilities.

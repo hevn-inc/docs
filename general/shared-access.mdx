@@ -1,0 +1,87 @@
+---
+title: "Shared account access"
+description: "Invite other users to manage a balance — with full onchain ownership or a limited spend allowance — grantable and revocable without HEVN in the middle."
+---
+
+A HEVN account owner can invite other users to help manage the balance — for example, a founder adding a finance teammate. This is **not** implemented as a platform-level permission that HEVN enforces off-chain. It is implemented directly at the wallet layer, using two standards built by Coinbase for Base smart wallets.
+
+## Two access modes
+
+| | Full access | Limited access |
+| --- | --- | --- |
+| Standard | [`MultiOwnable`](https://github.com/coinbase/smart-wallet/blob/main/src/MultiOwnable.sol) (Smart Wallet owners) | [Spend Permissions](https://github.com/coinbase/spend-permissions) |
+| What the invitee can do | Anything an owner can: spend the entire balance, manage other owners | Spend **up to an exact allowance** (e.g. 500 USDC per month), nothing else |
+| Enforced by | The wallet contract's owner check | The `SpendPermissionManager` contract, onchain |
+| Typical use | Co-founder, fully trusted partner | Accountant, operations teammate, automation/agent with a budget |
+| Revocation | Remove the owner onchain | Revoke the permission onchain |
+
+## Full access: `MultiOwnable`
+
+Coinbase's Smart Wallet contracts include [`MultiOwnable`](https://github.com/coinbase/smart-wallet/blob/main/src/MultiOwnable.sol), an auth module that maintains a set of owners onchain. Key properties:
+
+- **Owners are stored as `bytes`** — an owner can be a 32-byte-padded Ethereum address *or* a 64-byte secp256r1 (passkey) public key.
+- **Owner management is itself owner-gated.** Adding an owner (`addOwnerAddress` / `addOwnerPublicKey`) or removing one (`removeOwnerAtIndex`) requires a signature from an existing owner.
+- **Every owner's signature is validated by the wallet contract** for each user operation under [ERC-4337](https://eips.ethereum.org/EIPS/eip-4337).
+
+A full owner is a peer: they can spend any amount and manage the owner set. Grant full access only to people you would trust with the entire balance.
+
+See Base's documentation on [Base Account](https://docs.base.org/base-account/overview/what-is-base-account), where multi-owner support is a core feature of every smart wallet.
+
+## Limited access: Spend Permissions
+
+For everything short of full trust, HEVN uses [Spend Permissions](https://docs.base.org/base-account/improve-ux/spend-permissions) — an onchain primitive from Coinbase that lets a wallet owner grant another account the right to spend **a precisely bounded amount**.
+
+A permission is a signed `SpendPermission` struct with explicit constraints:
+
+| Field | Meaning |
+| --- | --- |
+| `account` | The smart wallet the funds come from |
+| `spender` | Who may spend (the invitee's address) |
+| `token` | Which asset (USDC) |
+| `allowance` | Maximum amount per period |
+| `period` | Length of the recurring window (e.g. 30 days) |
+| `start` / `end` | Validity bounds of the permission itself |
+
+How it works onchain:
+
+- The [`SpendPermissionManager`](https://github.com/coinbase/spend-permissions) singleton contract is registered on the wallet and enforces the permission logic: it tracks cumulative usage within each period and rejects anything beyond the allowance.
+- When a new period begins, usage resets to zero — enabling recurring budgets ("this account may spend up to 1,000 USDC per month").
+- The spender **cannot** exceed the allowance, touch other tokens, or change wallet ownership. The constraints are contract-enforced, not policy-enforced.
+- The owner can [revoke](https://docs.base.org/base-account/improve-ux/spend-permissions) the permission onchain at any time, immediately ending the spender's access.
+
+## How HEVN uses it
+
+<Steps>
+  <Step title="Invite">
+    The account owner invites another HEVN user by email and chooses the access mode — full ownership or a spend allowance. Because every HEVN user's Privy address is [deterministic from their email](/general/architecture#the-deterministic-chain), HEVN can resolve the invitee's key immediately.
+  </Step>
+  <Step title="Grant — signed by the user, not HEVN">
+    The account owner signs the grant: an owner-addition operation for full access, or a `SpendPermission` for limited access. HEVN prepares the operation and sponsors its gas, but cannot execute it — only the owner's signature makes it valid.
+  </Step>
+  <Step title="Shared management">
+    The invitee signs operations with their own key through their own email login — unrestricted as an owner, or within the allowance as a permitted spender. No key material is ever shared between users.
+  </Step>
+  <Step title="Revocation — also onchain">
+    The account owner removes an owner with `removeOwnerAtIndex`, or revokes a spend permission via the `SpendPermissionManager`. Once confirmed onchain, the removed key can no longer act on the wallet. Revocation does not depend on HEVN's cooperation or uptime.
+  </Step>
+</Steps>
+
+## Why this design is safe
+
+| Property | Guarantee |
+| --- | --- |
+| No key sharing | Each participant signs with their own Privy key; nobody ever reveals a secret to anyone. |
+| HEVN cannot grant itself access | Both grants require the owner's signature. HEVN holds no owner key and no spend permission. |
+| Limits are contract-enforced | An allowance is checked by the `SpendPermissionManager` on every spend — there is no "trusted middleware" that could be bypassed. |
+| Auditable | The owner set, every spend permission, and their full history are public onchain — verifiable on [Basescan](https://basescan.org). |
+| Cleanly revocable | Removal and revocation are onchain state changes; access ends cryptographically, not by policy. |
+
+<Note>
+  Platform roles (who can see invoices, edit contacts, etc.) are managed separately by the HEVN API under the [platform JWT](/general/authentication). Onchain ownership and spend permissions govern money; platform roles govern metadata. HEVN's app keeps the two in sync when you manage teammates.
+</Note>
+
+## References
+
+- [coinbase/smart-wallet](https://github.com/coinbase/smart-wallet) — `MultiOwnable` source and audits
+- [coinbase/spend-permissions](https://github.com/coinbase/spend-permissions) — `SpendPermissionManager` source and audits
+- [Use Spend Permissions](https://docs.base.org/base-account/improve-ux/spend-permissions) — Base documentation

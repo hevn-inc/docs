@@ -1,0 +1,50 @@
+---
+title: "Authentication"
+description: "Platform login is a web3 signature exchange for a JWT — and that JWT can never move money."
+---
+
+HEVN separates two completely different kinds of authorization:
+
+| | Platform authorization | Money authorization |
+| --- | --- | --- |
+| Credential | HEVN JWT (or `hvn_...` API key for CLI/API) | Signature from a smart wallet owner key |
+| Grants | Contacts, invoices, contracts, bank details, KYC, statements, analytics | Transfers and any onchain state change |
+| Issued by | HEVN backend | User's Privy wallet, per operation |
+| If leaked | Metadata exposure; **funds untouched** | Not applicable — the key is never exposed (see [Privy](/general/privy-wallets)) |
+
+## Platform login flow
+
+HEVN authenticates users the way web3 apps do — by proof of key ownership, not passwords:
+
+<Steps>
+  <Step title="Sign in with Privy">
+    The user authenticates with their email or Google account, unlocking their [Privy embedded wallet](/general/privy-wallets) in the session.
+  </Step>
+  <Step title="Sign a login message">
+    The app asks the Privy wallet to sign a challenge message. Signing a message is free, off-chain, and moves nothing.
+  </Step>
+  <Step title="HEVN verifies the signature">
+    The backend recovers the signer address from the signature and checks it against the expected Privy address for that identity.
+  </Step>
+  <Step title="HEVN issues its own JWT">
+    On success, HEVN issues a short-lived JWT scoped to platform features only.
+  </Step>
+</Steps>
+
+There is no password database to breach and nothing HEVN stores that could be replayed to impersonate a wallet.
+
+## What the JWT can and cannot do
+
+The JWT authorizes the HEVN API surface: creating contacts, issuing and paying *requests* for invoices, generating contracts, requesting bank details, reading balances and statements.
+
+<Warning>
+  The JWT is **not** a spending credential. Even a fully compromised JWT cannot produce a wallet signature, and the wallet contract only accepts operations signed by an [onchain owner](/general/smart-wallets#ownership-verifiable-onchain). Money movement always terminates in a signature from the user's key.
+</Warning>
+
+## API keys (CLI, REST API, agents)
+
+For automation, HEVN issues app-scoped `hvn_...` API keys (see [CLI authentication](/cli#authentication-model) and [REST API authentication](/api-reference/authentication)). An API key authorizes the platform API for a specific app that the account owner explicitly created and approved in the HEVN app during `hevn login`.
+
+Unlike the interactive JWT, an app can also be granted transfer scope — but that grant is made deliberately by the account owner when creating the app, is scoped to that app, and is revocable at any time. API keys are still not wallet keys: revoking the app immediately ends its access, and no key material ever leaves the [Privy layer](/general/privy-wallets).
+
+Treat API keys as secrets: scope one per integration, store them outside your codebase, and rotate them if exposed.
