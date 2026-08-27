@@ -43,7 +43,7 @@ The JWT authorizes the HEVN API surface: creating contacts, issuing and paying *
 
 ## API keys (CLI, REST API, agents)
 
-For automation, HEVN issues app-scoped `hvn_...` API keys (see [CLI authentication](/cli#authentication-model) and [REST API authentication](/api-reference/authentication)). An API key is more than a bearer token — it is a **full EVM-compatible keypair**, and its spending ability is governed onchain, by the same standard as [teammate access](/general/shared-access):
+For automation, HEVN issues app-scoped `hvn_...` API keys (see [CLI authentication](/cli/overview#authentication-model) and [REST API authentication](/api-reference/authentication)). An API key is more than a bearer token — it is a **full EVM-compatible keypair**, and its spending ability is governed onchain, by the same standard as [teammate access](/general/shared-access):
 
 1. **Platform scope.** The key is certified by HEVN for the platform API of one specific app: contacts, invoices, contracts, bank details, statements. This is the same trust level as the JWT.
 2. **Spending scope — optional, granted onchain.** The key's EVM address can be granted a [Spend Permission](/general/shared-access#limited-access-spend-permissions) by the account owner, exactly like a human teammate with limited access. The owner signs a `SpendPermission` naming the key's address as `spender`, with an explicit allowance and period.
