@@ -23,7 +23,7 @@ Privy never stores a complete private key anywhere. Keys are protected with a co
   </Step>
 </Steps>
 
-The result: **neither Privy nor HEVN ever sees the user's key**. HEVN cannot sign on the user's behalf, and a compromise of HEVN's servers would expose no key material at all.
+Under this model, **neither Privy nor HEVN ever sees the user's key**: HEVN cannot sign on the user's behalf, and a compromise of HEVN's servers would expose no key material at all. The key-layer guarantees rest on Privy's TEE infrastructure and attestations — this is a deliberate, explicit trust assumption on Privy as a specialized key-management provider (see their [security page](https://www.privy.io/security)), not on HEVN.
 
 Read more in Privy's own materials:
 
@@ -31,9 +31,17 @@ Read more in Privy's own materials:
 - [How Privy embedded wallets work](https://privy.io/blog/how-privy-embedded-wallets-work)
 - [Privy security](https://www.privy.io/security)
 
+## Exit hatch: key export
+
+The wallet is not locked into HEVN or Privy. At any time, the user can [export the private key](https://docs.privy.io/wallets/wallets/export) through Privy's export flow — the key is assembled on a separate origin, so neither HEVN nor Privy sees it during export — and load it into any standard wallet (MetaMask, Rabby, etc.). Since that key is the owner of the Base smart wallet, the exported key controls the funds with ordinary Ethereum tooling, **with no dependency on HEVN or Privy being online or in business**.
+
+<Warning>
+  Export is an emergency exit, not a security practice. An exported key forfeits every protection this page describes — sharding, TEE isolation, MFA — and becomes a plaintext secret you must guard yourself. For day-to-day resilience, use [MFA](#wallet-mfa-passkeys-and-otp) with multiple factors and a trusted [full-access co-owner](/general/shared-access) instead.
+</Warning>
+
 ## Deterministic: one email, one wallet
 
-The Privy wallet is bound to the user's email identity, and the mapping is stable and deterministic — the same email always resolves to the same wallet. Combined with the deterministic smart-wallet address derived from it, this means HEVN can know the final wallet address of any email **in advance**, which is what makes [sending money by email](/general/architecture#the-deterministic-chain) non-custodial and safe.
+The Privy wallet is bound to the user's email identity, and the mapping is stable and deterministic — the same email always resolves to the same wallet. Wallet activation and email → address resolution run through a dedicated, [change-frozen microservice](/general/architecture#provider-isolation-signed-responses) that signs its responses, so the resolution logic cannot be silently altered by a backend deploy. Combined with the deterministic smart-wallet address derived from it, this means HEVN can know the final wallet address of any email **in advance**, which is what makes [sending money by email](/general/architecture#the-deterministic-chain) non-custodial and safe.
 
 ## Access = email access
 
@@ -42,11 +50,15 @@ The only way to unlock the wallet is to complete Privy authentication as the own
 - **Email OTP** — prove you can read the inbox.
 - **Google OAuth** — prove you control the Google account, if that's how you signed up.
 
-There is no password stored by HEVN that could be leaked, and no seed phrase that could be phished. Conversely, this makes the email account the crown jewel — see [Security model](/general/security-model#protect-your-email) for recommended protections (2FA, hardware keys).
+There is no password stored by HEVN that could be leaked, and no seed phrase that could be phished. The flip side is that account recovery is deliberately impossible for anyone but you: Privy [cannot restore access or change login methods](https://www.privy.io/user-help-center) on request. Link a second login method and, if you trust someone with the account, add them as a [full-access co-owner](/general/shared-access) — see the [loss scenarios](/general/security-model#failure-scenarios). Conversely, this makes the email account the crown jewel — see [Security model](/general/security-model#protect-your-email) for recommended protections (2FA, hardware keys).
 
 ## Wallet MFA: passkeys and OTP
 
 On top of email authentication, Privy supports [multi-factor authentication for the wallet itself](https://docs.privy.io/authentication/user-authentication/mfa/overview). Once a user enrolls, **every action that touches the wallet's private key requires a second factor** — signing messages, sending transactions, exporting the key, and recovering the wallet on a new device.
+
+<Frame caption="Every key operation prompts for the second factor — here, a passkey verified with Face ID / Touch ID">
+  <img src="/images/mfa-passkey-approve.png" alt="HEVN dialog asking to approve an action with a passkey via face or fingerprint" />
+</Frame>
 
 Supported factors:
 
@@ -55,6 +67,12 @@ Supported factors:
 | **Passkeys** (recommended) | Biometric / device-bound verification (Face ID, Touch ID, hardware security key) via WebAuthn | Phishing-resistant, bound to your device, independent of carriers and third-party apps |
 | **Authenticator app (TOTP)** | 6-digit time-based code from Google Authenticator, Authy, 1Password, etc. | Works offline; secret never travels over a network |
 | **SMS** | 6-digit code sent to a registered phone number | Weakest of the three — vulnerable to SIM swapping; prefer passkeys or TOTP |
+
+Factors are enrolled and managed in the app's **Security** settings — passkeys, 2FA methods, and the list of signed-in devices:
+
+<Frame caption="Security settings: enrolled passkeys, additional 2FA methods, and active devices">
+  <img src="/images/security-settings.png" alt="HEVN security settings page with passkeys, two-factor authentication and devices sections" />
+</Frame>
 
 ### Why enable it
 

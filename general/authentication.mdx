@@ -7,10 +7,10 @@ HEVN separates two completely different kinds of authorization:
 
 | | Platform authorization | Money authorization |
 | --- | --- | --- |
-| Credential | HEVN JWT (or `hvn_...` API key for CLI/API) | Signature from a smart wallet owner key |
+| Credential | HEVN JWT | Signature from a wallet owner key, or from an [API key](#api-keys-cli-rest-api-agents) within its onchain spend allowance |
 | Grants | Contacts, invoices, contracts, bank details, KYC, statements, analytics | Transfers and any onchain state change |
-| Issued by | HEVN backend | User's Privy wallet, per operation |
-| If leaked | Metadata exposure; **funds untouched** | Not applicable — the key is never exposed (see [Privy](/general/privy-wallets)) |
+| Issued by | HEVN backend | The signer's own key, per operation |
+| If leaked | Metadata exposure; **funds untouched** | Owner key is never exposed (see [Privy](/general/privy-wallets)); a leaked API key is capped by its onchain allowance and revocable |
 
 ## Platform login flow
 
@@ -43,8 +43,21 @@ The JWT authorizes the HEVN API surface: creating contacts, issuing and paying *
 
 ## API keys (CLI, REST API, agents)
 
-For automation, HEVN issues app-scoped `hvn_...` API keys (see [CLI authentication](/cli#authentication-model) and [REST API authentication](/api-reference/authentication)). An API key authorizes the platform API for a specific app that the account owner explicitly created and approved in the HEVN app during `hevn login`.
+For automation, HEVN issues app-scoped `hvn_...` API keys (see [CLI authentication](/cli#authentication-model) and [REST API authentication](/api-reference/authentication)). An API key is more than a bearer token — it is a **full EVM-compatible keypair**, and its spending ability is governed onchain, by the same standard as [teammate access](/general/shared-access):
 
-Unlike the interactive JWT, an app can also be granted transfer scope — but that grant is made deliberately by the account owner when creating the app, is scoped to that app, and is revocable at any time. API keys are still not wallet keys: revoking the app immediately ends its access, and no key material ever leaves the [Privy layer](/general/privy-wallets).
+1. **Platform scope.** The key is certified by HEVN for the platform API of one specific app: contacts, invoices, contracts, bank details, statements. This is the same trust level as the JWT.
+2. **Spending scope — optional, granted onchain.** The key's EVM address can be granted a [Spend Permission](/general/shared-access#limited-access-spend-permissions) by the account owner, exactly like a human teammate with limited access. The owner signs a `SpendPermission` naming the key's address as `spender`, with an explicit allowance and period.
 
-Treat API keys as secrets: scope one per integration, store them outside your codebase, and rotate them if exposed.
+The consequences of this design:
+
+- **Without a spend permission, an API key cannot move a single cent.** There is no backend code path that spends on the key's behalf; a transfer request is executed as a user operation signed by the API key itself, and the `SpendPermissionManager` contract accepts it only within the granted allowance.
+- **A leaked key is capped and revocable.** The worst case is bounded by the remaining onchain allowance for the current period. The owner revokes the permission onchain (and the platform scope in the app) — after that, the key is inert.
+- **The user's own key is never involved.** No key material leaves the [Privy layer](/general/privy-wallets); the API key is a separate identity with its own, strictly smaller, rights.
+
+Every key's activity is fully observable in the app — spend against its allowance, transaction history, and its access footprint across payments, invoices, contracts, and cards:
+
+<Frame caption="An AI agent operating on an API key: spend tracking, activity heatmap, and its access level — all bounded by the owner-granted permission">
+  <img src="/images/agent-overview.png" alt="Agent dashboard showing total spent, transactions, level of access, activity heatmap and access summary" />
+</Frame>
+
+Treat API keys as secrets: scope one per integration, grant the smallest allowance that works, store keys outside your codebase, and rotate them if exposed.

@@ -60,6 +60,7 @@
             "group": "Security",
             "pages": [
               "general/authentication",
+              "general/trust-assumptions",
               "general/security-model"
             ]
           }

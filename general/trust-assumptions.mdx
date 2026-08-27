@@ -1,0 +1,31 @@
+---
+title: "Trust assumptions"
+description: "Non-custodial does not mean trustless. An honest map of what HEVN relies on, what a failure of each dependency would mean, and how each one is bounded."
+---
+
+Every real system relies on something. Rather than claim HEVN is "trustless", this page lists exactly what the architecture depends on, what happens if each dependency fails, and how each dependency is deliberately kept narrow.
+
+## The map
+
+| Dependency | Relied on for | If it fails | How it's bounded |
+| --- | --- | --- | --- |
+| [Coinbase Smart Wallet contracts](/general/smart-wallets) | Wallet logic: ownership, spend permissions, nonces | A contract bug would affect every Base Account user, not just HEVN | Open-source, audited, canonical deployments — [addresses](/general/smart-wallets#contract-addresses) are verifiable on Basescan |
+| Base network | Settlement of every transaction | Outage delays transactions; funds and state remain onchain | Public L2 with public explorers; nothing HEVN-specific |
+| [Privy](/general/privy-wallets) | Key management; email → key mapping | Outage delays signing; permanent failure → [key export](/general/privy-wallets#exit-hatch-key-export) escape hatch | Shamir + TEE model, attestation; [key export](/general/privy-wallets#exit-hatch-key-export) as the exit hatch |
+| Licensed banking partners | Fiat legs: deposits and payouts | A payout in progress depends on the partner completing the fiat leg | [One-time addresses](/general/deposits-and-payouts) per payout; HEVN never holds the money; no pooled balances |
+| [NEAR Intents / 1Click](/general/cross-chain) | Cross-chain swaps; in-flight settlement | Failed or expired intents follow the refund flow — for withdrawals, back to your HEVN wallet | One-time quote-bound addresses; trust scoped to one swap at a time |
+| [CDP Paymaster](https://docs.cdp.coinbase.com/paymaster/docs/welcome) | Gas sponsorship for gasless USDC | Unavailability delays operations; it can never initiate or alter them | A paymaster only pays fees under ERC-4337 |
+| HEVN platform | Metadata (contacts, invoices, bank details) and the UI you see | Metadata tampering; display is protected by [signed provider responses](/general/architecture#provider-isolation-signed-responses) | No keys, no owner role, no custody — [cannot sign a wallet operation](/general/security-model#failure-scenarios) |
+
+## What HEVN deliberately does NOT rely on
+
+Just as important is what is **absent** from the trust map:
+
+- **No HEVN key can move funds.** Money authorization terminates in a signature from the user's key or an owner-granted, contract-capped [spend permission](/general/shared-access#limited-access-spend-permissions) — never in a backend decision.
+- **No omnibus accounts.** There is no pooled HEVN balance whose solvency you would have to trust; every balance is an individual onchain wallet.
+- **No proprietary contracts.** HEVN deploys Coinbase's audited standard as-is instead of writing its own wallet logic.
+- **No lock-in.** The [exported key](/general/privy-wallets#exit-hatch-key-export) controls the wallet with standard Ethereum tooling, independent of HEVN and Privy.
+
+## Shrinking the map over time
+
+The roadmap reduces the remaining assumptions rather than adding new ones: independent audits of the [provider microservices](/general/architecture#provider-isolation-signed-responses) and moving them into TEEs with attested builds, so their guarantees are verifiable rather than taken on trust.

@@ -73,7 +73,7 @@ Use these flags for scripts, agent tools, CI jobs, and data extraction. In JSON/
 hevn login --api-key hvn_...
 ```
 
-One `hvn_...` API key is used for every authenticated endpoint, including transfers. The default header is `Authorization: Bearer hvn_...`; set `HEVN_API_KEY_HEADER=X-Api-Key` only when your backend deployment requires that header.
+One `hvn_...` API key is used for every authenticated endpoint, including transfers. Each API key is a full EVM keypair whose spending ability is bounded by an onchain spend permission granted by the account owner — see [how API keys work](/general/authentication#api-keys-cli-rest-api-agents). The default header is `Authorization: Bearer hvn_...`; set `HEVN_API_KEY_HEADER=X-Api-Key` only when your backend deployment requires that header.
 
 <Note>
   Transfer commands no longer require an app id. The backend resolves the owning app from the API key.

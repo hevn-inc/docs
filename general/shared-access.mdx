@@ -54,12 +54,20 @@ How it works onchain:
 <Steps>
   <Step title="Invite">
     The account owner invites another HEVN user by email and chooses the access mode — full ownership or a spend allowance. Because every HEVN user's Privy address is [deterministic from their email](/general/architecture#the-deterministic-chain), HEVN can resolve the invitee's key immediately.
+
+    <Frame caption="Inviting an operator with a 500 USDC monthly spending limit — the allowance and period become the onchain SpendPermission">
+      <img src="/images/team-invite-member.png" alt="Invite member dialog with role, operations, spending limit and expiry" />
+    </Frame>
   </Step>
   <Step title="Grant — signed by the user, not HEVN">
     The account owner signs the grant: an owner-addition operation for full access, or a `SpendPermission` for limited access. HEVN prepares the operation and sponsors its gas, but cannot execute it — only the owner's signature makes it valid.
   </Step>
   <Step title="Shared management">
     The invitee signs operations with their own key through their own email login — unrestricted as an owner, or within the allowance as a permitted spender. No key material is ever shared between users.
+
+    <Frame caption="The team view mirrors the onchain state: the operator's remaining allowance, its refresh period, and expiry">
+      <img src="/images/team-manage.png" alt="Team management page showing an owner and an operator with a 500 USDC allowance refreshing in 30 days" />
+    </Frame>
   </Step>
   <Step title="Revocation — also onchain">
     The account owner removes an owner with `removeOwnerAtIndex`, or revokes a spend permission via the `SpendPermissionManager`. Once confirmed onchain, the removed key can no longer act on the wallet. Revocation does not depend on HEVN's cooperation or uptime.

@@ -38,7 +38,7 @@ Sending money to external bank details works in the opposite direction, and agai
     Via the app, CLI, or API you create a payout to a bank beneficiary. This is a platform (JWT / API key) action — it produces a quote, not a money movement.
   </Step>
   <Step title="The banking partner issues a one-time crypto address">
-    The licensed banking partner returns a **single-use deposit address** dedicated to this specific payout.
+    The licensed banking partner returns a **single-use deposit address** dedicated to this specific payout. The address travels through HEVN's isolated [provider microservice](/general/architecture#provider-isolation-signed-responses), which signs it — the client verifies that signature before ever showing you the address.
   </Step>
   <Step title="You send the funds yourself">
     The transfer of USDC from your smart wallet to that address is signed by **your** key. HEVN cannot initiate it, cannot alter the destination, and never takes possession of the funds.
@@ -64,3 +64,4 @@ flowchart LR
 - **Attribution** — a dedicated address maps one deposit to one payout, with no ambiguity about whose money arrived.
 - **No standing honeypot** — there is no long-lived pooled address accumulating user funds.
 - **Auditability** — each leg of the payout is an ordinary, publicly verifiable transaction on [Base](https://basescan.org).
+- **Tamper-evidence** — the address is signed by the isolated provider service and verified by the client, so it cannot be substituted anywhere along the way ([details](/general/architecture#provider-isolation-signed-responses)).

@@ -49,10 +49,10 @@ In both directions the pattern is `crypto → smart wallet → crypto`: the fixe
 ## Why this is safe
 
 - **HEVN does not operate the deposit addresses.** One-time addresses are generated and managed by the 1Click service, not by HEVN. HEVN requests quotes and displays them — it cannot redirect or intercept funds in flight.
-- **Quotes are firm and verifiable.** The destination address and amount are fixed in the quote before any funds move; the destination for deposits is your own smart wallet address, which you can verify.
+- **Quotes are firm.** The destination address and amount are fixed in the quote before any funds move; the destination for deposits is your own smart wallet address, which you can check yourself. The HEVN client additionally validates every displayed deposit address against the 1Click quote it came from.
 - **One-time, single-purpose addresses.** Each address maps to exactly one quote, eliminating misattribution and pooled-fund risk.
 - **Competitive execution.** Pricing comes from market makers competing in an open protocol rather than a single counterparty's desk. See [1Click fee mechanics](https://docs.near-intents.org/near-intents/integration/distribution-channels/1click-app-fees-calculation).
-- **Failure means refund, not loss.** Expired or failed intents follow 1Click's refund flow back to the sender.
+- **Failure means refund, not loss.** Expired or failed intents follow 1Click's refund flow back to the sender — for withdrawals, straight back to your HEVN smart wallet. While an intent is in flight, settlement is the 1Click service's responsibility: this is a deliberate, bounded trust assumption on the provider, scoped to one swap at a time.
 
 <Note>
   As with [fiat payouts](/general/deposits-and-payouts), HEVN's role in a cross-chain swap is metadata only: requesting the quote, showing the address, and tracking status. The funds move directly between your wallets and the 1Click settlement layer.

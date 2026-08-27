@@ -11,7 +11,7 @@ flowchart LR
     B -->|"sole owner"| C["Base Smart Wallet<br/>(your balance lives here)"]
 ```
 
-The user's Privy wallet is the **initial and sole owner** of the smart wallet. Only owner signatures can authorize spending; HEVN holds no owner key.
+The user's Privy wallet is the **initial owner** of the smart wallet — and the only one, unless the user deliberately [adds others](/general/shared-access). Only keys with owner rights or an owner-granted spend allowance can authorize spending; HEVN holds neither.
 
 ## What the smart wallet gives you
 
@@ -52,12 +52,12 @@ The wallet inherits Coinbase's [`MultiOwnable`](https://github.com/coinbase/smar
 
 ## Idempotent transfers: no double-sends
 
-Every action from the wallet is an ERC-4337 *user operation* carrying a **unique nonce**, validated by the canonical `EntryPoint` contract's nonce manager ([ERC-4337, "Semi-abstracted nonce support"](https://eips.ethereum.org/EIPS/eip-4337)). The `EntryPoint` accepts each `(sender, nonce)` pair **exactly once**:
+Every action from the wallet is an ERC-4337 *user operation* carrying a **unique nonce**, validated by the canonical `EntryPoint` contract's nonce manager ([ERC-4337, "Semi-abstracted nonce support"](https://eips.ethereum.org/EIPS/eip-4337)). The `EntryPoint` accepts each `(sender, nonce)` pair **at most once**: once an operation executes, resubmitting it — by accident, by a retrying client, or by a malicious relayer — is rejected at the protocol level.
 
-- Once an operation executes, resubmitting it — by accident, by a retrying client, or by a malicious relayer — is rejected at the protocol level.
-- A signed-but-unexecuted operation cannot be replayed on another chain or against another wallet: the signature commits to the wallet address, chain, and `EntryPoint`.
+HEVN builds on this for money movement. For each payout to a [one-time withdrawal address](/general/deposits-and-payouts#fiat-payouts) — a banking-partner offramp or a [1Click](/general/cross-chain) swap — the client derives the operation's **nonce from that one-time deposit address**. One address, one nonce, one possible execution:
 
-HEVN builds on this guarantee for money movement: each transfer — including every payout to a [one-time withdrawal address](/general/deposits-and-payouts#fiat-payouts) — is exactly one signed user operation. If the app, the CLI, or the network retries a submission, the same operation lands **at most once onchain**. Double-spending a payout is not prevented by HEVN's backend deduplicating requests — it is impossible by construction at the wallet layer.
+- If the app, the CLI, or the network retries a submission, the same operation lands at most once onchain.
+- A second transfer to the same one-time address would need the same nonce — which the `EntryPoint` has already consumed. Double-sending a payout is rejected by the wallet layer itself, not by HEVN's backend deduplicating requests.
 
 <Note>
   The platform API adds its own idempotency keys on top (see the [CLI reference](/api-reference/app-api)), but those protect metadata calls. For funds, the source of truth is the `EntryPoint` nonce check onchain.
@@ -71,7 +71,20 @@ The ownership chain is public and auditable:
 2. The user's Privy address is registered as owner at deployment.
 3. Anyone can verify on [Basescan](https://basescan.org) that no HEVN-controlled key is an owner.
 
-Every state change to the wallet — a transfer, an owner addition, an owner removal — requires a valid signature from a current owner, validated by the wallet contract itself under the ERC-4337 `EntryPoint`. There is no administrative backdoor, upgrade key, or pause switch held by HEVN.
+Every state change to the wallet — a transfer, an owner addition, an owner removal, or a contract upgrade — requires a valid signature from a current owner, validated by the wallet contract itself under the ERC-4337 `EntryPoint`. The wallet is Coinbase's audited standard, deployed as-is: the upgrade mechanism it ships with ([UUPS](https://github.com/coinbase/smart-wallet)) is exercisable **only by the wallet's owners**. HEVN holds no owner key, no upgrade key, no pause switch — the trust anchor for the contract layer is Coinbase's public, audited code, not HEVN.
+
+## Contract addresses
+
+Everything above is verifiable against the live deployment on Base:
+
+| Contract | Address |
+| --- | --- |
+| Coinbase Smart Wallet Factory | [`0x0BA5ED0c6AA8c49038F819E587E2633c4A9F428a`](https://basescan.org/address/0x0BA5ED0c6AA8c49038F819E587E2633c4A9F428a) |
+| ERC-4337 EntryPoint (v0.6) | [`0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789`](https://basescan.org/address/0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789) |
+| SpendPermissionManager | [`0xf85210B21cC50302F477BA56686d2019dC9b67Ad`](https://basescan.org/address/0xf85210B21cC50302F477BA56686d2019dC9b67Ad) |
+| USDC (Base, issued by Circle) | [`0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`](https://basescan.org/address/0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913) |
+
+These are the canonical deployments from [coinbase/smart-wallet](https://github.com/coinbase/smart-wallet) and [coinbase/spend-permissions](https://github.com/coinbase/spend-permissions) — you can compare the verified bytecode on Basescan against the audited source in those repositories. Gas is sponsored through the [Coinbase Developer Platform Paymaster](https://docs.cdp.coinbase.com/paymaster/docs/welcome).
 
 ## References
 
