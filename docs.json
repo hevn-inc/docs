@@ -89,15 +89,6 @@
               "cli/commands/contracts",
               "cli/commands/cards-banks"
             ]
-          },
-          {
-            "group": "Reference",
-            "pages": [
-              "api-reference/app-api",
-              "api-reference/mcp-api",
-              "api-reference/public-api",
-              "cli/development"
-            ]
           }
         ]
       },
@@ -152,10 +143,6 @@
     {
       "source": "/configuration",
       "destination": "/cli/configuration"
-    },
-    {
-      "source": "/development",
-      "destination": "/cli/development"
     },
     {
       "source": "/commands/account",

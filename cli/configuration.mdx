@@ -40,7 +40,7 @@ Built-in environments:
 | --- | --- | --- |
 | `prod` | `https://app.gethevn.com` | `https://api.hevn.finance/api/v1` |
 | `dev` | `https://app-beta.hevn.finance` | `https://dev-api.hevn.finance/api/v1` |
-| `local` | `http://localhost:8081` | Local or configured development API |
+| `local` | `http://localhost:8081` | `http://localhost:8000/api/v1` |
 
 You can also override URLs directly:
 
@@ -60,32 +60,22 @@ hevn login
 This saves:
 
 - `api_key`
-- `api_key_header`
-- `base_url`, when returned by the login callback
+- `base_url`, when provided or returned by the login callback
 
 For automation, either save a key directly:
 
 ```bash
 hevn login --api-key hvn_...
-hevn login --api-key hvn_... --api-key-header X-Api-Key
 hevn login --api-key hvn_... --api-base-url https://api.example.com/api/v1
 ```
 
-or set credentials through environment variables:
+or set credentials through an environment variable:
 
 ```bash
 export HEVN_API_KEY="hvn_..."
-# Optional. Defaults to Authorization.
-export HEVN_API_KEY_HEADER="Authorization"
 ```
 
-`Authorization` mode adds a `Bearer` prefix automatically when the key does not already start with one. Use `X-Api-Key` only when your backend deployment requires that header:
-
-```bash
-export HEVN_API_KEY_HEADER="X-Api-Key"
-```
-
-The CLI no longer uses `HEVN_APP_ID`; transfer endpoints derive the owning app from the API key.
+The key is always sent in the `X-Api-Key` header — see [API authentication](/api-reference/authentication). The CLI does not use `HEVN_APP_ID`; transfer endpoints derive the owning app from the API key.
 
 ## Output formats
 

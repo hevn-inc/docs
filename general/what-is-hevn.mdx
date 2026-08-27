@@ -37,7 +37,7 @@ Your entire account chain is derived deterministically:
 ```mermaid
 flowchart LR
     A["Email"] --> B["Privy embedded wallet"]
-    B -->|"sole owner"| C["Base Smart Wallet<br/>(your HEVN account)"]
+    B -->|"initial owner"| C["Base Smart Wallet<br/>(your HEVN account)"]
 ```
 
 Because each step is deterministic, HEVN can compute the wallet address for any email address **before** the recipient ever signs up. This is what makes sending money by email safe: funds go directly to a smart wallet that only the owner of that email will ever be able to control. There is no escrow step and no custodial holding period.

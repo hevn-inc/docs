@@ -38,7 +38,7 @@ There is no password database to breach and nothing HEVN stores that could be re
 The JWT authorizes the HEVN API surface: creating contacts, issuing and paying *requests* for invoices, generating contracts, requesting bank details, reading balances and statements.
 
 <Warning>
-  The JWT is **not** a spending credential. Even a fully compromised JWT cannot produce a wallet signature, and the wallet contract only accepts operations signed by an [onchain owner](/general/smart-wallets#ownership-verifiable-onchain). Money movement always terminates in a signature from the user's key.
+  The JWT is **not** a spending credential. Even a fully compromised JWT cannot produce a wallet signature, and the wallet contract only accepts operations signed by an [onchain owner](/general/smart-wallets#ownership-verifiable-onchain). Money movement always terminates in a signature from an authorized key — the owner's, a teammate's, or an API key acting within its allowance.
 </Warning>
 
 ## API keys (CLI, REST API, agents)

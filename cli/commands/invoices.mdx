@@ -116,8 +116,14 @@ hevn invoice decline --invoice-id <invoice-id> --yes --yaml
 
 ## Pay an invoice
 
-Invoice payment is handled by the transfer command:
+Actually moving the money is handled by the transfer command:
 
 ```bash
 hevn transfer --invoice-id <invoice-id> --memo "Invoice payment"
+```
+
+Separately, `hevn invoice pay` **marks** an invoice as paid (optionally with a custom transaction reference) without moving funds — use it when the invoice was settled outside HEVN:
+
+```bash
+hevn invoice pay <invoice-id> --reference <tx-reference>
 ```

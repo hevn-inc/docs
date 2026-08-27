@@ -18,7 +18,7 @@ hevn whoami
 hevn whoami --yaml
 ```
 
-List account state, auth state, balances, and MCP allowance:
+List account state, auth state, balances, and the API key's remaining transfer allowance:
 
 ```bash
 hevn account list --yaml
@@ -67,7 +67,19 @@ The default provider is `swipelux`. Supported provider values are passed through
 
 ## KYB
 
-There is no dedicated KYB flow in the CLI today. KYB endpoints are present in the REST OpenAPI schema for direct API integrations, but `hevn` currently exposes profile/KYC commands only.
+Business verification has a full CLI flow:
+
+```bash
+hevn kyb status              # show the KYB graph and what is still missing
+hevn kyb fill                # interactive walkthrough: company, people, documents
+hevn kyb company             # create or update the company entity
+hevn kyb person add          # add an owner/director (list / set / remove also available)
+hevn kyb upload              # upload a document for an entity
+hevn kyb submit              # submit the graph for review
+hevn kyb share user@co.com   # share a KYB link with a teammate
+```
+
+`kyb status` is the entry point: it prints the company entity, people, documents, and the exact fields the submission gate still requires.
 
 ## Status
 

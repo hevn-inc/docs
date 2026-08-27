@@ -8,7 +8,7 @@ The HEVN platform does not operate on the user's Privy EOA directly. Each accoun
 ```mermaid
 flowchart LR
     A["Email"] --> B["Privy embedded wallet"]
-    B -->|"sole owner"| C["Base Smart Wallet<br/>(your balance lives here)"]
+    B -->|"initial owner"| C["Base Smart Wallet<br/>(your balance lives here)"]
 ```
 
 The user's Privy wallet is the **initial owner** of the smart wallet — and the only one, unless the user deliberately [adds others](/general/shared-access). Only keys with owner rights or an owner-granted spend allowance can authorize spending; HEVN holds neither.
@@ -60,7 +60,7 @@ HEVN builds on this for money movement. For each payout to a [one-time withdrawa
 - A second transfer to the same one-time address would need the same nonce — which the `EntryPoint` has already consumed. Double-sending a payout is rejected by the wallet layer itself, not by HEVN's backend deduplicating requests.
 
 <Note>
-  The platform API adds its own idempotency keys on top (see the [CLI reference](/api-reference/app-api)), but those protect metadata calls. For funds, the source of truth is the `EntryPoint` nonce check onchain.
+  The platform API adds its own idempotency keys on top (see [API authentication](/api-reference/authentication#idempotency)), but those protect metadata calls. For funds, the source of truth is the `EntryPoint` nonce check onchain.
 </Note>
 
 ## Ownership, verifiable onchain

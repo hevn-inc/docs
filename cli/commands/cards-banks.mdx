@@ -25,6 +25,21 @@ hevn cards kyc-link
 hevn cards kyc-link --no-qr
 ```
 
+## Manage cards
+
+Create a card, inspect it, and control it day-to-day:
+
+```bash
+hevn cards new
+hevn cards get <card-id>
+hevn cards reveal <card-id>
+hevn cards set-limit <card-id> --amount 500
+hevn cards freeze <card-id>
+hevn cards unfreeze <card-id>
+```
+
+`cards reveal` returns full card details — treat the output as a secret. `cards set-limit`, `freeze`, and `unfreeze` are mutating commands and support `--dry-run`.
+
 The CLI can print a terminal QR code for KYC links unless `--no-qr` is provided.
 
 ## Banks
@@ -44,7 +59,7 @@ hevn banks list --all
 Get details for a rail:
 
 ```bash
-hevn banks details --rail uaefts_named_zand
+hevn banks details --rail <rail-id>
 ```
 
 ## Validate bank details

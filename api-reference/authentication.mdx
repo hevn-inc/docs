@@ -1,30 +1,24 @@
 ---
-title: "Authentication"
-description: "Authentication modes and headers used by HEVN CLI REST calls."
+title: "API authentication"
+description: "The X-Api-Key header, key issuance, idempotency, and the public mode used by HEVN REST calls."
 ---
 
-The CLI uses one HEVN API key for authenticated app and transfer endpoints, plus a public mode for unauthenticated reads.
+All authenticated endpoints take one HEVN app API key (`hvn_...`), sent in the **`X-Api-Key`** header. There is no alternate header mode: `Authorization: Bearer` is reserved for the app's own JWT session flow and is not used by API keys or the CLI.
 
-## HEVN API key mode
-
-Authenticated endpoints build headers from `HEVN_API_KEY` or saved login config.
-
-Default header:
+## API key mode
 
 ```http
-Authorization: Bearer hvn_...
+X-Api-Key: hvn_...
 Accept: application/json
 device-id: hevn-cli
 device-type: cli
 device-name: HEVN CLI
 ```
 
-Set it manually:
+The CLI builds these headers from `HEVN_API_KEY` or saved login config:
 
 ```bash
 export HEVN_API_KEY="hvn_..."
-# Optional. Defaults to Authorization.
-export HEVN_API_KEY_HEADER="Authorization"
 ```
 
 Use browser login:
@@ -37,21 +31,10 @@ or direct API-key login for automation:
 
 ```bash
 hevn login --api-key hvn_...
-hevn login --api-key hvn_... --api-key-header X-Api-Key
+hevn login --api-key hvn_... --api-base-url https://api.example.com/api/v1
 ```
 
-`hevn login` stores the API key, header mode, and optional base URL in the local CLI config.
-
-## Alternate X-Api-Key mode
-
-Some deployments require `X-Api-Key` instead of `Authorization`:
-
-```bash
-export HEVN_API_KEY="hvn_..."
-export HEVN_API_KEY_HEADER="X-Api-Key"
-```
-
-The CLI reuses whichever header was configured for all authenticated endpoints, including transfers.
+`hevn login` stores the API key (and the base URL, when provided or returned by the login callback) in the local CLI config.
 
 ## Non-interactive auth
 
@@ -80,6 +63,8 @@ hevn transfer contact \
   --amount 25 \
   --idempotency-key <stable-operation-id>
 ```
+
+`hevn transfer email` and `hevn transfer contact` generate an idempotency key automatically when you don't pass one; for `hevn transfer --invoice-id`, pass `--idempotency-key` explicitly if you need retry safety.
 
 ## API-key introspection
 

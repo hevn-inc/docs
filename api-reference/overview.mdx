@@ -3,10 +3,7 @@ title: "REST API overview"
 description: "REST endpoints used internally by HEVN CLI."
 ---
 
-This section has two API reference layers:
-
-- **Generated API Reference** is powered by the live HEVN OpenAPI schema from `https://api.hevn.finance/openapi.json` and enables Mintlify's endpoint pages, request examples, and interactive API Playground.
-- **CLI wrapper notes** live in the CLI tab and document the REST endpoints that the current CLI calls through `src/hevn_cli/api/*`.
+The **Generated API Reference** below is a curated subset of the HEVN OpenAPI schema (`https://api.hevn.finance/openapi.json`): endpoint pages, request examples, and an interactive API Playground.
 
 ## Base URL
 
@@ -31,11 +28,10 @@ export HEVN_BASE_URL=https://api.hevn.finance/api/v1
 
 ## API clients
 
-| Client | Source | Auth mode | Used for |
-| --- | --- | --- | --- |
-| `AppApi` | `src/hevn_cli/api/app.py` | HEVN API key | Account, profile, contacts, invoices, contracts, banks, cards, quotes, transactions |
-| `McpApi` | `src/hevn_cli/api/mcp.py` | Same HEVN API key | Balance, API-key introspection, and app-scoped transfers |
-| `PublicApi` | `src/hevn_cli/api/public.py` | Public | FX rates and public invoices |
+| Client | Auth mode | Used for |
+| --- | --- | --- |
+| `AppApi` | HEVN API key (`X-Api-Key`) | Account, profile, contacts, invoices, contracts, banks, cards, KYB, balance, quotes, transfers, transactions |
+| `PublicApi` | Public | FX rates and public invoices |
 
 ## Request behavior
 
