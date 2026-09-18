@@ -1155,26 +1155,6 @@
             "description": "Prefixed client id"
           },
           {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Your own key for this write, `^[A-Za-z0-9._:-]{1,128}$`. A retry with the same key replays the first answer; the same key with a different request is refused.",
-              "examples": [
-                "po-inv-2026-114"
-              ]
-            },
-            "description": "Your own key for this write, `^[A-Za-z0-9._:-]{1,128}$`. A retry with the same key replays the first answer; the same key with a different request is refused."
-          },
-          {
             "name": "X-Hevn-Account",
             "in": "header",
             "required": false,
@@ -1193,6 +1173,26 @@
               ]
             },
             "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Your own key for this write, `^[A-Za-z0-9._:-]{1,128}$`. A retry with the same key replays the first answer; the same key with a different request is refused.",
+              "examples": [
+                "po-inv-2026-114"
+              ]
+            },
+            "description": "Your own key for this write, `^[A-Za-z0-9._:-]{1,128}$`. A retry with the same key replays the first answer; the same key with a different request is refused."
           }
         ],
         "responses": {
