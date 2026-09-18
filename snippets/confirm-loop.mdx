@@ -9,7 +9,7 @@ class ReopenRequired(Exception):
 
 
 def confirm_until_settled(self, confirm_path: str, signature: str, *, deadline=180.0):
-    """A method on Hevn. confirm_path is "/payouts/po_…/confirm" or "/transfers/tr_…/confirm"."""
+    """A method on Hevn. confirm_path is "/payouts/po_…/confirm" or an escrow action's confirm."""
     started, delay = time.monotonic(), 1.0
     while True:
         try:
@@ -36,7 +36,7 @@ const CONFIRM_AGAIN = new Set(["funding_in_progress", "bundler_rejected", "bundl
 
 export class ReopenRequired extends Error {}
 
-// A method on Hevn. confirmPath is "/payouts/po_…/confirm" or "/transfers/tr_…/confirm".
+// A method on Hevn. confirmPath is "/payouts/po_…/confirm" or an escrow action's confirm.
 export async function confirmUntilSettled(confirmPath, signature, { deadline = 180_000 } = {}) {
   const until = Date.now() + deadline;
   let delay = 1_000;
@@ -67,7 +67,7 @@ var confirmAgain = map[string]bool{
 
 var ErrReopenRequired = errors.New("hevn: approval expired, re-open with the same Idempotency-Key")
 
-// confirmPath is "/payouts/po_…/confirm" or "/transfers/tr_…/confirm".
+// confirmPath is "/payouts/po_…/confirm" or an escrow action's confirm.
 func (c *Client) ConfirmUntilSettled(confirmPath, signature string) (Payload, error) {
 	until, delay := time.Now().Add(3*time.Minute), time.Second
 	for {

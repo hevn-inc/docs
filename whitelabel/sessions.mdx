@@ -152,7 +152,7 @@ The header is read exactly where the resource has no owner of its own in the pat
 
 | Routes | The header |
 | --- | --- |
-| `/banks*`, `/payins*`, `/payouts*`, `/transfers*`, `/contacts*`, `/transactions*`, `/documents`, and the `/sandbox` money routes | **Accepted, optional.** Without it the call acts on your account |
+| `/banks*`, `/payins*`, `/payouts*`, `/contacts*`, `/transactions*`, `/documents`, and the `/sandbox` money routes | **Accepted, optional.** Without it the call acts on your account |
 | `/clients/{clientId}` and everything under it — `/kyb`, `/kyb/submit`, `/balance` | **Refused** unless it equals the client id already in the path. The path is the scope |
 | `POST /clients`, `GET /clients` | **Refused.** These are about your own account by definition |
 | `/auth/*` | **Ignored.** A login has no account to act for yet, so the header is neither read nor refused |

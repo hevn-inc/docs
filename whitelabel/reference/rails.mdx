@@ -117,12 +117,9 @@ The bank segment is the partner behind the rail and is not something to branch o
 
 `supportedTokens` on a rail record is what that rail can deliver into the client's wallet.
 
-| `supportedTokens` | What to do |
-| --- | --- |
-| One token | That is what arrives. `settlementToken` echoes it once the rail is open. |
-| `["USDC", "EURC"]` | Choose with `PUT /v1/banks/{rail}/settlement-token`. |
+A rail's token is fixed when the rail is opened, so choosing the token means choosing the rail id: rails that can deliver either token ship as a pair of ids, one per token, with the EURC variant's id ending in `_eurc`. `settlementToken` on the record echoes what the open rail delivers.
 
-Some rails ship as a pair of ids instead, one per token, with the EURC variant's id ending in `_eurc`. Both forms appear in `GET /v1/banks`; which one a rail uses is visible from whether `supportedTokens` has one member or two.
+Per deposit the choice is on the money-in call: `POST /v1/payins` takes a `settlementToken`, and a token no rail of the client's settles into answers `422 payin_not_available` with `details.options[]` listing the pairs that do.
 
 `feeBps` on the rail record is HEVN's deposit fee in basis points for that rail. It is a whole number: `25` is 0.25%.
 

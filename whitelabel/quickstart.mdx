@@ -286,7 +286,7 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
     `userId` login returned in step 1.
   </Step>
 
-  <Step title="Prepare the transfer">
+  <Step title="Prepare the payout">
     `publicKey` says which of your registered keys will sign this payment.
 
     <CodeGroup>
@@ -295,90 +295,91 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
     export HEVN_PUBLIC_KEY=$(openssl ec -in "$HEVN_KEY_PEM" -pubout -outform DER 2>/dev/null \
       | base64 | tr -d '\n')
 
-    curl -X POST "$HEVN_API/transfers" \
+    curl -X POST "$HEVN_API/payouts" \
       -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" -H "X-Hevn-Account: $HEVN_CLIENT_ID" \
-      -H "Idempotency-Key: quickstart-transfer-1" -H "Content-Type: application/json" \
+      -H "Idempotency-Key: quickstart-payout-1" -H "Content-Type: application/json" \
       -d "{\"contactId\":\"$HEVN_CONTACT_ID\",\"amount\":\"5.00\",\"publicKey\":\"$HEVN_PUBLIC_KEY\"}"
     ```
 
     ```python Python
-    transfer = northwind.post("/transfers", {
+    payout = northwind.post("/payouts", {
         "contactId": contact["id"], "amount": "5.00", "publicKey": key.public_key,
-    }, idempotency_key="quickstart-transfer-1")
+    }, idempotency_key="quickstart-payout-1")
     ```
 
     ```javascript Node
-    const transfer = await northwind.post("/transfers", {
+    const payout = await northwind.post("/payouts", {
       contactId: contact.id, amount: "5.00", publicKey: key.publicKey,
-    }, { idempotencyKey: "quickstart-transfer-1" });
+    }, { idempotencyKey: "quickstart-payout-1" });
     ```
 
     ```go Go
-    transfer, err := northwind.Post("/transfers", hevn.Body{
+    payout, err := northwind.Post("/payouts", hevn.Body{
     	"contactId": contact.Str("id"), "amount": "5.00", "publicKey": key.PublicKey,
-    }, hevn.IdempotencyKey("quickstart-transfer-1"))
+    }, hevn.IdempotencyKey("quickstart-payout-1"))
     ```
 
     </CodeGroup>
 
     ```json Response
     {
-      "id": "tr_6d21…",
+      "id": "po_6d21…",
       "kind": "onchain",
       "status": "awaitingSignature",
       "approval": { "id": "…", "payload": "eyJib2R5Ijp…", "expiresAt": "2026-09-17T10:06:10Z" },
       "debit": { "address": "0x8f3bd1c7a0e94f25b6d1c83a5e07f4b219ad6e80", "amount": "5.00",
                  "amountAtomic": "5000000", "token": "USDC", "chainId": 84532 },
       "recipient": { "contactId": "ct_3K9…", "name": "Treasury", "address": "0x8f3bd1c7a0e94f25b6d1c83a5e07f4b219ad6e80" },
-      "idempotencyKey": "quickstart-transfer-1"
+      "idempotencyKey": "quickstart-payout-1"
     }
     ```
 
-    `debit` is what will actually leave the wallet, decoded from the operation you are about to sign —
-    for a transfer its `address` is the recipient. `approval.payload` is the bytes to sign, and it is
-    live for 120 seconds.
+    A contact that is a wallet address makes this an on-chain payout — `kind` says `onchain`, there is
+    no conversion, and `quote` carries no rate and no fee. `debit` is what will actually leave the
+    wallet, decoded from the operation you are about to sign, and for a wallet recipient its
+    `address` is the recipient. `approval.payload` is the bytes to sign, live for 120 seconds.
 
-    `quickstart-transfer-1` names this payment. Re-run this step with the same key and you replay
-    the transfer you already have, at the same price; change the key and you send twice.
+    `quickstart-payout-1` names this payment. Re-run this step with the same key and you replay
+    the payout you already have, at the same price; change the key and you send twice.
   </Step>
 
   <Step title="Check the debit, sign it, confirm">
     Check the terms against what you meant to send, then sign the decoded payload and confirm.
-    Nothing here re-prices anything: `transfer` is the record step 7 returned.
+    Nothing here re-prices anything: `payout` is the record step 7 returned.
 
     <SignPayload />
 
     <CodeGroup>
 
     ```python Python
-    debit, expected = transfer["debit"], own_wallet
+    debit, expected = payout["debit"], own_wallet
     if (debit["amount"], debit["token"], debit["address"].lower()) != ("5.00", "USDC", expected.lower()):
         raise RuntimeError(f"refusing to sign {debit}")
 
-    signature = key.sign_payload(transfer["approval"]["payload"])
-    receipt = northwind.post(f"/transfers/{transfer['id']}/confirm", {"signature": signature})
+    signature = key.sign_payload(payout["approval"]["payload"])
+    receipt = northwind.post(f"/payouts/{payout['id']}/confirm", {"signature": signature})
     ```
 
     ```javascript Node
-    const { amount, token, address } = transfer.debit;
+    const { amount, token, address } = payout.debit;
     const expected = ownWallet.toLowerCase();
     if (amount !== "5.00" || token !== "USDC" || address.toLowerCase() !== expected) {
       throw new Error(`refusing to sign ${amount} ${token} to ${address}`);
     }
 
-    const signature = key.signPayload(transfer.approval.payload);
-    const receipt = await northwind.post(`/transfers/${transfer.id}/confirm`, { signature });
+    const signature = key.signPayload(payout.approval.payload);
+    const receipt = await northwind.post(`/payouts/${payout.id}/confirm`, { signature });
     ```
 
     ```go Go
     expected := strings.ToLower(ownWallet)
-    if transfer.Str("debit.amount") != "5.00" || transfer.Str("debit.token") != "USDC" ||
-    	strings.ToLower(transfer.Str("debit.address")) != expected {
-    	return fmt.Errorf("refusing to sign %v", transfer["debit"])
+    if payout.Str("debit.amount") != "5.00" || payout.Str("debit.token") != "USDC" ||
+    	strings.ToLower(payout.Str("debit.address")) != expected {
+    	return fmt.Errorf("refusing to sign %v", payout["debit"])
     }
 
-    signature, err := key.SignPayload(transfer.Str("approval.payload"))
-    receipt, err := northwind.Post("/transfers/"+transfer.Str("id")+"/confirm",
+    signature, err := key.SignPayload(payout.Str("approval.payload"))
+    receipt, err := northwind.Post("/payouts/"+payout.Str("id")+"/confirm",
     	hevn.Body{"signature": signature})
     ```
 
@@ -414,7 +415,7 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
     </CodeGroup>
 
     A row carries its amounts as two sides — `from` is what left the source, `to` is what arrived —
-    rather than a single `amount`. On this transfer both are `5.000000 USDC`.
+    rather than a single `amount`. On this payout both are `5.000000 USDC`.
 
     The 5 USDC that left in step 8 is there with its `txHash`, and the same 5 USDC are now in your
     own account's balance — read it with the balance call from step 5, pointed at `$HEVN_USER_ID`.
@@ -423,7 +424,7 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
 
 ## What just happened
 
-- **Your key, not a password.** Login was a signature over a payload HEVN built, and the transfer was
+- **Your key, not a password.** Login was a signature over a payload HEVN built, and the payout was
   a second signature over an operation HEVN built. Neither exposes a secret you could leak twice.
   See [Signing](/whitelabel/signing).
 - **The client is a real account.** It has its own wallet, its own ledger and its own legal identity —

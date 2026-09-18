@@ -45,8 +45,7 @@ The key is scoped to `(your account, the operation)`. The same string on two ope
 
 | Route | What the key anchors |
 | --- | --- |
-| `POST /v1/payouts` | the booking and its price. A retry replays; different terms answer `409 idempotency_key_reused` with `details.payoutId`. |
-| `POST /v1/transfers` | the transfer. The key is part of the `tr_` id, so the same key always names the same transfer. |
+| `POST /v1/payouts` | the payment. For a bank recipient it anchors the booking and its price; for a wallet recipient it is part of the `po_` id, so the same key always names the same payment. A retry replays; different terms answer `409 idempotency_key_reused`. |
 | `POST /v1/escrow` | the deal, its resolved windows and its `approve` action. The **raw** key is echoed as `action.idempotencyKey`. |
 | `POST /v1/escrow/{escrowId}/actions` | the action. The raw key is the address in the confirm URL. |
 | `POST /v1/sandbox/deposits`, `/payins/{payinId}/complete`, `/payouts/{payoutId}/status` | the emulated credit or status move. |

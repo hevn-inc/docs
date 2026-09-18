@@ -8,7 +8,7 @@ Seven rules hold for all 48 operations. Read them once and no endpoint will surp
 | Rule | In one line |
 | --- | --- |
 | [Money](#money) | A decimal string in the asset's major unit, never a number |
-| [Ids](#ids) | Prefixed and opaque: `cl_`, `po_`, `tr_`, `pi_`, `txn_`, `ct_`, `bnk_`, `doc_`, `kyb_`, `esc_` |
+| [Ids](#ids) | Prefixed and opaque: `cl_`, `po_`, `pi_`, `txn_`, `ct_`, `bnk_`, `doc_`, `kyb_`, `esc_` |
 | [Casing](#casing) | camelCase everywhere, unknown keys refused, null fields omitted |
 | [`Idempotency-Key`](#idempotency-key) | Accepted on every write, required nowhere |
 | [Pagination](#pagination) | A cursor and a limit; no offset and no total |
@@ -39,11 +39,11 @@ Every id is prefixed, opaque and safe to store as text:
 
 | Prefix | Resource | Prefix | Resource |
 | --- | --- | --- | --- |
-| `cl_` | client (and your own account) | `ct_` | contact |
-| `po_` | payout | `bnk_` | bank record of an open rail |
-| `tr_` | transfer | `doc_` | document |
+| `cl_` | client (and your own account) | `bnk_` | bank record of an open rail |
+| `po_` | payout, over a bank rail or on chain | `doc_` | document |
 | `pi_` | payin | `kyb_` | KYB application |
 | `txn_` | transaction | `esc_` | escrow deal |
+| `ct_` | contact | | |
 
 Do not parse them, derive them or assume a length. An id of the wrong kind in a body or query field
 is `400 invalid_id` with the expected prefix in `details`; in a path it is that resource's own `404`,

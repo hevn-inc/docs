@@ -136,7 +136,6 @@ A `422 validation_failed` names every field that failed, in wire spelling, with 
 | `rail_not_found` | 404 | No such rail id. Copy one from `GET /v1/banks`. |
 | `rail_not_available` | 403 | The rail is not offered to this client. |
 | `rail_requirements_unmet` | 422 | Something the rail needs is missing. `GET /v1/banks/{rail}/requirements` lists it. |
-| `settlement_token_unsupported` | 422 | This rail cannot settle into that token. `supportedTokens` on the rail lists the ones it can. |
 | `phone_required` | 422 | The client has no phone number. `PATCH /v1/clients/{clientId}` with one, then open the rail. |
 | `payin_not_available` | 422 | This client cannot be paid in that currency over that method. `details.options` lists the pairs that work. |
 | `payin_expired` | 410 | The price no longer holds. Quote the payin again. |
@@ -145,14 +144,15 @@ A `422 validation_failed` names every field that failed, in wire spelling, with 
 
 ## Payouts
 
-Booking a payout or a transfer, and the contacts they pay. The refusals that arrive at `confirm` are in [Funding a payment](#funding-a-payment) below.
+Booking a payout — to a bank account or to a wallet — and the contacts it pays. The refusals that arrive at `confirm` are in [Funding a payment](#funding-a-payment) below.
 
 | Slug | Status | What to do |
 | --- | --- | --- |
 | `contact_details_invalid` | 422 | The recipient's requisites or address are incomplete for the method. `details.fields` names them. |
 | `contact_in_use` | 409 | A payout still references this contact. It cannot be deleted. |
 | `recipient_not_payable` | 409 | The recipient cannot be paid on this rail. `details.blockers` is the same array `capabilities` returns. |
-| `recipient_requires_quote` | 409 | This recipient is paid through a payout, not a transfer. |
+| `recipient_chain_unsupported` | 422 | The recipient is on a chain a client balance cannot pay. Only USDC on Base is paid from the balance; `details.chain` echoes what was asked. |
+| `recipient_token_unsupported` | 422 | The recipient expects a token a client balance cannot pay. `details.token` echoes it. |
 | `recipient_details_invalid` | 422 | The partner refused the recipient's details — most often a beneficiary name the bank does not recognise. Correct the contact and book again. |
 | `amount_below_minimum` | 422 | Below the route's minimum. `POST /v1/payouts/preview` reports it as `minAmount`. |
 | `amount_above_maximum` | 422 | Above the route's maximum. |
@@ -165,7 +165,7 @@ Booking a payout or a transfer, and the contacts they pay. The refusals that arr
 
 ## Funding a payment
 
-These arrive at `POST /v1/payouts/{payoutId}/confirm` and `POST /v1/transfers/{transferId}/confirm`; two of them — `quote_not_submitted` and `payout_not_fundable` — also answer the sandbox settlement routes, where they mean the same thing. The decision table for the four that branch is on [Payouts](/whitelabel/payouts#when-a-payout-is-refused).
+These arrive at `POST /v1/payouts/{payoutId}/confirm`; two of them — `quote_not_submitted` and `payout_not_fundable` — also answer the sandbox settlement routes, where they mean the same thing. The decision table for the four that branch is on [Payouts](/whitelabel/payouts#when-a-payout-is-refused).
 
 | Slug | Status | What to do |
 | --- | --- | --- |
@@ -181,8 +181,6 @@ These arrive at `POST /v1/payouts/{payoutId}/confirm` and `POST /v1/transfers/{t
 | `quote_not_fundable` | 409 | The booking is no longer fundable. Request a new one. |
 | `funding_mode_unsupported` | 409 | This route cannot be funded with a developer key. |
 | `funding_token_unsupported` | 409 | Only USDC funds a payout. |
-| `contact_requires_quote` | 409 | A bank contact is paid with `POST /v1/payouts`, not `POST /v1/transfers`. |
-| `direct_transfer_unsupported` | 409 | A transfer is USDC on Base to a crypto contact. Anything else is a payout. |
 | `self_transfer` | 409 | The recipient is the client's own wallet. |
 | `smart_wallet_not_deployed` | 409 | The client's wallet is not on chain yet. Wait for `status: "ready"`. |
 | `wallet_owner_unverified` | 409 | The wallet's owner set does not yet include the signer. Contact support. |

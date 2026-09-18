@@ -50,7 +50,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -60,7 +60,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -157,7 +157,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -167,7 +167,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -258,7 +258,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -268,7 +268,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -373,7 +373,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -383,7 +383,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -459,7 +459,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "$ref": "#/components/schemas/FacadeClientStatus"
+                  "$ref": "#/components/schemas/PartnerClientStatus"
                 },
                 {
                   "type": "null"
@@ -531,7 +531,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -541,7 +541,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -616,7 +616,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -626,7 +626,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -739,7 +739,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -749,7 +749,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -849,7 +849,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -859,7 +859,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -952,7 +952,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/FacadeKybWriteRequest"
+                "$ref": "#/components/schemas/PartnerKybWriteRequest"
               }
             }
           }
@@ -963,7 +963,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeKybWriteResponse"
+                  "$ref": "#/components/schemas/PartnerKybWriteResponse"
                 }
               }
             }
@@ -973,7 +973,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -983,7 +983,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -1086,7 +1086,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeKybResponse"
+                  "$ref": "#/components/schemas/PartnerKybResponse"
                 }
               }
             }
@@ -1096,7 +1096,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -1106,7 +1106,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -1201,7 +1201,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeKybSubmitResponse"
+                  "$ref": "#/components/schemas/PartnerKybSubmitResponse"
                 }
               }
             }
@@ -1211,7 +1211,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -1221,7 +1221,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -1341,7 +1341,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -1351,7 +1351,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -1477,7 +1477,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -1487,7 +1487,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -1590,7 +1590,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -1600,7 +1600,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -1708,7 +1708,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -1718,7 +1718,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -1809,7 +1809,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -1819,7 +1819,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -1902,7 +1902,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -1912,7 +1912,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -1999,7 +1999,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -2009,7 +2009,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -2029,145 +2029,6 @@
           {
             "code": "account_forbidden",
             "status": 403
-          }
-        ]
-      }
-    },
-    "/banks/{rail}/settlement-token": {
-      "put": {
-        "tags": [
-          "Bank accounts"
-        ],
-        "summary": "Choose which token deposits settle in",
-        "operationId": "setRailSettlementToken",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "rail",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "description": "Opaque rail id",
-              "examples": [
-                "wire_named"
-              ]
-            },
-            "description": "Opaque rail id"
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Your own key for this write, `^[A-Za-z0-9._:-]{1,128}$`. A retry with the same key replays the first answer; the same key with a different request is refused.",
-              "examples": [
-                "po-inv-2026-114"
-              ]
-            },
-            "description": "Your own key for this write, `^[A-Za-z0-9._:-]{1,128}$`. A retry with the same key replays the first answer; the same key with a different request is refused."
-          },
-          {
-            "name": "X-Hevn-Account",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself.",
-              "examples": [
-                "cl_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
-              ]
-            },
-            "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SettlementTokenRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RailView"
-                }
-              }
-            }
-          },
-          "4XX": {
-            "description": "The request was refused. Branch on `error.code`.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
-                }
-              }
-            }
-          },
-          "5XX": {
-            "description": "The request failed on our side. Retry with the same `Idempotency-Key`.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "description": "Acts on a client account — the one named in the path, or the one `X-Hevn-Account` selects.",
-        "x-hevn-acting-as": "client",
-        "x-hevn-error-codes": [
-          {
-            "code": "rail_not_found",
-            "status": 404
-          },
-          {
-            "code": "settlement_token_unsupported",
-            "status": 422
-          },
-          {
-            "code": "account_not_found",
-            "status": 404
-          },
-          {
-            "code": "account_forbidden",
-            "status": 403
-          },
-          {
-            "code": "account_read_only",
-            "status": 403
-          },
-          {
-            "code": "idempotency_key_invalid",
-            "status": 400
           }
         ]
       }
@@ -2253,7 +2114,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -2263,7 +2124,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -2405,7 +2266,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -2415,7 +2276,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -2510,7 +2371,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -2520,7 +2381,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -2624,7 +2485,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -2634,13 +2495,13 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
           }
         },
-        "description": "One call quotes, books and prepares. The answer carries `quote` (the terms you may refuse), `approval.payload` (the bytes to sign) and `debit` (what will actually leave the wallet, read out of the operation being signed). Sign the decoded payload with your developer key and call confirm.\n\nActs on a client account — the one named in the path, or the one `X-Hevn-Account` selects.",
+        "description": "One call quotes, books and prepares, for a bank recipient and a wallet recipient alike. The answer carries `quote` (the terms you may refuse — a wallet payout converts nothing, so it carries no rate and no fee), `approval.payload` (the bytes to sign) and `debit` (what will actually leave the wallet, read out of the operation being signed). Sign the decoded payload with your developer key and call confirm.\n\nActs on a client account — the one named in the path, or the one `X-Hevn-Account` selects.",
         "x-hevn-acting-as": "client",
         "x-hevn-error-codes": [
           {
@@ -2652,8 +2513,12 @@
             "status": 409
           },
           {
-            "code": "recipient_requires_quote",
-            "status": 409
+            "code": "recipient_chain_unsupported",
+            "status": 422
+          },
+          {
+            "code": "recipient_token_unsupported",
+            "status": 422
           },
           {
             "code": "recipient_details_invalid",
@@ -2673,6 +2538,10 @@
           },
           {
             "code": "insufficient_funds",
+            "status": 409
+          },
+          {
+            "code": "self_transfer",
             "status": 409
           },
           {
@@ -2792,7 +2661,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -2802,7 +2671,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -2932,7 +2801,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -2942,18 +2811,22 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
           }
         },
-        "description": "Acts on a client account — the one named in the path, or the one `X-Hevn-Account` selects.",
+        "description": "Answers for the whole lifecycle of every payout, over a bank rail or on chain, and is the route `pollUrl` names.\n\nActs on a client account — the one named in the path, or the one `X-Hevn-Account` selects.",
         "x-hevn-acting-as": "client",
         "x-hevn-error-codes": [
           {
             "code": "payout_not_found",
             "status": 404
+          },
+          {
+            "code": "invalid_id",
+            "status": 400
           },
           {
             "code": "account_not_found",
@@ -3026,7 +2899,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -3036,7 +2909,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -3076,308 +2949,6 @@
           {
             "code": "account_forbidden",
             "status": 403
-          }
-        ]
-      }
-    },
-    "/transfers": {
-      "post": {
-        "tags": [
-          "Payouts"
-        ],
-        "summary": "Send USDC on-chain",
-        "operationId": "createTransfer",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "X-Hevn-Account",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself.",
-              "examples": [
-                "cl_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
-              ]
-            },
-            "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Your own key for this write, `^[A-Za-z0-9._:-]{1,128}$`. A retry with the same key replays the first answer; the same key with a different request is refused.",
-              "examples": [
-                "po-inv-2026-114"
-              ]
-            },
-            "description": "Your own key for this write, `^[A-Za-z0-9._:-]{1,128}$`. A retry with the same key replays the first answer; the same key with a different request is refused."
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TransferCreateRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PayoutResponse"
-                }
-              }
-            }
-          },
-          "4XX": {
-            "description": "The request was refused. Branch on `error.code`.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
-                }
-              }
-            }
-          },
-          "5XX": {
-            "description": "The request failed on our side. Retry with the same `Idempotency-Key`.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "description": "The same envelope as a payout, for a recipient that is a wallet address rather than a bank account.\n\nActs on a client account — the one named in the path, or the one `X-Hevn-Account` selects.",
-        "x-hevn-acting-as": "client",
-        "x-hevn-error-codes": [
-          {
-            "code": "contact_not_found",
-            "status": 404
-          },
-          {
-            "code": "recipient_requires_quote",
-            "status": 409
-          },
-          {
-            "code": "direct_transfer_unsupported",
-            "status": 409
-          },
-          {
-            "code": "self_transfer",
-            "status": 409
-          },
-          {
-            "code": "amount_precision_unsupported",
-            "status": 422
-          },
-          {
-            "code": "insufficient_funds",
-            "status": 409
-          },
-          {
-            "code": "invalid_id",
-            "status": 400
-          },
-          {
-            "code": "account_not_found",
-            "status": 404
-          },
-          {
-            "code": "account_forbidden",
-            "status": 403
-          },
-          {
-            "code": "account_read_only",
-            "status": 403
-          },
-          {
-            "code": "idempotency_key_invalid",
-            "status": 400
-          },
-          {
-            "code": "idempotency_key_reused",
-            "status": 409
-          }
-        ]
-      }
-    },
-    "/transfers/{transferId}/confirm": {
-      "post": {
-        "tags": [
-          "Payouts"
-        ],
-        "summary": "Sign the on-chain transfer",
-        "operationId": "confirmTransfer",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "transferId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "X-Hevn-Account",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself.",
-              "examples": [
-                "cl_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
-              ]
-            },
-            "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ConfirmRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PayoutReceiptResponse"
-                }
-              }
-            }
-          },
-          "202": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PayoutReceiptResponse"
-                }
-              }
-            },
-            "description": "Accepted"
-          },
-          "4XX": {
-            "description": "The request was refused. Branch on `error.code`.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
-                }
-              }
-            }
-          },
-          "5XX": {
-            "description": "The request failed on our side. Retry with the same `Idempotency-Key`.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "description": "Acts on a client account — the one named in the path, or the one `X-Hevn-Account` selects.",
-        "x-hevn-acting-as": "client",
-        "x-hevn-error-codes": [
-          {
-            "code": "payout_not_found",
-            "status": 404
-          },
-          {
-            "code": "signature_invalid",
-            "status": 400
-          },
-          {
-            "code": "key_not_registered",
-            "status": 403
-          },
-          {
-            "code": "account_not_controlled",
-            "status": 403
-          },
-          {
-            "code": "funding_attempt_expired",
-            "status": 409
-          },
-          {
-            "code": "funding_attempts_exhausted",
-            "status": 409
-          },
-          {
-            "code": "already_funded",
-            "status": 409
-          },
-          {
-            "code": "approval_expired",
-            "status": 410
-          },
-          {
-            "code": "insufficient_funds",
-            "status": 409
-          },
-          {
-            "code": "bundler_rejected",
-            "status": 502
-          },
-          {
-            "code": "bundler_unavailable",
-            "status": 502
-          },
-          {
-            "code": "user_operation_rejected",
-            "status": 502
-          },
-          {
-            "code": "funding_state_unknown",
-            "status": 409
           }
         ]
       }
@@ -3462,7 +3033,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -3472,7 +3043,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -3579,7 +3150,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -3589,7 +3160,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -3671,7 +3242,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -3681,7 +3252,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -3791,7 +3362,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -3801,7 +3372,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -3913,7 +3484,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -3923,7 +3494,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -4042,7 +3613,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -4052,7 +3623,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -4298,7 +3869,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -4308,7 +3879,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -4530,7 +4101,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -4540,7 +4111,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -4810,7 +4381,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -4820,7 +4391,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -4911,7 +4482,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -4921,7 +4492,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -5035,7 +4606,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -5045,7 +4616,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -5109,7 +4680,7 @@
                 {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/FacadeEscrowStatus"
+                    "$ref": "#/components/schemas/PartnerEscrowStatus"
                   }
                 },
                 {
@@ -5212,7 +4783,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -5222,7 +4793,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -5301,7 +4872,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -5311,7 +4882,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -5434,7 +5005,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -5444,7 +5015,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -5591,7 +5162,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -5601,7 +5172,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -5720,7 +5291,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -5730,7 +5301,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -5804,7 +5375,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -5814,7 +5385,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -5930,7 +5501,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -5940,7 +5511,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -6102,7 +5673,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -6112,7 +5683,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -6256,7 +5827,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -6266,7 +5837,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FacadeErrorResponse"
+                  "$ref": "#/components/schemas/PartnerErrorResponse"
                 }
               }
             }
@@ -6966,7 +6537,7 @@
       "ClientFailureResponse": {
         "properties": {
           "code": {
-            "$ref": "#/components/schemas/FacadeClientFailure"
+            "$ref": "#/components/schemas/PartnerClientFailure"
           },
           "message": {
             "type": "string"
@@ -7019,7 +6590,7 @@
             ]
           },
           "status": {
-            "$ref": "#/components/schemas/FacadeClientStatus"
+            "$ref": "#/components/schemas/PartnerClientStatus"
           },
           "name": {
             "anyOf": [
@@ -7062,7 +6633,7 @@
             ]
           },
           "kybStatus": {
-            "$ref": "#/components/schemas/FacadeKybStatus",
+            "$ref": "#/components/schemas/PartnerKybStatus",
             "default": "notStarted"
           },
           "kybApplicationId": {
@@ -8157,7 +7728,7 @@
             "type": "string"
           },
           "status": {
-            "$ref": "#/components/schemas/FacadeEscrowActionStatus"
+            "$ref": "#/components/schemas/PartnerEscrowActionStatus"
           },
           "amount": {
             "anyOf": [
@@ -8394,7 +7965,7 @@
             "type": "string"
           },
           "status": {
-            "$ref": "#/components/schemas/FacadeEscrowStatus"
+            "$ref": "#/components/schemas/PartnerEscrowStatus"
           },
           "availableActions": {
             "items": {
@@ -8512,1373 +8083,6 @@
           "statement",
           "confirmation",
           "receipt"
-        ]
-      },
-      "FacadeClientFailure": {
-        "type": "string",
-        "enum": [
-          "provisioning_failed",
-          "request_rejected",
-          "request_canceled"
-        ]
-      },
-      "FacadeClientStatus": {
-        "type": "string",
-        "enum": [
-          "provisioning",
-          "ready",
-          "failed"
-        ]
-      },
-      "FacadeErrorBody": {
-        "properties": {
-          "code": {
-            "$ref": "#/components/schemas/FacadeErrorCode"
-          },
-          "message": {
-            "type": "string"
-          },
-          "details": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          }
-        },
-        "required": [
-          "code",
-          "message"
-        ],
-        "type": "object"
-      },
-      "FacadeErrorCode": {
-        "enum": [
-          "invalid_request",
-          "validation_failed",
-          "invalid_cursor",
-          "invalid_id",
-          "idempotency_key_invalid",
-          "idempotency_key_reused",
-          "unauthenticated",
-          "token_expired",
-          "forbidden",
-          "not_found",
-          "method_not_allowed",
-          "conflict",
-          "gone",
-          "payload_too_large",
-          "rate_limited",
-          "provider_unavailable",
-          "database_unavailable",
-          "internal_error",
-          "invalid_credentials",
-          "request_expired",
-          "challenge_not_found",
-          "challenge_consumed",
-          "challenge_expired",
-          "signature_invalid",
-          "key_not_registered",
-          "signer_not_attached",
-          "wallet_not_linked",
-          "approval_consumed",
-          "approval_expired",
-          "approval_mismatch",
-          "signing_policy_refused",
-          "login_unavailable",
-          "login_mode_unavailable",
-          "account_header_invalid",
-          "account_scope_conflict",
-          "account_not_found",
-          "account_forbidden",
-          "account_read_only",
-          "account_not_controlled",
-          "contact_not_found",
-          "quote_not_submitted",
-          "quote_not_fundable",
-          "funding_mode_unsupported",
-          "funding_token_unsupported",
-          "contact_requires_quote",
-          "direct_transfer_unsupported",
-          "self_transfer",
-          "insufficient_funds",
-          "smart_wallet_not_deployed",
-          "wallet_owner_unverified",
-          "already_funded",
-          "funding_in_progress",
-          "funding_attempts_exhausted",
-          "funding_state_unknown",
-          "funding_attempt_expired",
-          "contact_changed",
-          "user_operation_rejected",
-          "user_operation_unavailable",
-          "integrator_inactive",
-          "client_creation_not_enabled",
-          "email_in_use",
-          "name_in_use",
-          "client_request_conflict",
-          "client_not_found",
-          "profile_locked",
-          "recipient_not_payable",
-          "recipient_requires_quote",
-          "recipient_details_invalid",
-          "amount_below_minimum",
-          "amount_above_maximum",
-          "amount_precision_unsupported",
-          "payout_not_found",
-          "payout_not_fundable",
-          "quote_expired",
-          "bundler_rejected",
-          "bundler_unavailable",
-          "contact_details_invalid",
-          "contact_in_use",
-          "kyb_incomplete",
-          "kyb_roster_conflict",
-          "kyb_subject_conflict",
-          "document_fields_missing",
-          "document_not_found",
-          "document_type_unsupported",
-          "invalid_enum_value",
-          "entity_not_found",
-          "escrow_not_found",
-          "escrow_action_not_found",
-          "escrow_not_operated_by_you",
-          "escrow_state_changed",
-          "action_in_flight",
-          "simulation_failed",
-          "stale_nonce",
-          "amount_out_of_range",
-          "amount_not_allowed",
-          "window_closed",
-          "token_not_supported",
-          "receiver_not_a_client",
-          "rail_not_found",
-          "rail_not_available",
-          "rail_requirements_unmet",
-          "settlement_token_unsupported",
-          "phone_required",
-          "payin_not_available",
-          "payin_expired",
-          "payin_not_found",
-          "transaction_not_found"
-        ],
-        "type": "string"
-      },
-      "FacadeErrorResponse": {
-        "properties": {
-          "error": {
-            "$ref": "#/components/schemas/FacadeErrorBody"
-          }
-        },
-        "required": [
-          "error"
-        ],
-        "type": "object"
-      },
-      "FacadeEscrowActionStatus": {
-        "type": "string",
-        "enum": [
-          "awaitingSignature",
-          "signing",
-          "submitted",
-          "confirmed",
-          "reverted",
-          "failed",
-          "superseded",
-          "dropped"
-        ]
-      },
-      "FacadeEscrowStatus": {
-        "type": "string",
-        "enum": [
-          "draft",
-          "authorized",
-          "charged",
-          "partiallyCaptured",
-          "captured",
-          "voided",
-          "reclaimed",
-          "partiallyRefunded",
-          "refunded"
-        ]
-      },
-      "FacadeKybAddress": {
-        "properties": {
-          "streetAddress": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 200,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "addressLine2": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 200,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "city": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 200,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "state": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 200,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "zip": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 200,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "country": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/CountryCode"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "additionalProperties": false,
-        "type": "object"
-      },
-      "FacadeKybAddressView": {
-        "properties": {
-          "streetAddress": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "addressLine2": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "city": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "state": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "zip": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "country": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "type": "object"
-      },
-      "FacadeKybApplicationResponse": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "pattern": "^(?:kyb_)?[A-Za-z0-9._:\\-]{1,216}$",
-            "examples": [
-              "kyb_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
-            ]
-          },
-          "attemptNo": {
-            "type": "integer"
-          },
-          "status": {
-            "$ref": "#/components/schemas/FacadeKybStatus"
-          },
-          "comment": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "submittedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "decidedAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "attemptNo",
-          "status",
-          "submittedAt"
-        ]
-      },
-      "FacadeKybCompany": {
-        "properties": {
-          "legalName": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 200,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "tradeName": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 200,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "country": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/CountryCode"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "registrationNumber": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 200,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "taxId": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 200,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "phone": {
-            "anyOf": [
-              {
-                "type": "string",
-                "pattern": "^\\+[1-9]\\d{6,14}$"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "email": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 200,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "address": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/FacadeKybAddress"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "entityType": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/FiatEntityType"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "incorporationDate": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "websites": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string",
-                  "maxLength": 200,
-                  "minLength": 1
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "expectedMonthlyVolumeUsd": {
-            "anyOf": [
-              {
-                "anyOf": [
-                  {
-                    "type": "number"
-                  },
-                  {
-                    "type": "string",
-                    "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
-                  }
-                ],
-                "type": "string",
-                "example": "500.00",
-                "ge": 0
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "businessDescription": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 4000,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "businessType": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/FiatBusinessType"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "businessIndustry": {
-            "anyOf": [
-              {
-                "type": "string",
-                "pattern": "^\\d{6}$"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "verifierRole": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/FiatVerifierRole"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "sourceOfFunds": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/FiatSourceOfFunds"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "purposeOfFunds": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/FiatPurposeOfFunds"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "flowOfFunds": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 4000,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "additionalProperties": false,
-        "type": "object"
-      },
-      "FacadeKybCompanyView": {
-        "properties": {
-          "legalName": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "tradeName": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "country": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "registrationNumber": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "taxId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "phone": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "email": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "address": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/FacadeKybAddressView"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "entityType": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "incorporationDate": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "websites": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "expectedMonthlyVolumeUsd": {
-            "anyOf": [
-              {
-                "type": "string",
-                "example": "500.00"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "businessDescription": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "businessType": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "businessIndustry": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "verifierRole": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "sourceOfFunds": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "purposeOfFunds": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "flowOfFunds": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "type": "object"
-      },
-      "FacadeKybDocument": {
-        "properties": {
-          "slot": {
-            "$ref": "#/components/schemas/DocumentType"
-          },
-          "uploadId": {
-            "type": "string",
-            "pattern": "^(?:doc_)?[A-Za-z0-9._:\\-]{1,216}$",
-            "examples": [
-              "doc_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
-            ]
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "slot",
-          "uploadId"
-        ]
-      },
-      "FacadeKybDocumentBody": {
-        "properties": {
-          "company": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/FacadeKybCompanyView"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "people": {
-            "items": {
-              "$ref": "#/components/schemas/FacadeKybPersonView"
-            },
-            "type": "array"
-          },
-          "documents": {
-            "items": {
-              "$ref": "#/components/schemas/FacadeKybDocumentView"
-            },
-            "type": "array"
-          }
-        },
-        "type": "object"
-      },
-      "FacadeKybDocumentView": {
-        "properties": {
-          "slot": {
-            "$ref": "#/components/schemas/DocumentType"
-          },
-          "uploadId": {
-            "type": "string",
-            "pattern": "^(?:doc_)?[A-Za-z0-9._:\\-]{1,216}$",
-            "examples": [
-              "doc_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
-            ]
-          }
-        },
-        "type": "object",
-        "required": [
-          "slot",
-          "uploadId"
-        ]
-      },
-      "FacadeKybPerson": {
-        "properties": {
-          "key": {
-            "anyOf": [
-              {
-                "type": "string",
-                "pattern": "^[A-Za-z0-9._:\\-]{1,64}$"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "firstName": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 200,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "middleName": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 200,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "lastName": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 200,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "dateOfBirth": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "email": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 200,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "phone": {
-            "anyOf": [
-              {
-                "type": "string",
-                "pattern": "^\\+[1-9]\\d{6,14}$"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "address": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/FacadeKybAddress"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "taxIdCountry": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/CountryCode"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "taxId": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 200,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "ownershipPercentage": {
-            "anyOf": [
-              {
-                "type": "number",
-                "maximum": 100.0,
-                "exclusiveMinimum": 0.0
-              },
-              {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "hasControl": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "isDirector": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "isSigner": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "documents": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/FacadeKybDocument"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "additionalProperties": false,
-        "type": "object"
-      },
-      "FacadeKybPersonRef": {
-        "properties": {
-          "key": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id"
-        ]
-      },
-      "FacadeKybPersonView": {
-        "properties": {
-          "key": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "firstName": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "middleName": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "lastName": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "dateOfBirth": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "email": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "phone": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "address": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/FacadeKybAddressView"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "taxIdCountry": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "taxId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "ownershipPercentage": {
-            "anyOf": [
-              {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "hasControl": {
-            "type": "boolean",
-            "default": false
-          },
-          "isDirector": {
-            "type": "boolean",
-            "default": false
-          },
-          "isSigner": {
-            "type": "boolean",
-            "default": false
-          },
-          "documents": {
-            "items": {
-              "$ref": "#/components/schemas/FacadeKybDocumentView"
-            },
-            "type": "array"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id"
-        ]
-      },
-      "FacadeKybResponse": {
-        "properties": {
-          "ready": {
-            "type": "boolean"
-          },
-          "missing": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "status": {
-            "$ref": "#/components/schemas/FacadeKybStatus",
-            "default": "notStarted"
-          },
-          "application": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/FacadeKybApplicationResponse"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "document": {
-            "$ref": "#/components/schemas/FacadeKybDocumentBody"
-          }
-        },
-        "type": "object",
-        "required": [
-          "ready"
-        ]
-      },
-      "FacadeKybStatus": {
-        "type": "string",
-        "enum": [
-          "notStarted",
-          "pending",
-          "approved",
-          "rfi",
-          "rejected"
-        ]
-      },
-      "FacadeKybSubmitResponse": {
-        "properties": {
-          "applicationId": {
-            "type": "string",
-            "pattern": "^(?:kyb_)?[A-Za-z0-9._:\\-]{1,216}$",
-            "examples": [
-              "kyb_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
-            ]
-          },
-          "status": {
-            "$ref": "#/components/schemas/FacadeKybStatus"
-          },
-          "attemptNo": {
-            "type": "integer"
-          },
-          "pollUrl": {
-            "type": "string"
-          }
-        },
-        "type": "object",
-        "required": [
-          "applicationId",
-          "status",
-          "attemptNo",
-          "pollUrl"
-        ]
-      },
-      "FacadeKybWriteRequest": {
-        "properties": {
-          "company": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/FacadeKybCompany"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "people": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/FacadeKybPerson"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "documents": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/FacadeKybDocument"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "additionalProperties": false,
-        "type": "object"
-      },
-      "FacadeKybWriteResponse": {
-        "properties": {
-          "ready": {
-            "type": "boolean"
-          },
-          "missing": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "people": {
-            "items": {
-              "$ref": "#/components/schemas/FacadeKybPersonRef"
-            },
-            "type": "array"
-          }
-        },
-        "type": "object",
-        "required": [
-          "ready"
         ]
       },
       "FiatBusinessType": {
@@ -10191,6 +8395,1373 @@
         "type": "object",
         "required": [
           "items"
+        ]
+      },
+      "PartnerClientFailure": {
+        "type": "string",
+        "enum": [
+          "provisioning_failed",
+          "request_rejected",
+          "request_canceled"
+        ]
+      },
+      "PartnerClientStatus": {
+        "type": "string",
+        "enum": [
+          "provisioning",
+          "ready",
+          "failed"
+        ]
+      },
+      "PartnerErrorBody": {
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/PartnerErrorCode"
+          },
+          "message": {
+            "type": "string"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "type": "object"
+      },
+      "PartnerErrorCode": {
+        "enum": [
+          "invalid_request",
+          "validation_failed",
+          "invalid_cursor",
+          "invalid_id",
+          "idempotency_key_invalid",
+          "idempotency_key_reused",
+          "unauthenticated",
+          "token_expired",
+          "forbidden",
+          "not_found",
+          "method_not_allowed",
+          "conflict",
+          "gone",
+          "payload_too_large",
+          "rate_limited",
+          "provider_unavailable",
+          "database_unavailable",
+          "internal_error",
+          "invalid_credentials",
+          "request_expired",
+          "challenge_not_found",
+          "challenge_consumed",
+          "challenge_expired",
+          "signature_invalid",
+          "key_not_registered",
+          "signer_not_attached",
+          "wallet_not_linked",
+          "approval_consumed",
+          "approval_expired",
+          "approval_mismatch",
+          "signing_policy_refused",
+          "login_unavailable",
+          "login_mode_unavailable",
+          "account_header_invalid",
+          "account_scope_conflict",
+          "account_not_found",
+          "account_forbidden",
+          "account_read_only",
+          "account_not_controlled",
+          "contact_not_found",
+          "quote_not_submitted",
+          "quote_not_fundable",
+          "funding_mode_unsupported",
+          "funding_token_unsupported",
+          "contact_requires_quote",
+          "direct_transfer_unsupported",
+          "self_transfer",
+          "insufficient_funds",
+          "smart_wallet_not_deployed",
+          "wallet_owner_unverified",
+          "already_funded",
+          "funding_in_progress",
+          "funding_attempts_exhausted",
+          "funding_state_unknown",
+          "funding_attempt_expired",
+          "contact_changed",
+          "user_operation_rejected",
+          "user_operation_unavailable",
+          "integrator_inactive",
+          "client_creation_not_enabled",
+          "email_in_use",
+          "name_in_use",
+          "client_request_conflict",
+          "client_not_found",
+          "profile_locked",
+          "recipient_not_payable",
+          "recipient_chain_unsupported",
+          "recipient_token_unsupported",
+          "recipient_details_invalid",
+          "amount_below_minimum",
+          "amount_above_maximum",
+          "amount_precision_unsupported",
+          "payout_not_found",
+          "payout_not_fundable",
+          "quote_expired",
+          "bundler_rejected",
+          "bundler_unavailable",
+          "contact_details_invalid",
+          "contact_in_use",
+          "kyb_incomplete",
+          "kyb_roster_conflict",
+          "kyb_subject_conflict",
+          "document_fields_missing",
+          "document_not_found",
+          "document_type_unsupported",
+          "invalid_enum_value",
+          "entity_not_found",
+          "escrow_not_found",
+          "escrow_action_not_found",
+          "escrow_not_operated_by_you",
+          "escrow_state_changed",
+          "action_in_flight",
+          "simulation_failed",
+          "stale_nonce",
+          "amount_out_of_range",
+          "amount_not_allowed",
+          "window_closed",
+          "token_not_supported",
+          "receiver_not_a_client",
+          "rail_not_found",
+          "rail_not_available",
+          "rail_requirements_unmet",
+          "phone_required",
+          "payin_not_available",
+          "payin_expired",
+          "payin_not_found",
+          "transaction_not_found"
+        ],
+        "type": "string"
+      },
+      "PartnerErrorResponse": {
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/PartnerErrorBody"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "type": "object"
+      },
+      "PartnerEscrowActionStatus": {
+        "type": "string",
+        "enum": [
+          "awaitingSignature",
+          "signing",
+          "submitted",
+          "confirmed",
+          "reverted",
+          "failed",
+          "superseded",
+          "dropped"
+        ]
+      },
+      "PartnerEscrowStatus": {
+        "type": "string",
+        "enum": [
+          "draft",
+          "authorized",
+          "charged",
+          "partiallyCaptured",
+          "captured",
+          "voided",
+          "reclaimed",
+          "partiallyRefunded",
+          "refunded"
+        ]
+      },
+      "PartnerKybAddress": {
+        "properties": {
+          "streetAddress": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "addressLine2": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "zip": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "country": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CountryCode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object"
+      },
+      "PartnerKybAddressView": {
+        "properties": {
+          "streetAddress": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "addressLine2": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "zip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "PartnerKybApplicationResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^(?:kyb_)?[A-Za-z0-9._:\\-]{1,216}$",
+            "examples": [
+              "kyb_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+            ]
+          },
+          "attemptNo": {
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PartnerKybStatus"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "decidedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "attemptNo",
+          "status",
+          "submittedAt"
+        ]
+      },
+      "PartnerKybCompany": {
+        "properties": {
+          "legalName": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tradeName": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "country": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CountryCode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "registrationNumber": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "taxId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\+[1-9]\\d{6,14}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "address": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PartnerKybAddress"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "entityType": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FiatEntityType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "incorporationDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "websites": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "maxLength": 200,
+                  "minLength": 1
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expectedMonthlyVolumeUsd": {
+            "anyOf": [
+              {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                  }
+                ],
+                "type": "string",
+                "example": "500.00",
+                "ge": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "businessDescription": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "businessType": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FiatBusinessType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "businessIndustry": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{6}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "verifierRole": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FiatVerifierRole"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sourceOfFunds": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FiatSourceOfFunds"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "purposeOfFunds": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FiatPurposeOfFunds"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "flowOfFunds": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object"
+      },
+      "PartnerKybCompanyView": {
+        "properties": {
+          "legalName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tradeName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "registrationNumber": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "taxId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "address": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PartnerKybAddressView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "entityType": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "incorporationDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "websites": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expectedMonthlyVolumeUsd": {
+            "anyOf": [
+              {
+                "type": "string",
+                "example": "500.00"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "businessDescription": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "businessType": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "businessIndustry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "verifierRole": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sourceOfFunds": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "purposeOfFunds": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "flowOfFunds": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "PartnerKybDocument": {
+        "properties": {
+          "slot": {
+            "$ref": "#/components/schemas/DocumentType"
+          },
+          "uploadId": {
+            "type": "string",
+            "pattern": "^(?:doc_)?[A-Za-z0-9._:\\-]{1,216}$",
+            "examples": [
+              "doc_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "slot",
+          "uploadId"
+        ]
+      },
+      "PartnerKybDocumentBody": {
+        "properties": {
+          "company": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PartnerKybCompanyView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "people": {
+            "items": {
+              "$ref": "#/components/schemas/PartnerKybPersonView"
+            },
+            "type": "array"
+          },
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/PartnerKybDocumentView"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "PartnerKybDocumentView": {
+        "properties": {
+          "slot": {
+            "$ref": "#/components/schemas/DocumentType"
+          },
+          "uploadId": {
+            "type": "string",
+            "pattern": "^(?:doc_)?[A-Za-z0-9._:\\-]{1,216}$",
+            "examples": [
+              "doc_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "slot",
+          "uploadId"
+        ]
+      },
+      "PartnerKybPerson": {
+        "properties": {
+          "key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._:\\-]{1,64}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "firstName": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "middleName": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastName": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dateOfBirth": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\+[1-9]\\d{6,14}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "address": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PartnerKybAddress"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "taxIdCountry": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CountryCode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "taxId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ownershipPercentage": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "hasControl": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "isDirector": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "isSigner": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "documents": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PartnerKybDocument"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object"
+      },
+      "PartnerKybPersonRef": {
+        "properties": {
+          "key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ]
+      },
+      "PartnerKybPersonView": {
+        "properties": {
+          "key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "firstName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "middleName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dateOfBirth": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "address": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PartnerKybAddressView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "taxIdCountry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "taxId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ownershipPercentage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "hasControl": {
+            "type": "boolean",
+            "default": false
+          },
+          "isDirector": {
+            "type": "boolean",
+            "default": false
+          },
+          "isSigner": {
+            "type": "boolean",
+            "default": false
+          },
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/PartnerKybDocumentView"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ]
+      },
+      "PartnerKybResponse": {
+        "properties": {
+          "ready": {
+            "type": "boolean"
+          },
+          "missing": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PartnerKybStatus",
+            "default": "notStarted"
+          },
+          "application": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PartnerKybApplicationResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "document": {
+            "$ref": "#/components/schemas/PartnerKybDocumentBody"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ready"
+        ]
+      },
+      "PartnerKybStatus": {
+        "type": "string",
+        "enum": [
+          "notStarted",
+          "pending",
+          "approved",
+          "rfi",
+          "rejected"
+        ]
+      },
+      "PartnerKybSubmitResponse": {
+        "properties": {
+          "applicationId": {
+            "type": "string",
+            "pattern": "^(?:kyb_)?[A-Za-z0-9._:\\-]{1,216}$",
+            "examples": [
+              "kyb_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/PartnerKybStatus"
+          },
+          "attemptNo": {
+            "type": "integer"
+          },
+          "pollUrl": {
+            "type": "string"
+          }
+        },
+        "type": "object",
+        "required": [
+          "applicationId",
+          "status",
+          "attemptNo",
+          "pollUrl"
+        ]
+      },
+      "PartnerKybWriteRequest": {
+        "properties": {
+          "company": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PartnerKybCompany"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "people": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PartnerKybPerson"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "documents": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PartnerKybDocument"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object"
+      },
+      "PartnerKybWriteResponse": {
+        "properties": {
+          "ready": {
+            "type": "boolean"
+          },
+          "missing": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "people": {
+            "items": {
+              "$ref": "#/components/schemas/PartnerKybPersonRef"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ready"
         ]
       },
       "PayinCreateRequest": {
@@ -11282,7 +10853,7 @@
             "$ref": "#/components/schemas/RailRequiresView"
           },
           "kybStatus": {
-            "$ref": "#/components/schemas/FacadeKybStatus"
+            "$ref": "#/components/schemas/PartnerKybStatus"
           },
           "kycStatus": {
             "$ref": "#/components/schemas/RailKycStatus"
@@ -12382,18 +11953,6 @@
           "userId"
         ]
       },
-      "SettlementTokenRequest": {
-        "properties": {
-          "token": {
-            "$ref": "#/components/schemas/DepositToken"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "token"
-        ]
-      },
       "TokenBalanceView": {
         "properties": {
           "token": {
@@ -12800,42 +12359,6 @@
           "status",
           "isIncome",
           "createdAt"
-        ]
-      },
-      "TransferCreateRequest": {
-        "properties": {
-          "contactId": {
-            "type": "string",
-            "pattern": "^(?:ct_)?[A-Za-z0-9._:\\-]{1,216}$",
-            "examples": [
-              "ct_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
-            ]
-          },
-          "amount": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
-              }
-            ],
-            "type": "string",
-            "example": "500.00"
-          },
-          "publicKey": {
-            "type": "string",
-            "maxLength": 512,
-            "minLength": 1
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "contactId",
-          "amount",
-          "publicKey"
         ]
       },
       "UserAddress": {

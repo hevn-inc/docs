@@ -8,7 +8,7 @@ same terms again at confirm — your job is to check the echo and sign, not to a
 
 <Steps>
   <Step title="Prepare" icon="file-text">
-    You call the opening route — `POST /v1/payouts`, `POST /v1/transfers`,
+    You call the opening route — `POST /v1/payouts` or
     `POST /v1/escrow/{escrowId}/actions`. HEVN prices the payment, books it, builds the on-chain
     operation and stores an approval. The response carries `quote`, `approval` and `debit`.
   </Step>
@@ -49,10 +49,10 @@ sequenceDiagram
 | What moves | Prepare | Confirm | Approval window |
 | --- | --- | --- | --- |
 | Fiat out over a bank rail | `POST /v1/payouts` | `POST /v1/payouts/{payoutId}/confirm` | 120 s |
-| USDC out on Base | `POST /v1/transfers` | `POST /v1/transfers/{transferId}/confirm` | 120 s |
+| USDC out on Base | `POST /v1/payouts` with a wallet recipient | `POST /v1/payouts/{payoutId}/confirm` | 120 s |
 | An escrow deal, and every escrow action | `POST /v1/escrow`, `POST /v1/escrow/{escrowId}/actions` | `POST /v1/escrow/{escrowId}/actions/{idempotencyKey}/confirm` | 60 s |
 
-Payouts and transfers act on a client — send `X-Hevn-Account`. Escrow is always operated by you, so it
+Payouts act on a client — send `X-Hevn-Account`. Escrow is always operated by you, so it
 refuses that header. Every confirm body is the same two fields:
 
 ```json
