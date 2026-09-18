@@ -1,0 +1,19 @@
+<CodeGroup>
+
+```bash Python
+python -m venv .venv && source .venv/bin/activate
+pip install cryptography httpx
+```
+
+```bash Node
+# Node 20 or newer. Signing and HTTP use node:crypto and global fetch.
+node --version
+npm init --yes
+```
+
+```bash Go
+go mod init example.com/hevn
+# Signing and HTTP use the standard library only: crypto/ecdsa, encoding/pem, net/http.
+```
+
+</CodeGroup>

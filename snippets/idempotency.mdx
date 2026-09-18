@@ -1,0 +1,25 @@
+Derive `Idempotency-Key` from an id your own system already owns, pass it in from the caller, and
+keep it identical across every retry of the same payment.
+
+<CodeGroup>
+
+```python Python
+key = f"payout-{invoice.id}"  # "payout-INV-2026-114"
+northwind.post("/payouts", payout, idempotency_key=key)
+```
+
+```javascript Node
+const key = `payout-${invoice.id}`;
+await northwind.post("/payouts", payout, { idempotencyKey: key });
+```
+
+```go Go
+key := "payout-" + invoice.ID
+northwind.Post("/payouts", payout, hevn.IdempotencyKey(key))
+```
+
+</CodeGroup>
+
+Never generate the key inside the helper that sends the request, and never rotate it on a retry —
+both turn one payment into two. The format and the replay windows are in
+[Conventions](/whitelabel/conventions#idempotency-key).

@@ -1,0 +1,122 @@
+---
+title: "Developer key"
+description: "Generate a P-256 keypair, register the public half with HEVN once, and rotate it without downtime."
+---
+
+Your backend holds one credential: a P-256 keypair. The private half never leaves your server and is
+what logs you in and signs every payment. HEVN stores only the public half.
+
+## What the key must be
+
+| Property | Requirement |
+| --- | --- |
+| Curve | **P-256**, also called `secp256r1` or `prime256v1` |
+| Public key on the wire | **base64** (standard alphabet, padded) of the **DER SubjectPublicKeyInfo** |
+| Signature on the wire | **base64** of the **ASN.1 DER** ECDSA `(r, s)` over **SHA-256** of the message |
+| Keys per account | up to **5** registered at once, so a rotation never needs downtime |
+| Identifier | the key's fingerprint, `sha256:<hex of sha256(DER)>` |
+
+<Warning>
+  PEM armor in the `publicKey` field is rejected, base64url is rejected, and a raw 64-byte `r‖s`
+  signature — what WebCrypto and Java's P1363 mode produce — is rejected. Convert to DER before you
+  base64-encode. The details are in [Signing](/whitelabel/signing#signature-format).
+</Warning>
+
+## Generate it
+
+Write the private key to a file with mode `0600` and print only the public key. Nothing else ever
+needs to see the private half.
+
+import KeyGenerate from "/snippets/key-generate.mdx";
+import KeyLoad from "/snippets/key-load.mdx";
+
+<KeyGenerate />
+
+The single line it prints — `MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE…` — is what you register.
+
+## Register it in the app, once per environment
+
+Registration attaches the key to your account's signer, which changes what can authorize money from
+every wallet you control. That change is authorized by your own account, from your own browser
+session, so it is the one step in this guide that is not an API call.
+
+<Steps>
+  <Step title="Open the app">
+    `https://sandbox.gethevn.com` for the sandbox, `https://app.gethevn.com` for production. Sign in
+    as the account that will be your integrator account.
+  </Step>
+  <Step title="Paste the public key">
+    Open the developer-key screen and add the base64 public key you just printed. The app produces the
+    signature that registers it and attaches the signer.
+  </Step>
+  <Step title="Log in from code">
+    A successful `POST /v1/auth/challenge` is the proof that registration worked. See
+    [Sessions](/whitelabel/sessions).
+  </Step>
+</Steps>
+
+One registered key covers every client: when you create a client, its wallet is deployed with your
+signer already attached, so no per-client setup exists.
+
+## Load it in your server
+
+Every example on these pages reads the key from `HEVN_KEY_PEM`.
+
+<KeyLoad />
+
+## When a key is refused
+
+Login answers the same refusal for every key problem — an unknown email, an unregistered key, a
+signer that is not attached, a bad signature — so an attacker learns nothing from probing:
+
+| Status | `code` | What to check |
+| --- | --- | --- |
+| 401 | `invalid_credentials` | The email, that the key is registered on that account, and that you signed the proof string with it |
+| 400 | `request_expired` | `requestExpiry` must be in the future and at most 5 minutes ahead |
+
+At payment time the refusals are specific, because by then you are authenticated:
+`403 key_not_registered`, `409 signer_not_attached`, `400 signature_invalid`. The full list is in
+[Errors](/whitelabel/reference/errors#authentication-and-signing).
+
+## Rotate a key
+
+Saving keys in the app **replaces** the stored list; it does not merge. Rotation is therefore a
+three-step roll, and both keys work while both are registered.
+
+<Steps>
+  <Step title="Add the new key beside the old one">
+    Save a list holding both public keys. Nothing changes for running code.
+  </Step>
+  <Step title="Switch your servers">
+    Deploy the new PEM. Payments start carrying the new `publicKey`. An approval is bound to your
+    signer rather than to one key, so anything prepared just before the switch can still be confirmed
+    with either key while both are registered.
+  </Step>
+  <Step title="Drop the old key">
+    Save a list holding only the new key. The old key immediately stops being able to log in and to
+    authorize money.
+  </Step>
+</Steps>
+
+To revoke everything at once, save an empty list: no key can log in or sign for your clients
+afterwards.
+
+<Warning>
+  Removing a key does not cut sessions that already exist. An access token stays valid for its hour
+  and a refresh token for up to 60 days. Rotating stops the money paths immediately; for a leaked
+  *token*, rotate the key and contact HEVN to cut the sessions.
+</Warning>
+
+## Habits worth keeping
+
+- Keep the PEM in a secret manager and mount it at runtime; keep it out of images, repositories and
+  logs.
+- One key per environment, and one per deployment if you can — the `publicKey` on each payment tells
+  you which one signed.
+- Never sign in a browser. The key can spend from every client balance you control; a browser is the
+  wrong place for it.
+- Rehearse the roll before you need it. A rotation you have never run is not a control.
+
+<Card title="Next: Sessions" icon="ticket" href="/whitelabel/sessions">
+  Two calls to log in, and one header to act as any of your clients.
+</Card>

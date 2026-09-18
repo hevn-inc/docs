@@ -1,0 +1,131 @@
+---
+title: "Rails and payment methods"
+description: "What each payment method needs, which currencies the deposit rails carry, and how a rail id is put together."
+---
+
+Rail ids are opaque strings you copy from `GET /v1/banks`. This page is what they mean and what each payment method needs.
+
+## What each method needs
+
+A payment method is defined by the identifiers it routes on. The same matrix governs both directions: the `requisites.fields` you read off an open rail, and the `fields` you send when you save a contact.
+
+`+` means every group is required. `or` means any one of the alternatives in that group.
+
+| Method | Identifiers |
+| --- | --- |
+| `sepa` | `iban` |
+| `swift` | `accountNumber` or `iban` + `bic` |
+| `ach` | `accountNumber` + `routingNumber` |
+| `fedwire` | `accountNumber` + `routingNumber` |
+| `ukfps` | `accountNumber` + `routingNumber` |
+| `uaefts` | `iban` |
+| `pix` | `pixKey` or `accountNumber` |
+| `spei` | `accountNumber` or `iban` |
+| `npp` | `accountNumber` + `routingNumber` |
+| `nip` | `accountNumber` |
+| `breb` | `paymentKey` or `accountNumber` |
+| `pse` | `accountNumber` or `iban` |
+| `transfers_3_0` | `accountNumber` or `iban` |
+
+<Accordion title="Every other method">
+
+These do not open as deposit rails; they are destinations you can save as contacts and pay out to.
+
+| Method | Identifiers |
+| --- | --- |
+| `bdt_ewallet` | `financialInstitutionId` + `phoneNumber` |
+| `bdt_local` | `financialInstitutionId` + `branchNumber` + `accountNumber` |
+| `bob_local` | `financialInstitutionId` + `accountNumber` + `accountKind` |
+| `brl_local` | `financialInstitutionId` + `branchNumber` + `accountNumber` + `accountKind` |
+| `cad_eft` | `financialInstitutionId` + `accountNumber` + `routingNumber` |
+| `clp_local` | `financialInstitutionId` + `accountNumber` + `accountKind` |
+| `cny_alipay` | `phoneNumber` |
+| `cny_wechatpay` | `phoneNumber` |
+| `cop_local` | `financialInstitutionId` + `accountNumber` + `accountKind` |
+| `crc_local` | `financialInstitutionId` + `iban` + `phoneNumber` |
+| `dkk_local` | `iban` |
+| `dop_ewallet` | `financialInstitutionId` + `phoneNumber` |
+| `dop_local` | `financialInstitutionId` + `accountNumber` + `accountKind` |
+| `egp_local` | `financialInstitutionId` + `iban` |
+| `fednow` | `accountNumber` + `routingNumber` |
+| `gtq_ewallet` | `financialInstitutionId` + `phoneNumber` |
+| `gtq_local` | `financialInstitutionId` + `accountNumber` + `accountKind` + `phoneNumber` |
+| `hkd_fps` | `financialInstitutionId` + `accountNumber` |
+| `hnl_local` | `financialInstitutionId` + `accountNumber` + `accountKind` + `phoneNumber` |
+| `idr_ewallet` | `financialInstitutionId` + `phoneNumber` |
+| `idr_local` | `financialInstitutionId` + `accountNumber` |
+| `ils_local` | `financialInstitutionId` + `iban` |
+| `inr_local` | `accountNumber` + `routingNumber` |
+| `inr_upi` | `accountNumber` |
+| `jmd_local` | `financialInstitutionId` + `branchNumber` + `accountNumber` + `accountKind` + `phoneNumber` |
+| `jpy_local` | `financialInstitutionId` + `branchNumber` + `accountNumber` + `phoneNumber` |
+| `krw_local` | `financialInstitutionId` + `accountNumber` |
+| `myr_local` | `financialInstitutionId` + `accountNumber` |
+| `nok_local` | `iban` |
+| `php_ewallet` | `financialInstitutionId` + `phoneNumber` |
+| `php_local` | `financialInstitutionId` + `accountNumber` |
+| `pkr_ewallet` | `financialInstitutionId` + `phoneNumber` |
+| `pkr_raast` | `financialInstitutionId` + `accountNumber` or `iban` |
+| `pln_local` | `iban` |
+| `rtp` | `accountNumber` + `routingNumber` |
+| `sar_local` | `financialInstitutionId` + `iban` |
+| `sle_local` | `financialInstitutionId` + `phoneNumber` |
+| `thb_local` | `financialInstitutionId` + `accountNumber` |
+| `try_fast` | `financialInstitutionId` + `iban` |
+| `tzs_local` | `financialInstitutionId` + `phoneNumber` |
+| `ugx_local` | `financialInstitutionId` + `phoneNumber` |
+| `vnd_local` | `financialInstitutionId` + `accountNumber` |
+| `xof_local` | `financialInstitutionId` + `phoneNumber` |
+| `zmw_local` | `financialInstitutionId` + `phoneNumber` |
+
+</Accordion>
+
+Alongside the identifiers, every requisite and every contact carries a `holder`: `type` (`individual` or `business`) with `firstName` and `lastName`, or `businessName`. Some methods route on the name alone and ignore the account identifiers for matching; the identifiers are still required.
+
+## Deposit-rail coverage
+
+These are the methods a client can hold a rail in, and the currency each one settles from. A payer wires that currency; the client's wallet is credited in a stablecoin.
+
+| Method | Currency | Region |
+| --- | --- | --- |
+| `ach` | USD | United States |
+| `fedwire` | USD | United States |
+| `swift` | USD | International |
+| `sepa` | EUR | Euro area |
+| `ukfps` | GBP | United Kingdom |
+| `uaefts` | AED | United Arab Emirates |
+| `pix` | BRL | Brazil |
+| `spei` | MXN | Mexico |
+| `npp` | AUD | Australia |
+| `nip` | NGN | Nigeria |
+| `breb` | COP | Colombia |
+| `pse` | COP | Colombia |
+| `transfers_3_0` | ARS | Argentina |
+
+`GET /v1/banks` is authoritative and narrower: it returns only the rails a given client may hold, after its residency is taken into account. Read `currency` and `method` off that response rather than deriving them from this table.
+
+## Rail ids
+
+An id usually reads `{method}_{named|pooled}-{bank}` — the ids written this way on these pages, `sepa_named-bank_a` and `ach_named-bank_b`, stand in for the real ones — though a few carry no bank segment at all (`wire_named`). Two parts matter:
+
+- **`named`** — the client's own legal name is on the account. Payers see the client; nothing else is needed for the money to be attributed.
+- **`pooled`** — one partner account serves many clients, and each deposit is attributed by the `paymentReference` on the requisites. The payer must quote it.
+
+The bank segment is the partner behind the rail and is not something to branch on. Treat the whole id as opaque: compare it for equality, store it, copy it into `POST /v1/banks`, and never parse it or show it to your end users. Ids are per environment — one you hardcoded in the sandbox does not exist in production.
+
+## Settlement tokens
+
+`supportedTokens` on a rail record is what that rail can deliver into the client's wallet.
+
+| `supportedTokens` | What to do |
+| --- | --- |
+| One token | That is what arrives. `settlementToken` echoes it once the rail is open. |
+| `["USDC", "EURC"]` | Choose with `PUT /v1/banks/{rail}/settlement-token`. |
+
+Some rails ship as a pair of ids instead, one per token, with the EURC variant's id ending in `_eurc`. Both forms appear in `GET /v1/banks`; which one a rail uses is visible from whether `supportedTokens` has one member or two.
+
+`feeBps` on the rail record is HEVN's deposit fee in basis points for that rail. It is a whole number: `25` is 0.25%.
+
+<Card title="Next: KYB fields" icon="arrow-right" href="/whitelabel/reference/kyb-fields">
+  Every field of the KYB document, its accepted values, and the document slots.
+</Card>

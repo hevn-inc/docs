@@ -1,0 +1,77 @@
+---
+title: "Overview"
+description: "Issue real bank accounts to your own customers and move their money from your backend, with one API and one key."
+---
+
+With the whitelabel API you issue real bank accounts to your own customers and move their money from
+your backend — no HEVN UI, no HEVN operator, no end-user signature.
+
+```mermaid
+flowchart TB
+    K["Your backend<br/>holds the developer key"]
+    I["Your integrator account<br/>holds the registered public key"]
+    K -->|"one key, registered once"| I
+    I -->|"you create and act for these"| Wallet
+    subgraph Wallet["Client account — one per customer"]
+        W["Base smart wallet<br/>the balance lives here"]
+        B["Bank rails<br/>requisites in the client's legal name"]
+        T["Contacts<br/>saved payout recipients"]
+        B -->|"deposits settle into"| W
+        W -->|"payouts leave for"| T
+    end
+```
+
+## What you can build
+
+- **A marketplace with escrow.** Hold a buyer's money while a seller delivers, then capture it minus
+  your fee.
+- **A payroll or payables platform.** Collect from an employer, pay contractors to their own bank
+  accounts in their own currencies.
+- **An embedded neobank.** Give each of your customers bank details in their own company name, a
+  balance, a statement and outgoing payments, under your brand.
+
+## How it works
+
+You hold one HEVN account — your **integrator account** — and it creates and controls other HEVN
+accounts, one per customer. Those are your **clients**. Each client is a real account: it has a legal
+identity you verify once, bank **rails** that produce requisites in its own name, a balance, and a
+ledger.
+
+Every client balance is a stablecoin balance on that client's own Base smart wallet. Fiat arriving
+over a rail is converted by a partner bank and settles into that wallet; fiat leaving is the same
+journey in reverse. See [How money moves](/whitelabel/how-money-moves).
+
+Your backend authenticates with a **developer key** — a P-256 keypair whose private half never leaves
+your server. The same key authorizes money movement: HEVN builds each payment, echoes its exact
+terms, you check them and sign, HEVN executes. Nothing is ever constructed by you, and nothing moves
+without your signature. See [Signing](/whitelabel/signing).
+
+A client becomes usable by passing four gates in order — created, verification document complete,
+application approved, rail active. After that, one payment is two calls: `POST /v1/payouts` books and
+prices it, `POST /v1/payouts/{payoutId}/confirm` signs it.
+
+## What you get from HEVN, and what you keep
+
+| You build | HEVN provides |
+| --- | --- |
+| Your product, your UI, your customer relationship | The accounts, the bank rails, the balances, the ledger |
+| The onboarding form your customer fills in | The verification review and the partner-bank submission behind it |
+| The decision to pay, and the signature that authorizes it | The pricing, the operation, the execution and the receipt |
+
+Two things HEVN switches on for you rather than the API: your integrator account itself, and the
+permission to create clients. Both are a conversation, in the sandbox as in production — see
+[Going live](/whitelabel/going-live).
+
+## Where to start
+
+<CardGroup cols={3}>
+  <Card title="Quickstart" icon="rocket" href="/whitelabel/quickstart">
+    Nine steps in the sandbox: a client company that holds testnet USDC and has sent some of it out, signed by your key.
+  </Card>
+  <Card title="How money moves" icon="route" href="/whitelabel/how-money-moves">
+    One diagram and five rules: where a balance lives, who converts fiat, what is never instant.
+  </Card>
+  <Card title="Accounts and custody" icon="shield" href="/whitelabel/accounts-and-custody">
+    Who can move a client's money, what HEVN cannot do alone, and what happens if your key leaks.
+  </Card>
+</CardGroup>

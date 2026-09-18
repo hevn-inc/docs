@@ -1,0 +1,151 @@
+---
+title: "KYB fields"
+description: "Every field of the KYB document, its accepted values, the document slots, and how to read a missing[] path."
+---
+
+Every field of the KYB document, with its accepted values. The document is the body of `PUT /v1/clients/{clientId}/kyb` and the `document` block of `GET /v1/clients/{clientId}/kyb`; both use the same shape. [Onboarding](/whitelabel/onboarding) is the flow that fills it.
+
+"Required" below means submission is refused without it — the field appears in `missing[]` until it is set.
+
+## `company`
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `legalName` | string, 1–200 | yes | The registered name. Unique across HEVN; it is also the client's account name. |
+| `tradeName` | string, 1–200 | no | The name the business trades under, if different. |
+| `country` | ISO 3166-1 alpha-2 | yes | The jurisdiction of incorporation. Widens the required document slots. |
+| `registrationNumber` | string, 1–200 | no | The company number in its own register. |
+| `taxId` | string, 1–200 | US only | A US company owes its EIN as `XX-XXXXXXX`. A value that is not in that shape counts as missing. |
+| `phone` | E.164 | yes | Satisfied by the account phone as well — see [onboarding](/whitelabel/onboarding#two-phone-numbers-two-jobs). |
+| `email` | string, 1–200 | no | A compliance mailbox. HEVN does not write to it. |
+| `address` | object | yes | See below. |
+| `entityType` | enum | yes | |
+| `incorporationDate` | `YYYY-MM-DD` | no | |
+| `websites` | array of strings | no | |
+| `expectedMonthlyVolumeUsd` | decimal string, ≥ 0 | yes | Major units, for example `"250000"`. |
+| `businessDescription` | string, 1–4000 | yes | What the company sells, in a sentence a reviewer can act on. |
+| `businessType` | enum | yes | |
+| `businessIndustry` | 6 digits | no | An industry classification code, for example `"424990"`. |
+| `verifierRole` | enum | no | The relationship of the person who filled this in to the company. |
+| `sourceOfFunds` | enum | yes | Where the money the client will move comes from. |
+| `purposeOfFunds` | enum | yes | What it will be used for. |
+| `flowOfFunds` | string, 1–4000 | yes | How money reaches the company and where it goes, in plain sentences. |
+
+### `company.address` and `people[].address`
+
+Both addresses take the same object. Four of its fields are required; `state` and `addressLine2` are not.
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `streetAddress` | string, 1–200 | yes |
+| `addressLine2` | string, 1–200 | no |
+| `city` | string, 1–200 | yes |
+| `state` | string, 1–200 | no |
+| `zip` | string, 1–200 | yes |
+| `country` | ISO 3166-1 alpha-2 | yes |
+
+Write `state` as the ISO 3166-2 subdivision including its country prefix — `US-IL`, not `IL` and not `Illinois`.
+
+## `people[]`
+
+At least one person is required: a document with an empty roster reports `people` as missing. Give each person at least one role — `ownershipPercentage`, `hasControl`, `isDirector` or `isSigner` — or they are in the graph without being anything in it.
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `key` | 1–64 of `A-Z a-z 0-9 . _ : -` | `key` or `id` | Your own stable handle for this person. HEVN derives their id from it, which is what makes the write idempotent. |
+| `id` | UUID | `key` or `id` | Addresses a person who already exists in the client's graph. Takes precedence over `key`. A person with neither is refused. |
+| `firstName` | string, 1–200 | no | |
+| `middleName` | string, 1–200 | no | |
+| `lastName` | string, 1–200 | no | |
+| `dateOfBirth` | `YYYY-MM-DD` | no | |
+| `email` | string, 1–200 | no | |
+| `phone` | E.164 | yes | |
+| `address` | object | yes | |
+| `taxIdCountry` | ISO 3166-1 alpha-2 | yes | The country whose tax authority holds this person's number. Declared, never derived from the address. |
+| `taxId` | string, 1–200 | US only | A US tax resident owes an SSN as `XXX-XX-XXXX`. |
+| `ownershipPercentage` | decimal string, > 0 and ≤ 100 | no | |
+| `hasControl` | boolean | no | |
+| `isDirector` | boolean | no | |
+| `isSigner` | boolean | no | |
+| `documents` | array of `{slot, uploadId}` | yes | One `proof_of_address` per person. |
+
+## Enums
+
+Send one of the listed members. An unlisted value is refused at the boundary with `422 invalid_enum_value`, carrying `details.field` and the accepted set in `details.allowed` — nothing is written.
+
+<AccordionGroup>
+
+<Accordion title="entityType">
+`llc` · `corporation` · `s_corporation` · `c_corporation` · `partnership` · `limited_partnership` · `sole_proprietorship` · `nonprofit` · `trust` · `cooperative` · `dao` · `foundation` · `other`
+</Accordion>
+
+<Accordion title="businessType">
+`technology` · `finance` · `healthcare` · `retail` · `e_commerce` · `manufacturing` · `real_estate` · `consulting` · `hospitality` · `education` · `transportation` · `entertainment` · `agriculture` · `construction` · `professional_services` · `crypto_web3` · `other`
+</Accordion>
+
+<Accordion title="sourceOfFunds">
+`business_revenue` · `investment` · `loan` · `personal_savings` · `third_party_funds` · `grant` · `other`
+</Accordion>
+
+<Accordion title="purposeOfFunds">
+`operations` · `payroll` · `vendor_payments` · `investment` · `treasury_management` · `international_transfers` · `other`
+</Accordion>
+
+<Accordion title="verifierRole">
+`officer` · `employer` · `accountant` · `agent`
+</Accordion>
+
+</AccordionGroup>
+
+## Document slots
+
+A slot is a named place a document goes. You upload a file, get a `doc_…` id back, and file it into a slot with `{"slot": "...", "uploadId": "doc_..."}` — on the document's own `documents[]` for company papers, on a person's `documents[]` for theirs.
+
+Every client needs these five on the company:
+
+| Slot | What it is |
+| --- | --- |
+| `certificate_of_incorporation` | The registrar's proof the company exists. |
+| `corporate_structure` | The ownership chart, down to the people. |
+| `director_structure` | Who the directors are. |
+| `proof_of_address` | A recent document showing the company's registered address. |
+| `source_of_funds` | Evidence behind the `sourceOfFunds` answer. |
+
+The jurisdiction adds to that list:
+
+| `company.country` | Extra slot |
+| --- | --- |
+| `US` | `tax_identification_document` — the IRS letter that assigned the EIN. |
+| `AE` | `vat_registration` — the FTA VAT/TRN registration certificate. |
+
+And every person needs one:
+
+| Slot | What it is |
+| --- | --- |
+| `proof_of_address` | A recent document showing where that person lives. |
+
+Other slots exist and are accepted — `passport_front`, `national_id`, `articles_of_association`, `bank_statement`, `ubo_declaration`, `power_of_attorney` and more — and a reviewer may ask for one in an RFI. Send an unknown slot and the write answers `422 document_type_unsupported` with the full accepted list in `details.allowed`.
+
+## Reading a `missing[]` path
+
+Every entry is a path into the document you sent. Fix it there and write again.
+
+| Path | Means |
+| --- | --- |
+| `company.flowOfFunds` | A company field is empty. |
+| `company.address.zip` | A required address field is empty. |
+| `people` | The roster is empty. Add at least one person. |
+| `people[0].taxIdCountry` | A field on the first person in the document is empty. |
+| `people[0].documents.proof_of_address` | That person's slot has nothing in it. |
+| `documents.certificate_of_incorporation` | A company slot has nothing in it. |
+| `graph.entities.<uuid>.phone` | The gap belongs to an entity the flat document does not own. |
+
+The index in `people[0]` is the person's position in the `people` array of `GET /v1/clients/{clientId}/kyb`, not the order you happened to send. Read the document back and index into that.
+
+## Complex ownership
+
+The flat document models one company owned directly by people. A chain with holding companies in it is written through HEVN's entity-graph routes, which are outside this API and available on request. The two models coexist: the flat document only ever replaces the people it created, and never touches an entity added another way — a write that would drop one answers `409 kyb_roster_conflict` with `details.entityIds`. Gaps belonging to those entities are the `graph.entities.<uuid>.<field>` rows above.
+
+<Card title="Next: Errors" icon="arrow-right" href="/whitelabel/reference/errors">
+  The envelope, and every slug the API can answer with.
+</Card>

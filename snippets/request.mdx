@@ -1,0 +1,196 @@
+<CodeGroup>
+
+```python Python
+import os, time, httpx
+
+
+class HevnError(Exception):
+    def __init__(self, status: int, body: dict):
+        error = (body or {}).get("error", {})
+        self.status, self.code = status, error.get("code", "internal_error")
+        self.details = error.get("details") or {}
+        super().__init__(f"{status} {self.code}: {error.get('message', '')}")
+
+
+class Hevn:
+    def __init__(self, session, client_id=None, http=None):
+        self.session, self.client_id = session, client_id
+        self.http = http or httpx.Client(base_url=os.environ["HEVN_API"], timeout=30)
+
+    def acting_as(self, client_id):
+        """A view of the same session that sends X-Hevn-Account on every call."""
+        return Hevn(self.session, client_id, self.http)
+
+    def get(self, path, params=None):
+        return self.call("GET", path, params=params)
+
+    def post(self, path, body=None, *, idempotency_key=None):
+        return self.call("POST", path, body=body, idempotency_key=idempotency_key)
+
+    def put(self, path, body=None, *, idempotency_key=None):
+        return self.call("PUT", path, body=body, idempotency_key=idempotency_key)
+
+    def patch(self, path, body=None):
+        return self.call("PATCH", path, body=body)
+
+    def delete(self, path):
+        return self.call("DELETE", path)
+
+    def call(self, method, path, *, body=None, params=None, idempotency_key=None, retried=False):
+        headers = {"Authorization": f"Bearer {self.session.token()}"}
+        if self.client_id:
+            headers["X-Hevn-Account"] = self.client_id
+        if idempotency_key:
+            headers["Idempotency-Key"] = idempotency_key
+        again = dict(body=body, params=params, idempotency_key=idempotency_key)
+        response = self.http.request(method, path, json=body, params=params, headers=headers)
+        if response.status_code == 429:
+            time.sleep(float(response.headers.get("Retry-After", "1")))
+            return self.call(method, path, retried=retried, **again)
+        if response.status_code == 401 and not retried:
+            self.session.token(refresh=True)
+            return self.call(method, path, retried=True, **again)
+        payload = response.json() if response.content else {}
+        if response.status_code >= 400:
+            raise HevnError(response.status_code, payload)
+        return payload
+```
+
+```javascript Node
+export class HevnError extends Error {
+  constructor(status, body) {
+    const error = body?.error ?? {};
+    super(`${status} ${error.code ?? "internal_error"}: ${error.message ?? ""}`);
+    this.status = status;
+    this.code = error.code ?? "internal_error";
+    this.details = error.details ?? {};
+  }
+}
+
+export class Hevn {
+  constructor(session, clientId) {
+    this.session = session;
+    this.clientId = clientId;
+    this.api = process.env.HEVN_API;
+  }
+
+  actingAs(clientId) {
+    return new Hevn(this.session, clientId);
+  }
+
+  get(path, params) {
+    return this.call("GET", path, { params });
+  }
+
+  post(path, body, opts) {
+    return this.call("POST", path, { body, ...opts });
+  }
+
+  put(path, body, opts) {
+    return this.call("PUT", path, { body, ...opts });
+  }
+
+  patch(path, body) {
+    return this.call("PATCH", path, { body });
+  }
+
+  delete(path) {
+    return this.call("DELETE", path);
+  }
+
+  async call(method, path, { body, params, idempotencyKey, retried = false } = {}) {
+    const url = new URL(this.api + path);
+    for (const [k, v] of Object.entries(params ?? {})) url.searchParams.set(k, String(v));
+    const headers = { authorization: `Bearer ${await this.session.token()}` };
+    if (body) headers["content-type"] = "application/json";
+    if (this.clientId) headers["x-hevn-account"] = this.clientId;
+    if (idempotencyKey) headers["idempotency-key"] = idempotencyKey;
+
+    const response = await fetch(url, { method, headers, body: body && JSON.stringify(body) });
+    const again = { body, params, idempotencyKey, retried };
+    if (response.status === 429) {
+      const wait = Number(response.headers.get("retry-after") ?? 1) * 1000;
+      await new Promise((done) => setTimeout(done, wait));
+      return this.call(method, path, again);
+    }
+    if (response.status === 401 && !retried) {
+      await this.session.token(true);
+      return this.call(method, path, { ...again, retried: true });
+    }
+    const text = await response.text();
+    const payload = text ? JSON.parse(text) : {};
+    if (!response.ok) throw new HevnError(response.status, payload);
+    return payload;
+  }
+}
+```
+
+```go Go
+type APIError struct {
+	Status  int
+	Code    string
+	Message string
+	Details map[string]any
+}
+
+func (e *APIError) Error() string { return fmt.Sprintf("%d %s: %s", e.Status, e.Code, e.Message) }
+
+// Body is a request body, Query a query string, Payload a decoded response.
+// Payload.Str walks a dotted path: payout.Str("approval.payload").
+type (
+	Body    map[string]any
+	Query   map[string]string
+	Payload map[string]any
+)
+
+// ActingAs returns a view of the same session that sends X-Hevn-Account.
+func (c *Client) ActingAs(clientID string) *Client {
+	bound := *c
+	bound.ClientID = clientID
+	return &bound
+}
+
+func (c *Client) Get(path string, query ...Query) (Payload, error) {
+	return c.Call("GET", path, nil, Opts{Query: first(query)})
+}
+
+func (c *Client) Post(path string, body Body, opts ...Opt) (Payload, error) {
+	return c.Call("POST", path, body, options(opts))
+}
+
+func (c *Client) Put(path string, body Body, opts ...Opt) (Payload, error) {
+	return c.Call("PUT", path, body, options(opts))
+}
+
+func (c *Client) Patch(path string, body Body, opts ...Opt) (Payload, error) {
+	return c.Call("PATCH", path, body, options(opts))
+}
+
+func (c *Client) Delete(path string, opts ...Opt) (Payload, error) {
+	return c.Call("DELETE", path, nil, options(opts))
+}
+
+func (c *Client) Call(method, path string, body Body, o Opts) (Payload, error) {
+	for attempt := 0; ; attempt++ {
+		res, err := c.HTTP.Do(c.request(method, path, body, o))
+		if err != nil {
+			return nil, err
+		}
+		payload, status := decode(res)
+		switch {
+		case status == 429 && attempt < 3:
+			time.Sleep(retryAfter(res))
+		case status == 401 && attempt == 0:
+			if _, err := c.Session.Token(true); err != nil {
+				return nil, err
+			}
+		case status >= 400:
+			return nil, asAPIError(status, payload)
+		default:
+			return payload, nil
+		}
+	}
+}
+```
+
+</CodeGroup>

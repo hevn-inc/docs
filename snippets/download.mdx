@@ -1,0 +1,56 @@
+<CodeGroup>
+
+```python Python
+def download(self, path, params, into):
+    """A method on Hevn. An export streams a file; every other route answers JSON."""
+    headers = {"Authorization": f"Bearer {self.session.token()}"}
+    if self.client_id:
+        headers["X-Hevn-Account"] = self.client_id
+    with self.http.stream("GET", path, params=params, headers=headers) as response:
+        if response.status_code >= 400:
+            response.read()
+            raise HevnError(response.status_code, response.json())
+        with open(into, "wb") as file:
+            for chunk in response.iter_bytes():
+                file.write(chunk)
+    return into
+```
+
+```javascript Node
+// A method on Hevn. An export streams a file; every other route answers JSON.
+export async function download(path, params, into) {
+  const url = new URL(this.api + path);
+  for (const [k, v] of Object.entries(params ?? {})) url.searchParams.set(k, String(v));
+  const headers = { authorization: `Bearer ${await this.session.token()}` };
+  if (this.clientId) headers["x-hevn-account"] = this.clientId;
+
+  const response = await fetch(url, { headers });
+  if (!response.ok) throw new HevnError(response.status, await response.json());
+  await writeFile(into, Buffer.from(await response.arrayBuffer()));
+  return into;
+}
+```
+
+```go Go
+// Download streams an export to a file; every other route answers JSON.
+func (c *Client) Download(path string, query Query, into string) (string, error) {
+	res, err := c.HTTP.Do(c.request("GET", path, nil, Opts{Query: query}))
+	if err != nil {
+		return "", err
+	}
+	defer res.Body.Close()
+	if res.StatusCode >= 400 {
+		payload, status := decode(res)
+		return "", asAPIError(status, payload)
+	}
+	file, err := os.Create(into)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+	_, err = io.Copy(file, res.Body)
+	return into, err
+}
+```
+
+</CodeGroup>

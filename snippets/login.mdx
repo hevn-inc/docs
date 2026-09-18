@@ -1,0 +1,100 @@
+<CodeGroup>
+
+```python Python
+import os, secrets, time, httpx
+
+
+def login(key) -> dict:
+    api, email = os.environ["HEVN_API"], os.environ["HEVN_EMAIL"]
+    nonce = secrets.randbits(48)
+    expiry = int(time.time() * 1000) + 120_000
+    proof = f"hevn-developer-key-login:{email}:{nonce}:{expiry}".encode()
+
+    started = httpx.post(f"{api}/auth/challenge", json={
+        "email": email,
+        "publicKey": public_key_b64(key),
+        "nonce": nonce,
+        "requestExpiry": expiry,
+        "signature": sign_bytes(key, proof),
+    })
+    started.raise_for_status()
+    challenge = started.json()
+
+    minted = httpx.post(f"{api}/auth/token", json={
+        "challengeId": challenge["challengeId"],
+        "signature": sign_payload(key, challenge["payload"]),
+    })
+    minted.raise_for_status()
+    return minted.json()  # accessToken, refreshToken, expiresIn, userId
+```
+
+```javascript Node
+export async function login(key) {
+  const api = process.env.HEVN_API;
+  const email = process.env.HEVN_EMAIL;
+  const nonce = Number(process.hrtime.bigint() % 281474976710656n);
+  const expiry = Date.now() + 120_000;
+  const proof = Buffer.from(`hevn-developer-key-login:${email}:${nonce}:${expiry}`);
+
+  const post = async (path, body) => {
+    const response = await fetch(`${api}${path}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) throw new Error(`${path} ${response.status} ${await response.text()}`);
+    return response.json();
+  };
+
+  const challenge = await post("/auth/challenge", {
+    email,
+    publicKey: publicKeyB64(key),
+    nonce,
+    requestExpiry: expiry,
+    signature: signBytes(key, proof),
+  });
+
+  return post("/auth/token", {
+    challengeId: challenge.challengeId,
+    signature: signPayload(key, challenge.payload),
+  });
+}
+```
+
+```go Go
+func Login(key *ecdsa.PrivateKey) (Tokens, error) {
+	api, email := os.Getenv("HEVN_API"), os.Getenv("HEVN_EMAIL")
+	nonce := rand.Int63n(1 << 48)
+	expiry := time.Now().Add(2 * time.Minute).UnixMilli()
+
+	proof := fmt.Sprintf("hevn-developer-key-login:%s:%d:%d", email, nonce, expiry)
+	proofSignature, err := SignBytes(key, []byte(proof))
+	if err != nil {
+		return Tokens{}, err
+	}
+	publicKey, err := PublicKeyB64(key)
+	if err != nil {
+		return Tokens{}, err
+	}
+
+	var challenge struct{ ChallengeID, Payload string }
+	if err := PostJSON(api+"/auth/challenge", map[string]any{
+		"email": email, "publicKey": publicKey, "nonce": nonce,
+		"requestExpiry": expiry, "signature": proofSignature,
+	}, &challenge); err != nil {
+		return Tokens{}, err
+	}
+
+	payloadSignature, err := SignPayload(key, challenge.Payload)
+	if err != nil {
+		return Tokens{}, err
+	}
+	var tokens Tokens
+	err = PostJSON(api+"/auth/token", map[string]any{
+		"challengeId": challenge.ChallengeID, "signature": payloadSignature,
+	}, &tokens)
+	return tokens, err
+}
+```
+
+</CodeGroup>

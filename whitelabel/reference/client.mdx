@@ -1,0 +1,439 @@
+---
+title: "HTTP client"
+description: "The whole client — key loading, login, acting as a client, signing, retries and polling — in Python, Node and Go."
+---
+
+import InstallSnippet from "/snippets/install.mdx";
+import KeyLoadSnippet from "/snippets/key-load.mdx";
+import SignPayloadSnippet from "/snippets/sign-payload.mdx";
+import LoginSnippet from "/snippets/login.mdx";
+import RequestSnippet from "/snippets/request.mdx";
+import DownloadSnippet from "/snippets/download.mdx";
+import ConfirmLoopSnippet from "/snippets/confirm-loop.mdx";
+import PollSnippet from "/snippets/poll.mdx";
+
+Every example in these guides calls the same small client. This page is that client, in Python, Node
+and Go. Copy it once and each guide fits in three to eight lines.
+
+## The surface every guide assumes
+
+| What you want | Python | Node | Go |
+| --- | --- | --- | --- |
+| Act for a client | `hevn.acting_as(client_id)` | `hevn.actingAs(clientId)` | `api.ActingAs(clientID)` |
+| Read | `hevn.get(path, params={…})` | `hevn.get(path, {…})` | `api.Get(path, hevn.Query{…})` |
+| Write | `hevn.post(path, body, idempotency_key="…")` | `hevn.post(path, body, { idempotencyKey })` | `api.Post(path, hevn.Body{…}, hevn.IdempotencyKey("…"))` |
+| Read a response field | `payout["approval"]["payload"]` | `payout.approval.payload` | `payout.Str("approval.payload")` |
+| Walk a response list | `page["items"]` | `page.items` | `page.List("items")` |
+| Sign an approval | `key.sign_payload(b64)` | `key.signPayload(b64)` | `key.SignPayload(b64)` |
+| Name the signing key | `key.public_key` | `key.publicKey` | `key.PublicKey` |
+| Confirm to settlement | `hevn.confirm_until_settled(path, sig)` | `hevn.confirmUntilSettled(path, sig)` | `api.ConfirmUntilSettled(path, sig)` |
+| Poll a read | `poll_until(read, done)` | `pollUntil(read, done)` | `hevn.PollUntil(read, done, deadline)` |
+| Download an export | `hevn.download(path, params, into)` | `hevn.download(path, params, into)` | `api.Download(path, hevn.Query{…}, into)` |
+
+It reads three environment variables — `HEVN_API`, `HEVN_KEY_PEM` and `HEVN_EMAIL` — set up in the
+[Quickstart](/whitelabel/quickstart). Nothing below hardcodes a host.
+
+<Note>
+  In the Go tabs the client is a variable called `api` and `hevn` is the package: `api.Post(…)` is a
+  call on your client, `hevn.Body{…}` is a type from the package. Naming the variable `hevn` shadows
+  the package and stops the file compiling.
+</Note>
+
+## Install
+
+<InstallSnippet />
+
+## Load the developer key
+
+The private half comes from `HEVN_KEY_PEM` and never leaves the process.
+
+<KeyLoadSnippet />
+
+## Sign bytes
+
+Two functions, used by login and by every payment: ECDSA P-256 over SHA-256, DER-encoded, base64
+out. [Signing](/whitelabel/signing#signature-format) is why each rule is there.
+
+<SignPayloadSnippet />
+
+## Wrap the key
+
+The guides call `key.sign_payload(...)` and read `key.public_key`. That is these two functions
+bound to one loaded key.
+
+<CodeGroup>
+
+```python Python
+class Key:
+    def __init__(self):
+        self.raw = load_key()                     # the loaded key login() takes
+        self.public_key = public_key_b64(self.raw)
+
+    def sign_bytes(self, message: bytes) -> str:
+        return sign_bytes(self.raw, message)
+
+    def sign_payload(self, payload_b64: str) -> str:
+        return sign_payload(self.raw, payload_b64)
+```
+
+```javascript Node
+export class Key {
+  constructor() {
+    this.raw = loadKey();                      // the loaded key login() takes
+    this.publicKey = publicKeyB64(this.raw);
+  }
+
+  signBytes(message) {
+    return signBytes(this.raw, message);
+  }
+
+  signPayload(payloadB64) {
+    return signPayload(this.raw, payloadB64);
+  }
+}
+```
+
+```go Go
+type Key struct {
+	raw       *ecdsa.PrivateKey // the loaded key Login() takes
+	PublicKey string
+}
+
+func NewKey() (*Key, error) {
+	key, err := LoadKey()
+	if err != nil {
+		return nil, err
+	}
+	public, err := PublicKeyB64(key)
+	return &Key{raw: key, PublicKey: public}, err
+}
+
+func (k *Key) SignBytes(message []byte) (string, error) { return SignBytes(k.raw, message) }
+func (k *Key) SignPayload(payloadB64 string) (string, error) {
+	return SignPayload(k.raw, payloadB64)
+}
+```
+
+</CodeGroup>
+
+## Log in
+
+Two calls, two signatures. The result is an access token good for an hour and a refresh token good
+for sixty days — see [Sessions](/whitelabel/sessions).
+
+<LoginSnippet />
+
+## Hold the session
+
+One object owns the tokens and re-mints the access token on demand, so the request layer below never
+thinks about expiry.
+
+<CodeGroup>
+
+```python Python
+class Session:
+    def __init__(self, key):
+        self.key = key
+        self._tokens, self._expires_at = None, 0.0
+
+    def token(self, refresh: bool = False) -> str:
+        if refresh or self._tokens is None or time.time() > self._expires_at - 60:
+            self._tokens = login(self.key.raw) if self._tokens is None else self._refresh()
+            self._expires_at = time.time() + self._tokens["expiresIn"]
+        return self._tokens["accessToken"]
+
+    def _refresh(self) -> dict:
+        response = httpx.post(
+            f"{os.environ['HEVN_API']}/auth/refresh",
+            json={},
+            headers={"Authorization": f"Bearer {self._tokens['refreshToken']}"},
+        )
+        response.raise_for_status()
+        return {**self._tokens, **response.json()}
+```
+
+```javascript Node
+export class Session {
+  constructor(key) {
+    this.key = key;
+    this.tokens = null;
+    this.expiresAt = 0;
+  }
+
+  async token(refresh = false) {
+    if (refresh || !this.tokens || Date.now() > this.expiresAt - 60_000) {
+      this.tokens = this.tokens ? await this.refresh() : await login(this.key.raw);
+      this.expiresAt = Date.now() + this.tokens.expiresIn * 1000;
+    }
+    return this.tokens.accessToken;
+  }
+
+  async refresh() {
+    const response = await fetch(`${process.env.HEVN_API}/auth/refresh`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${this.tokens.refreshToken}`,
+        "content-type": "application/json",
+      },
+      body: "{}",
+    });
+    if (!response.ok) throw new Error(`refresh ${response.status}`);
+    return { ...this.tokens, ...(await response.json()) };
+  }
+}
+```
+
+```go Go
+// Tokens is what both /auth/token and /auth/refresh answer; the refresh call
+// omits refreshToken, so the zero value keeps the one you already hold.
+type Tokens struct {
+	AccessToken  string `json:"accessToken"`
+	RefreshToken string `json:"refreshToken"`
+	ExpiresIn    int    `json:"expiresIn"`
+	UserID       string `json:"userId"`
+}
+
+type Session struct {
+	Key       *Key
+	tokens    Tokens
+	expiresAt time.Time
+	mu        sync.Mutex
+}
+
+func (s *Session) Token(refresh bool) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !refresh && s.tokens.AccessToken != "" && time.Now().Before(s.expiresAt.Add(-time.Minute)) {
+		return s.tokens.AccessToken, nil
+	}
+	tokens, err := s.mint()
+	if err != nil {
+		return "", err
+	}
+	s.tokens = tokens
+	s.expiresAt = time.Now().Add(time.Duration(tokens.ExpiresIn) * time.Second)
+	return s.tokens.AccessToken, nil
+}
+
+func (s *Session) mint() (Tokens, error) {
+	if s.tokens.RefreshToken == "" {
+		return Login(s.Key.raw)
+	}
+	var minted Tokens
+	err := PostJSON(os.Getenv("HEVN_API")+"/auth/refresh", map[string]any{},
+		&minted, Bearer(s.tokens.RefreshToken))
+	minted.RefreshToken = s.tokens.RefreshToken // the refresh call does not re-issue it
+	return minted, err
+}
+
+// PostJSON POSTs a JSON body and decodes the answer; opts set headers such as
+// the bearer. Login (above) uses it without a bearer, because neither login
+// call takes one.
+func PostJSON(url string, body map[string]any, out any, opts ...func(*http.Request)) error {
+	encoded, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+	request, err := http.NewRequest("POST", url, bytes.NewReader(encoded))
+	if err != nil {
+		return err
+	}
+	request.Header.Set("Content-Type", "application/json")
+	for _, apply := range opts {
+		apply(request)
+	}
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+	if response.StatusCode >= 400 {
+		payload, _ := decode(response)
+		return asAPIError(response.StatusCode, payload)
+	}
+	return json.NewDecoder(response.Body).Decode(out)
+}
+
+func Bearer(token string) func(*http.Request) {
+	return func(r *http.Request) { r.Header.Set("Authorization", "Bearer "+token) }
+}
+```
+
+</CodeGroup>
+
+## Send a request
+
+One place turns the [error envelope](/whitelabel/reference/errors) into a typed error, honours
+`Retry-After` on a `429`, re-mints once on a `401`, and adds `X-Hevn-Account` when the client is
+bound.
+
+<RequestSnippet />
+
+## Download an export
+
+`GET /v1/transactions/export` streams a file rather than JSON, so it gets its own method: same
+headers, same typed error, bytes to disk instead of a parsed body.
+
+<DownloadSnippet />
+
+## Confirm until it settles
+
+The whole [retry policy](/whitelabel/signing#retrying-a-confirm) as one method: `already_funded` is
+success, `funding_attempt_expired` means re-open, a `202` and the bundler codes mean confirm again,
+anything else propagates.
+
+<ConfirmLoopSnippet />
+
+## Poll a read
+
+Client provisioning, KYB review, rail activation and payin settlement all end in a read that
+changes on someone else's clock.
+
+<PollSnippet />
+
+## The Go plumbing
+
+Python and Node are complete above. Go's helpers are worth spelling out once.
+
+```go Go
+type Client struct {
+	API      string
+	ClientID string
+	HTTP     *http.Client
+	Session  *Session
+}
+
+type Opts struct {
+	Query          Query
+	IdempotencyKey string
+}
+
+type Opt func(*Opts)
+
+func IdempotencyKey(key string) Opt { return func(o *Opts) { o.IdempotencyKey = key } }
+
+func options(opts []Opt) Opts {
+	var o Opts
+	for _, apply := range opts {
+		apply(&o)
+	}
+	return o
+}
+
+func first(queries []Query) Query {
+	if len(queries) == 0 {
+		return nil
+	}
+	return queries[0]
+}
+
+// at walks a dotted path and returns nil when any step is missing.
+func (p Payload) at(path string) any {
+	var node any = map[string]any(p)
+	for _, step := range strings.Split(path, ".") {
+		object, ok := node.(map[string]any)
+		if !ok {
+			return nil
+		}
+		node = object[step]
+	}
+	return node
+}
+
+func (p Payload) Str(path string) string { value, _ := p.at(path).(string); return value }
+func (p Payload) Bool(path string) bool  { value, _ := p.at(path).(bool); return value }
+
+// List walks a dotted path to an array of objects: catalogue.List("rails").
+func (p Payload) List(path string) []Payload {
+	items, _ := p.at(path).([]any)
+	page := make([]Payload, 0, len(items))
+	for _, item := range items {
+		if object, ok := item.(map[string]any); ok {
+			page = append(page, object)
+		}
+	}
+	return page
+}
+
+func (c *Client) request(method, path string, body Body, o Opts) *http.Request {
+	var reader io.Reader
+	if body != nil {
+		encoded, _ := json.Marshal(body)
+		reader = bytes.NewReader(encoded)
+	}
+	request, _ := http.NewRequest(method, c.API+path, reader)
+	token, _ := c.Session.Token(false)
+	request.Header.Set("Authorization", "Bearer "+token)
+	if body != nil {
+		request.Header.Set("Content-Type", "application/json")
+	}
+	if c.ClientID != "" {
+		request.Header.Set("X-Hevn-Account", c.ClientID)
+	}
+	if o.IdempotencyKey != "" {
+		request.Header.Set("Idempotency-Key", o.IdempotencyKey)
+	}
+	if len(o.Query) > 0 {
+		query := request.URL.Query()
+		for name, value := range o.Query {
+			query.Set(name, value)
+		}
+		request.URL.RawQuery = query.Encode()
+	}
+	return request
+}
+
+func decode(res *http.Response) (Payload, int) {
+	defer res.Body.Close()
+	var payload Payload
+	_ = json.NewDecoder(res.Body).Decode(&payload)
+	return payload, res.StatusCode
+}
+
+func retryAfter(res *http.Response) time.Duration {
+	seconds, err := strconv.Atoi(res.Header.Get("Retry-After"))
+	if err != nil || seconds <= 0 {
+		return time.Second
+	}
+	return time.Duration(seconds) * time.Second
+}
+
+func asAPIError(status int, payload Payload) *APIError {
+	body, _ := payload["error"].(map[string]any)
+	details, _ := body["details"].(map[string]any)
+	code, _ := body["code"].(string)
+	message, _ := body["message"].(string)
+	if code == "" {
+		code = "internal_error"
+	}
+	return &APIError{Status: status, Code: code, Message: message, Details: details}
+}
+```
+
+## Put it together
+
+<CodeGroup>
+
+```python Python
+key = Key()
+hevn = Hevn(Session(key))                      # acts on your integrator account
+northwind = hevn.acting_as("cl_7YQ2Kf3mN8")    # acts on one client
+```
+
+```javascript Node
+const key = new Key();
+const hevn = new Hevn(new Session(key));
+const northwind = hevn.actingAs("cl_7YQ2Kf3mN8");
+```
+
+```go Go
+key, err := hevn.NewKey()
+api := &hevn.Client{API: os.Getenv("HEVN_API"), HTTP: http.DefaultClient, Session: &hevn.Session{Key: key}}
+northwind := api.ActingAs("cl_7YQ2Kf3mN8")
+```
+
+</CodeGroup>
+
+<Card title="Back to the Quickstart" icon="rocket" href="/whitelabel/quickstart">
+  Nine steps in the sandbox, from an empty account to money that moved on chain.
+</Card>

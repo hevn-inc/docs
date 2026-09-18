@@ -78,3 +78,7 @@ One `hvn_...` API key is used for every authenticated endpoint, including transf
 <Note>
   Transfer commands no longer require an app id. The backend resolves the owning app from the API key.
 </Note>
+
+<Note>
+  App API keys are the CLI and agent credential. They are not the credential for the [whitelabel REST API](/api-reference/overview), which authenticates with a developer key and JWT sessions and rejects `X-Api-Key`.
+</Note>

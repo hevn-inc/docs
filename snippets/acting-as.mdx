@@ -1,0 +1,30 @@
+Send `X-Hevn-Account: cl_…` with your own access token to act for one client. Omit the header and
+the call acts on your integrator account instead.
+
+<CodeGroup>
+
+```bash cURL
+curl "$HEVN_API/banks" \
+  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+  -H "X-Hevn-Account: $HEVN_CLIENT_ID"
+```
+
+```python Python
+northwind = hevn.acting_as(CLIENT_ID)
+rails = northwind.get("/banks")
+```
+
+```javascript Node
+const northwind = hevn.actingAs(clientId);
+const rails = await northwind.get("/banks");
+```
+
+```go Go
+northwind := api.ActingAs(clientID)
+rails, err := northwind.Get("/banks")
+```
+
+</CodeGroup>
+
+Details, and the routes that refuse the header, are in
+[Sessions](/whitelabel/sessions#acting-as-a-client).

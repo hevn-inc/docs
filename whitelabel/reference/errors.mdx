@@ -1,0 +1,230 @@
+---
+title: "Errors"
+description: "One envelope and all 107 error slugs, grouped by resource, with what to do about each."
+---
+
+Every refusal from `/v1` has the same body. `code` is a stable lowercase slug — branch on it, and never on `message`.
+
+```json
+{
+  "error": {
+    "code": "already_funded",
+    "message": "This payment was already funded.",
+    "details": { "payoutId": "po_4c8a…", "transactionHash": "0x4f1c…" }
+  }
+}
+```
+
+| Key | Contract |
+| --- | --- |
+| `code` | One of the 107 slugs below. Stable across releases. Lowercase, `snake_case`, never a class name. |
+| `message` | One sentence, safe to log or show an operator. Rewritten whenever it can be made clearer — do not parse it. |
+| `details` | camelCase, and present only when there is something to carry: the id the key already owns, the fields that failed, the amount available. On a `5xx` it also carries `requestId`. |
+
+Every response — success or failure — carries an `X-Request-ID` header. Log it on anything you cannot resolve yourself; it is the first thing support asks for.
+
+## Field errors
+
+A `422 validation_failed` names every field that failed, in wire spelling, with the validator's own code:
+
+```json
+{
+  "error": {
+    "code": "validation_failed",
+    "message": "The request body is invalid.",
+    "details": {
+      "fields": [
+        { "field": "people[0].taxIdCountry", "code": "missing", "message": "Field required" },
+        { "field": "maxAmount", "code": "amount_precision", "message": "USDC allows 6 decimals." }
+      ]
+    }
+  }
+}
+```
+
+`details.location` appears when the failure is not in the body — `query`, `path` or `header`. Unknown keys are rejected rather than ignored, so a typo in a field name is a `422` with `code: "extra_forbidden"`, not a silently dropped value.
+
+## Status codes
+
+| Status | What it means for your code |
+| --- | --- |
+| `400` | The request could not be read: a malformed id, cursor or header. Fix the call. |
+| `401` | No session, or an expired one. Refresh the access token and retry once. |
+| `403` | The session is real but may not do this. Never retry unchanged. |
+| `404` | No such resource — including a resource that exists but is not yours. |
+| `405` | Wrong method on a real path. |
+| `409` | The resource's state refuses this request. Read the slug: some are success in disguise (`already_funded`), some ask you to wait (`funding_in_progress`), most ask you to re-read and choose again. |
+| `410` | The thing you are pointing at expired. Create a new one. |
+| `413` | The upload is too large. |
+| `422` | The body parsed but a value is wrong, or a precondition on the data is unmet. |
+| `429` | Rate limited. Sleep for `Retry-After` seconds, then retry. See [Limits](/whitelabel/reference/limits#rate-limits). |
+| `500` | Our fault. `details.requestId` identifies the failure. |
+| `501` | A mode that exists in the schema but is not enabled here. |
+| `502` | Chain infrastructure refused or was unreachable. Safe to retry a confirm. |
+| `503` | A partner or the database is temporarily unavailable. Retry with backoff. |
+
+## Request and transport
+
+| Slug | Status | What to do |
+| --- | --- | --- |
+| `invalid_request` | 400 | The request is not valid in a way no single field covers. `message` says what. |
+| `validation_failed` | 422 | Fix the fields in `details.fields`. |
+| `invalid_cursor` | 400 | The cursor belongs to another query or another sort order. Restart the walk with no `cursor`. |
+| `invalid_id` | 400 | A body or query field carries an id from another namespace. `details.expectedPrefix` names the right one. |
+| `idempotency_key_invalid` | 400 | The header is outside `^[A-Za-z0-9._:-]{1,128}$`. |
+| `idempotency_key_reused` | 409 | The same key already names different terms. `details` carries the id it owns (`payoutId`, `escrowId`). Replay the exact body, or use a new key. |
+| `unauthenticated` | 401 | Send `Authorization: Bearer <accessToken>`. |
+| `token_expired` | 401 | Re-mint with `POST /v1/auth/refresh` and retry once. |
+| `forbidden` | 403 | This session may not perform this operation. |
+| `not_found` | 404 | No such resource. |
+| `method_not_allowed` | 405 | Wrong verb for this path. |
+| `conflict` | 409 | A state conflict with no narrower slug. Read `message`, re-read the resource. |
+| `gone` | 410 | The resource is no longer available. |
+| `payload_too_large` | 413 | Send a smaller upload. |
+| `rate_limited` | 429 | Sleep `Retry-After` seconds, then retry. |
+| `provider_unavailable` | 503 | A partner is down or the sandbox treasury cannot pay. Retry with backoff. |
+| `database_unavailable` | 503 | Retry with backoff. |
+| `internal_error` | 500 | Log `details.requestId` and contact support. |
+
+## Authentication and signing
+
+| Slug | Status | What to do |
+| --- | --- | --- |
+| `invalid_credentials` | 401 | The email, the key or the proof did not check out. One code for all three, deliberately. |
+| `request_expired` | 400 | `requestExpiry` is in the past or more than five minutes out. Sign a fresh proof. |
+| `challenge_not_found` | 404 | Unknown `challengeId`. Start a new challenge. |
+| `challenge_consumed` | 409 | A challenge is single-use. Start a new one. |
+| `challenge_expired` | 410 | Start a new challenge and sign it promptly. |
+| `signature_invalid` | 400 | The signature does not verify against the stored payload. Nothing was consumed — sign the decoded payload bytes and try again. |
+| `key_not_registered` | 403 | This public key is not registered for the account. Register it in the app. |
+| `signer_not_attached` | 409 | The developer signer is not attached to the account's wallet. |
+| `wallet_not_linked` | 409 | The account has no wallet yet. For a client, wait for `status: "ready"`. |
+| `approval_consumed` | 409 | This approval already signed something. Prepare the operation again. |
+| `approval_expired` | 410 | The approval's window closed. Prepare again and sign the new payload. |
+| `approval_mismatch` | 409 | The approval does not belong to this operation. Do not reuse a payload across resources. |
+| `signing_policy_refused` | 403 | The signing policy refused the operation. Take it to support with `X-Request-ID`. |
+| `login_unavailable` | 503 | Login is temporarily unavailable. Retry with backoff. |
+| `login_mode_unavailable` | 501 | This login mode is not enabled here. `details.use` names the one that is. |
+
+## Acting as a client
+
+| Slug | Status | What to do |
+| --- | --- | --- |
+| `account_header_invalid` | 400 | `X-Hevn-Account` is not a `cl_…` id. |
+| `account_scope_conflict` | 400 | The header was sent to a route that refuses it, or it disagrees with the client id in the path. `details.reason` says which. |
+| `account_not_found` | 404 | Unknown client, or a client that is not yours. The two are indistinguishable by design. |
+| `account_forbidden` | 403 | The client exists but cannot be acted for right now — typically a paused integrator profile. |
+| `account_read_only` | 403 | This credential may read the client but not write. `details.credential` names it. |
+| `account_not_controlled` | 403 | This session does not control the account's wallet, so it cannot sign for it. |
+
+## Clients
+
+| Slug | Status | What to do |
+| --- | --- | --- |
+| `integrator_inactive` | 403 | Your integrator profile is not active. HEVN switches it on; nothing in the API does. |
+| `client_creation_not_enabled` | 403 | Your account cannot create clients yet. HEVN enables this. |
+| `email_in_use` | 409 | That email already belongs to an account. Look it up with `GET /v1/clients?email=`. |
+| `name_in_use` | 409 | Company names are globally unique. Send a more specific legal name. |
+| `client_request_conflict` | 409 | An identical client request is already in flight. Poll instead of creating again. |
+| `client_not_found` | 404 | Unknown client id, or not one of yours. |
+| `profile_locked` | 409 | The field is frozen after verification. `details.fields` names them. |
+
+## Rails and payins
+
+| Slug | Status | What to do |
+| --- | --- | --- |
+| `rail_not_found` | 404 | No such rail id. Copy one from `GET /v1/banks`. |
+| `rail_not_available` | 403 | The rail is not offered to this client. |
+| `rail_requirements_unmet` | 422 | Something the rail needs is missing. `GET /v1/banks/{rail}/requirements` lists it. |
+| `settlement_token_unsupported` | 422 | This rail cannot settle into that token. `supportedTokens` on the rail lists the ones it can. |
+| `phone_required` | 422 | The client has no phone number. `PATCH /v1/clients/{clientId}` with one, then open the rail. |
+| `payin_not_available` | 422 | This client cannot be paid in that currency over that method. `details.options` lists the pairs that work. |
+| `payin_expired` | 410 | The price no longer holds. Quote the payin again. |
+| `payin_not_found` | 404 | Unknown payin id, or one belonging to another client. |
+| `transaction_not_found` | 404 | Unknown transaction id for this account. |
+
+## Payouts
+
+Booking a payout or a transfer, and the contacts they pay. The refusals that arrive at `confirm` are in [Funding a payment](#funding-a-payment) below.
+
+| Slug | Status | What to do |
+| --- | --- | --- |
+| `contact_details_invalid` | 422 | The recipient's requisites or address are incomplete for the method. `details.fields` names them. |
+| `contact_in_use` | 409 | A payout still references this contact. It cannot be deleted. |
+| `recipient_not_payable` | 409 | The recipient cannot be paid on this rail. `details.blockers` is the same array `capabilities` returns. |
+| `recipient_requires_quote` | 409 | This recipient is paid through a payout, not a transfer. |
+| `recipient_details_invalid` | 422 | The partner refused the recipient's details — most often a beneficiary name the bank does not recognise. Correct the contact and book again. |
+| `amount_below_minimum` | 422 | Below the route's minimum. `POST /v1/payouts/preview` reports it as `minAmount`. |
+| `amount_above_maximum` | 422 | Above the route's maximum. |
+| `amount_precision_unsupported` | 422 | More decimals than the asset allows. Amounts are refused, never rounded. |
+| `payout_not_found` | 404 | Unknown payout id for this client. |
+| `payout_not_fundable` | 409 | This payout can no longer be funded. Book a new one. |
+| `quote_expired` | 409 | The price expired. Book again with the same `Idempotency-Key` to get a fresh one. |
+| `bundler_rejected` | 502 | The chain rejected the operation. Confirm again with backoff. |
+| `bundler_unavailable` | 502 | Chain infrastructure is unreachable. Confirm again with backoff. |
+
+## Funding a payment
+
+These arrive at `POST /v1/payouts/{payoutId}/confirm` and `POST /v1/transfers/{transferId}/confirm`; two of them — `quote_not_submitted` and `payout_not_fundable` — also answer the sandbox settlement routes, where they mean the same thing. The decision table for the four that branch is on [Payouts](/whitelabel/payouts#when-a-payout-is-refused).
+
+| Slug | Status | What to do |
+| --- | --- | --- |
+| `already_funded` | 409 | **Success.** The money moved; `details.transactionHash` proves it. Never re-open. |
+| `funding_in_progress` | 409 | An attempt is still in flight. Wait, then confirm again. |
+| `funding_attempt_expired` | 409 | The approval expired. Re-open with the same `Idempotency-Key` and sign the new payload. |
+| `funding_attempts_exhausted` | 409 | Too many re-opens. Quote a new payout with a new key. |
+| `funding_state_unknown` | 409 | An earlier attempt may still land. **Do not retry.** Read the payout, then take it to support. |
+| `insufficient_funds` | 409 | The client's balance does not cover the debit. `details.available` and `details.required` are atomic units. |
+| `contact_changed` | 409 | The contact was edited after the payout was booked. Book again. |
+| `contact_not_found` | 404 | The contact was deleted. |
+| `quote_not_submitted` | 409 | The payout was never booked with the partner. Book it again. |
+| `quote_not_fundable` | 409 | The booking is no longer fundable. Request a new one. |
+| `funding_mode_unsupported` | 409 | This route cannot be funded with a developer key. |
+| `funding_token_unsupported` | 409 | Only USDC funds a payout. |
+| `contact_requires_quote` | 409 | A bank contact is paid with `POST /v1/payouts`, not `POST /v1/transfers`. |
+| `direct_transfer_unsupported` | 409 | A transfer is USDC on Base to a crypto contact. Anything else is a payout. |
+| `self_transfer` | 409 | The recipient is the client's own wallet. |
+| `smart_wallet_not_deployed` | 409 | The client's wallet is not on chain yet. Wait for `status: "ready"`. |
+| `wallet_owner_unverified` | 409 | The wallet's owner set does not yet include the signer. Contact support. |
+| `user_operation_rejected` | 502 | The bundler rejected the operation. Confirm again. |
+| `user_operation_unavailable` | 502 | The bundler or paymaster is unavailable. Confirm again with backoff. |
+
+## KYB and documents
+
+| Slug | Status | What to do |
+| --- | --- | --- |
+| `kyb_incomplete` | 422 | Submission was attempted with gaps. `GET /v1/clients/{clientId}/kyb` lists `missing[]`. |
+| `kyb_roster_conflict` | 409 | The people on file conflict with this write — usually a person removed while still owning shares. |
+| `kyb_subject_conflict` | 409 | The subject conflicts with the verification data already on file. |
+| `document_fields_missing` | 422 | A document carries none of the values a reviewer needs. `details.documents` names each `<slot>.<key>`; write them with `PUT /v1/documents/{documentId}/content`. |
+| `document_not_found` | 404 | Unknown `doc_…` id for this client. |
+| `document_type_unsupported` | 422 | That slot does not accept this document type. |
+| `invalid_enum_value` | 422 | The value is not one of the accepted ones. See [KYB fields](/whitelabel/reference/kyb-fields). |
+| `entity_not_found` | 404 | Unknown person or company in the verification data. |
+
+## Escrow
+
+| Slug | Status | What to do |
+| --- | --- | --- |
+| `escrow_not_found` | 404 | Unknown deal id, or a deal you do not operate. |
+| `escrow_action_not_found` | 404 | No action on this deal carries that idempotency key. The confirm URL takes the **raw** key you sent to `POST /actions`. |
+| `escrow_not_operated_by_you` | 403 | You are a party to the deal but not its operator. |
+| `escrow_state_changed` | 409 | The deal moved since the action was prepared: nothing is capturable, the payment was already collected, or the approval already landed. Read the deal and pick from `availableActions`. |
+| `action_in_flight` | 409 | One signing wallet runs one action at a time, across every deal. The refusal carries no `details`, so track the deal you left in flight yourself, sync it, then retry. |
+| `simulation_failed` | 409 | The action would revert on chain. Check balances and windows, then prepare again. |
+| `stale_nonce` | 409 | The wallet's nonce moved between prepare and confirm. Prepare again with the same key. |
+| `amount_not_allowed` | 409 | `void` and `reclaim` take no amount. |
+| `amount_out_of_range` | 422 | The amount is outside what the deal allows. An over-large `capture` or `authorize` currently arrives as a bare `400 invalid_request` instead, with no `details` and the generic message. |
+| `window_closed` | 409 | The action's window has passed. A closed window currently arrives as a bare `400 invalid_request` instead — handle both the same way: read the deal, pick from `availableActions`. |
+| `token_not_supported` | 422 | Escrow settles in `USDC` or `EURC`, by symbol. |
+| `receiver_not_a_client` | 422 | Both parties must be clients of yours. |
+| `conflict` | 409 | A state conflict with no narrower slug — on escrow it is what an unclassified deal error becomes. Read `message`, re-read the deal. An approval that closed is `410 approval_expired`, one already used is `409 approval_consumed`. |
+| `bundler_rejected`, `bundler_unavailable` | 502 | Chain infrastructure. Confirm again with backoff. |
+
+## Handling a refusal in code
+
+Write the envelope into a typed error once, at the bottom of your HTTP layer: read `error.code`, keep `error.details`, honour `Retry-After` on a `429`, re-mint the access token once on a `401`, and log `details.requestId` on anything `5xx`. Every example in these guides calls that one helper, and it is written out in full on [HTTP client](/whitelabel/reference/client).
+
+<Card title="Next: Limits" icon="gauge" href="/whitelabel/reference/limits">
+  Every number that can refuse a request: rate limits, expiry windows, page sizes, sandbox caps.
+</Card>

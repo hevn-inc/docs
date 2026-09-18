@@ -1,0 +1,56 @@
+<CodeGroup>
+
+```python Python
+import random, time
+
+
+def poll_until(read, done, *, deadline=120.0, first=1.0, cap=8.0):
+    """Call read() until done(value) is true. Returns the last value or raises TimeoutError."""
+    started, delay = time.monotonic(), first
+    while True:
+        value = read()
+        if done(value):
+            return value
+        if time.monotonic() - started > deadline:
+            raise TimeoutError(f"still {value.get('status')} after {deadline:.0f}s")
+        time.sleep(delay + random.uniform(0, delay / 2))
+        delay = min(delay * 2, cap)
+```
+
+```javascript Node
+export async function pollUntil(read, done, { deadline = 120_000, first = 1_000, cap = 8_000 } = {}) {
+  const until = Date.now() + deadline;
+  let delay = first;
+  for (;;) {
+    const value = await read();
+    if (done(value)) return value;
+    if (Date.now() > until) throw new Error(`still ${value.status} after ${deadline}ms`);
+    await new Promise((wake) => setTimeout(wake, delay + Math.random() * (delay / 2)));
+    delay = Math.min(delay * 2, cap);
+  }
+}
+```
+
+```go Go
+func PollUntil[T any](read func() (T, error), done func(T) bool, deadline time.Duration) (T, error) {
+	until, delay := time.Now().Add(deadline), time.Second
+	for {
+		value, err := read()
+		if err != nil {
+			return value, err
+		}
+		if done(value) {
+			return value, nil
+		}
+		if time.Now().After(until) {
+			return value, fmt.Errorf("hevn: still pending after %s", deadline)
+		}
+		time.Sleep(delay + time.Duration(rand.Int63n(int64(delay/2))))
+		if delay < 8*time.Second {
+			delay *= 2
+		}
+	}
+}
+```
+
+</CodeGroup>

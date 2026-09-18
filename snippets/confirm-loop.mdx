@@ -1,0 +1,100 @@
+<CodeGroup>
+
+```python Python
+CONFIRM_AGAIN = {"funding_in_progress", "bundler_rejected", "bundler_unavailable"}
+
+
+class ReopenRequired(Exception):
+    """The approval expired. Re-open the payment with the same Idempotency-Key."""
+
+
+def confirm_until_settled(self, confirm_path: str, signature: str, *, deadline=180.0):
+    """A method on Hevn. confirm_path is "/payouts/po_…/confirm" or "/transfers/tr_…/confirm"."""
+    started, delay = time.monotonic(), 1.0
+    while True:
+        try:
+            receipt = self.post(confirm_path, {"signature": signature})
+            if receipt["status"] != "submitted":
+                return receipt
+            reason = "submitted"
+        except HevnError as error:
+            if error.code == "already_funded":
+                return {"status": "settled", "transactionHash": error.details.get("transactionHash")}
+            if error.code == "funding_attempt_expired":
+                raise ReopenRequired(confirm_path) from error
+            if error.code not in CONFIRM_AGAIN:
+                raise
+            reason = error.code
+        if time.monotonic() - started > deadline:
+            raise TimeoutError(f"{confirm_path} still {reason} after {deadline:.0f}s")
+        time.sleep(delay)
+        delay = min(delay * 2, 8.0)
+```
+
+```javascript Node
+const CONFIRM_AGAIN = new Set(["funding_in_progress", "bundler_rejected", "bundler_unavailable"]);
+
+export class ReopenRequired extends Error {}
+
+// A method on Hevn. confirmPath is "/payouts/po_…/confirm" or "/transfers/tr_…/confirm".
+export async function confirmUntilSettled(confirmPath, signature, { deadline = 180_000 } = {}) {
+  const until = Date.now() + deadline;
+  let delay = 1_000;
+  for (;;) {
+    let reason = "submitted";
+    try {
+      const receipt = await this.post(confirmPath, { signature });
+      if (receipt.status !== "submitted") return receipt;
+    } catch (error) {
+      if (error.code === "already_funded") {
+        return { status: "settled", transactionHash: error.details.transactionHash };
+      }
+      if (error.code === "funding_attempt_expired") throw new ReopenRequired(confirmPath);
+      if (!CONFIRM_AGAIN.has(error.code)) throw error;
+      reason = error.code;
+    }
+    if (Date.now() > until) throw new Error(`${confirmPath} still ${reason}`);
+    await new Promise((wake) => setTimeout(wake, delay));
+    delay = Math.min(delay * 2, 8_000);
+  }
+}
+```
+
+```go Go
+var confirmAgain = map[string]bool{
+	"funding_in_progress": true, "bundler_rejected": true, "bundler_unavailable": true,
+}
+
+var ErrReopenRequired = errors.New("hevn: approval expired, re-open with the same Idempotency-Key")
+
+// confirmPath is "/payouts/po_…/confirm" or "/transfers/tr_…/confirm".
+func (c *Client) ConfirmUntilSettled(confirmPath, signature string) (Payload, error) {
+	until, delay := time.Now().Add(3*time.Minute), time.Second
+	for {
+		receipt, err := c.Post(confirmPath, Body{"signature": signature})
+		var apiErr *APIError
+		switch {
+		case err == nil && receipt.Str("status") != "submitted":
+			return receipt, nil
+		case err == nil: // submitted: no receipt yet, confirm again
+		case !errors.As(err, &apiErr):
+			return nil, err
+		case apiErr.Code == "already_funded":
+			return Payload{"status": "settled", "transactionHash": apiErr.Details["transactionHash"]}, nil
+		case apiErr.Code == "funding_attempt_expired":
+			return nil, ErrReopenRequired
+		case !confirmAgain[apiErr.Code]:
+			return nil, err
+		}
+		if time.Now().After(until) {
+			return nil, fmt.Errorf("hevn: %s did not settle in time", confirmPath)
+		}
+		time.Sleep(delay)
+		if delay < 8*time.Second {
+			delay *= 2
+		}
+	}
+}
+```
+
+</CodeGroup>

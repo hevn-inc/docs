@@ -1,0 +1,199 @@
+---
+title: "Sandbox"
+description: "The one place /v1/sandbox/* is documented: read the treasury, mint money, settle a payin and move a payout."
+---
+
+import ActingAsSnippet from "/snippets/acting-as.mdx";
+import EnvSnippet from "/snippets/env.mdx";
+import SandboxCapsSnippet from "/snippets/sandbox-caps.mdx";
+
+The sandbox is the same API against one emulated partner on Base Sepolia. Same paths, same bodies, same slugs, same signatures — only the counterparty is fake, and four extra routes let you play it: the 44 operations production serves, plus these.
+
+<EnvSnippet />
+
+## What is real and what is emulated
+
+| | In the sandbox |
+| --- | --- |
+| Chain | Base Sepolia. Balances, wallets, signatures and transaction hashes are real; the tokens are testnet USDC and EURC. |
+| Fiat partner | One emulator answers for every rail. It issues checksum-valid requisites — `SBOX…` BICs, DE/AE/GB IBANs, ABA routing numbers, a PIX key, an 18-digit SPEI number. |
+| Money in and out | Paid by a shared HEVN treasury on demand, through the routes below. Nothing arrives on its own. |
+| FX | A fixed table: USD 1, EUR 1.08, GBP 1.27, AED 0.2723, and so on, with USDC pegged to USD and EURC to EUR. |
+| Verification | A submitted KYB application is approved immediately. Rails open without a compliance queue. |
+| Background work | Off. Every call projects its own rows before it returns, so there is nothing to wait for that you did not ask for. |
+| Cards, swaps, cross-chain routing | Disabled. They are not part of the whitelabel API. |
+
+<SandboxCapsSnippet />
+
+Three of these four routes move a client's money, and the header is how you pick which client. `GET /v1/sandbox/treasury` accepts it and reports the same shared treasury either way.
+
+<ActingAsSnippet />
+
+None of these routes exist in production; there they answer `404`.
+
+## What the sandbox does not grant
+
+Being an integrator, being allowed to create clients, and being allowed to operate escrow are flags on your account, and nothing in the API sets them — in the sandbox as in production, HEVN does. There is no self-enrolment call. Until the flags are on, `POST /v1/clients` answers `403 integrator_inactive` or `403 client_creation_not_enabled`; `GET /v1/clients` answering an empty page is the cheapest confirmation that they are.
+
+## Read the treasury
+
+Every emulated credit is paid by one account, and every emulated payout is booked against it.
+
+<CodeGroup>
+
+```bash cURL
+curl -s "$HEVN_API/sandbox/treasury" -H "Authorization: Bearer $HEVN_ACCESS_TOKEN"
+```
+
+```python Python
+treasury = hevn.get("/sandbox/treasury")
+```
+
+```javascript Node
+const treasury = await hevn.get("/sandbox/treasury");
+```
+
+```go Go
+treasury, err := api.Get("/sandbox/treasury")
+```
+
+</CodeGroup>
+
+```json Response — 200
+{ "chainId": 84532, "address": "0x7d4E5E29e6d40735D4f9bB74a0234383068f8A21",
+  "gasBalance": "0.0412", "maxCredit": "100",
+  "balances": [ { "token": "USDC", "tokenAddress": "0x036CbD…", "balance": "842.51" },
+                { "token": "EURC", "tokenAddress": "0x808456…", "balance": "310.00" } ] }
+```
+
+`maxCredit` is the live per-call ceiling. When the treasury is empty or out of gas, credits answer `503 provider_unavailable` with `details.treasuryAddress` and `details.token` — that is a faucet problem, not your bug.
+
+## Mint money
+
+`POST /v1/sandbox/deposits` has two arms, and `bankId` picks between them.
+
+- **With `bankId`** it is an unsolicited bank transfer into that rail's requisites: `amount` is in the rail's currency, the emulator converts at the fixed rate and delivers the settlement token to the client's wallet. `remitter` and `paymentReference` are the payer's name and message.
+- **Without `bankId`** it is a token transfer straight to the client's wallet. `token` is `USDC` (default) or `EURC`, and it is the fastest way to fund a client before a payout test.
+
+<CodeGroup>
+```bash cURL
+curl -s -X POST "$HEVN_API/sandbox/deposits" \
+  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+  -H "X-Hevn-Account: $HEVN_CLIENT_ID" \
+  -H "Idempotency-Key: fund-northwind-001" \
+  -H "Content-Type: application/json" \
+  -d '{"amount":"6.00","token":"USDC"}'
+```
+
+```python Python
+northwind = hevn.acting_as(CLIENT_ID)
+credit = northwind.post("/sandbox/deposits", {"amount": "6.00", "token": "USDC"},
+                        idempotency_key="fund-northwind-001")
+```
+
+```javascript Node
+const northwind = hevn.actingAs(clientId);
+const credit = await northwind.post("/sandbox/deposits",
+  { amount: "6.00", token: "USDC" },
+  { idempotencyKey: "fund-northwind-001" });
+```
+
+```go Go
+northwind := api.ActingAs(clientID)
+credit, err := northwind.Post("/sandbox/deposits", hevn.Body{"amount": "6.00", "token": "USDC"},
+	hevn.IdempotencyKey("fund-northwind-001"))
+```
+</CodeGroup>
+
+```json Response — 200
+{ "depositId": "sbx_cd_1b8e0f7a2c", "status": "settled",
+  "token": "USDC", "amount": "6.000000", "currency": "USDC",
+  "idempotencyKey": "fund-northwind-001",
+  "credited": "6.000000", "txHash": "0x08fa…", "transactionId": "txn_9e4…" }
+```
+
+A bank deposit answers the same shape with the fiat side filled in — `amount` and `currency` in the rail's currency, `credited` in the settlement token, plus `fee`, `feeCurrency` and `rate`. When the credit settles a payin you quoted, `payinId` names it.
+
+The key is optional here, as everywhere. Send one and a retry replays it (`200` with `Idempotency-Replayed: true`); send none and HEVN derives one from the request and echoes it as `idempotencyKey`. Two identical un-keyed deposits always replay, whatever the gap between them, so pass an explicit key when you want a second identical credit.
+
+`202` means the treasury's transfer has not confirmed yet. Repeat the same request until it is `settled`; nothing is ever credited twice.
+
+## Settle a payin
+
+A quoted payin waits for a bank transfer that will never arrive on its own. This route is that transfer.
+
+<CodeGroup>
+
+```bash cURL
+curl -s -X POST "$HEVN_API/sandbox/payins/pi_2b7f14c0a9/complete" \
+  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+  -H "X-Hevn-Account: $HEVN_CLIENT_ID" \
+  -H "Content-Type: application/json" \
+  -d '{"remitter":"ACME GmbH"}'
+```
+
+```python Python
+settled = northwind.post(f"/sandbox/payins/{payin['id']}/complete", {"remitter": "ACME GmbH"})
+```
+
+```javascript Node
+const settled = await northwind.post(`/sandbox/payins/${payin.id}/complete`,
+  { remitter: "ACME GmbH" });
+```
+
+```go Go
+settled, err := northwind.Post("/sandbox/payins/"+payin.Str("id")+"/complete",
+	hevn.Body{"remitter": "ACME GmbH"})
+```
+
+</CodeGroup>
+
+The body is optional and `remitter` is the only field in it — it becomes the payer name on the resulting income row, which is what you want if you are testing reconciliation. The payin must be open: one you never opened with `POST /v1/payins/{payinId}/instructions` answers `409 quote_not_submitted`.
+
+## Move a payout
+
+Booking and signing a payout work exactly as in production; the partner is emulated, so nothing settles on its own. You drive it.
+
+<CodeGroup>
+```bash cURL
+curl -s -X POST "$HEVN_API/sandbox/payouts/po_4c8a13d7f2/status" \
+  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+  -H "X-Hevn-Account: $HEVN_CLIENT_ID" \
+  -H "Content-Type: application/json" \
+  -d '{"status":"settled"}'
+```
+
+```python Python
+moved = northwind.post(f"/sandbox/payouts/{payout['id']}/status", {"status": "settled"})
+```
+
+```javascript Node
+const moved = await northwind.post(`/sandbox/payouts/${payout.id}/status`, { status: "settled" });
+```
+
+```go Go
+moved, err := northwind.Post("/sandbox/payouts/"+payout.Str("id")+"/status",
+	hevn.Body{"status": "settled"})
+```
+</CodeGroup>
+
+| `status` | Needs the payout funded | What it does |
+| --- | --- | --- |
+| `submitted` | yes | The partner accepted the payment. |
+| `settled` | yes | The payout is done and the ledger row becomes a success. |
+| `failed` | no | Allowed at any point. The money does **not** come back. |
+| `refunded` | yes | The status flips, then the treasury returns the source token to the client's wallet. |
+
+"Funded" means the on-chain debit you signed has landed. Asking for anything but `failed` before that answers `409 payout_not_fundable`. An illegal move — `settled` back to `submitted` — answers `409 conflict`. `refunded` answers `202` until the return lands; call it again until `refundTxHash` is set, and the same send is resumed, never duplicated.
+
+`status` shares its type with a payout's own status, so the schema also admits `awaitingSignature` — the one value this route never accepts. Sending it answers `422 validation_failed` with `details.fields[0].code = "value_error"` and the four legal values in the message; the four above are the whole vocabulary.
+
+Keep two test payouts more than `0.20` apart in amount: returned money is attributed to a refunded payout by amount, within a `0.20` tolerance.
+
+## What the sandbox does for you
+
+Three things the production path makes you wait for happen here without a call: a submitted KYB application is approved immediately, a rail you open becomes `active` with requisites as soon as the partner is asked, and every row exists by the time the call returns. That is the difference that will bite when you switch hosts — [Going live](/whitelabel/going-live) is the list.
+
+<Card title="Next: Going live" icon="rocket" href="/whitelabel/going-live">
+  What HEVN must enable, what you re-create per environment, and what production starts refusing.
+</Card>

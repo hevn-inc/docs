@@ -1,89 +1,144 @@
 ---
 title: "API authentication"
-description: "The X-Api-Key header, key issuance, idempotency, and the public mode used by HEVN REST calls."
+description: "Two calls to log in with a developer key, two tokens to hold, and one header to act as a client."
 ---
 
-All authenticated endpoints take one HEVN app API key (`hvn_...`), sent in the **`X-Api-Key`** header. There is no alternate header mode: `Authorization: Bearer` is reserved for the app's own JWT session flow and is not used by API keys or the CLI.
-
-## API key mode
+Every authenticated operation in this reference takes one header:
 
 ```http
-X-Api-Key: hvn_...
-Accept: application/json
-device-id: hevn-cli
-device-type: cli
-device-name: HEVN CLI
+Authorization: Bearer <accessToken>
+Content-Type: application/json
 ```
 
-The CLI builds these headers from `HEVN_API_KEY` or saved login config:
+The access token is a short-lived JWT your backend mints for itself, and the only credential this
+API documents. The refresh token is taken by `POST /auth/refresh` alone, and `X-Api-Key` belongs to
+the [CLI](/cli/overview): it cannot sign, and acting for a client with one is read-only
+(`403 account_read_only` on a write).
 
-```bash
-export HEVN_API_KEY="hvn_..."
+This page is the reference summary. [Sessions](/whitelabel/sessions) is the same flow with runnable
+Python, Node and Go.
+
+## Three credentials
+
+| Credential | Where it lives | Lifetime | What it authorizes |
+| --- | --- | --- | --- |
+| **Developer key** — a P-256 keypair you generate | Your servers. HEVN stores only the public half | Until you rotate it | Logging in without a browser, and signing money movement |
+| **Refresh token** | Your secret store | 60 days | Only `POST /auth/refresh` |
+| **Access token** | In memory | 60 minutes (`expiresIn: 3600`) | Every other operation |
+
+The public half is registered once per environment from the HEVN app, because registration changes
+your account's signer and needs your own browser session. Everything after that is code — see
+[Developer key](/whitelabel/developer-key).
+
+## Log in
+
+Two calls, neither of which needs a token.
+
+<Steps>
+  <Step title="Start a challenge">
+    `POST /auth/challenge` with `{email, publicKey, nonce, requestExpiry, signature}`, where
+    `signature` is your key's signature over these exact UTF-8 bytes:
+
+    ```
+    hevn-developer-key-login:{email}:{nonce}:{requestExpiry}
+    ```
+
+    `nonce` is a fresh non-negative integer and `requestExpiry` is epoch **milliseconds** at most
+    five minutes ahead. The answer is a `challengeId` and a base64 `payload`.
+  </Step>
+  <Step title="Exchange the signed payload for a session">
+    Base64-decode `payload`, sign those exact bytes, and call `POST /auth/token` with
+    `{challengeId, signature}`. It answers `accessToken`, `refreshToken`, `expiresIn` and `userId`.
+  </Step>
+</Steps>
+
+A challenge is single-use and expires within minutes. Every credential problem — unknown email,
+unregistered key, detached signer, bad signature — answers the same `401 invalid_credentials`, so
+probing learns nothing; only an expiry outside the window differs, as `400 request_expired`.
+
+## Re-mint an access token
+
+```http
+POST /auth/refresh
+Authorization: Bearer <refreshToken>
+Content-Type: application/json
+
+{}
 ```
 
-Use browser login:
-
-```bash
-hevn login
+```json
+{ "accessToken": "eyJ…", "expiresIn": 3600, "userId": "cl_9f2c…" }
 ```
 
-or direct API-key login for automation:
+Log in once per process, keep the refresh token in your secret store, and re-mint about a minute
+before the access token expires.
 
-```bash
-hevn login --api-key hvn_...
-hevn login --api-key hvn_... --api-base-url https://api.example.com/api/v1
+`POST /auth/refresh` also accepts `{"userId": "cl_…"}` and mints a token scoped to that one client.
+It still works and it is no longer the documented path: it costs one mint per client per hour and
+buys nothing `X-Hevn-Account` does not give you.
+
+## Act as a client
+
+Send the client's id alongside your own access token:
+
+```http
+Authorization: Bearer <accessToken>
+X-Hevn-Account: cl_7YQ2Kf3mN8
 ```
 
-`hevn login` stores the API key (and the base URL, when provided or returned by the login callback) in the local CLI config.
+Omit the header and the same call acts on your integrator account. One token covers every client you
+control, so there is nothing to cache per client. Each operation declares whether it accepts, refuses
+or path-scopes the header in the `x-hevn-acting-as` extension; the table of which is which is in
+[Sessions](/whitelabel/sessions#acting-as-a-client).
 
-## Non-interactive auth
+Sending the header where it is refused is an error, not a silent no-op:
+`400 account_header_invalid`, `400 account_scope_conflict`, `404 account_not_found` and
+`403 account_forbidden` are the four you will meet.
 
-In CI and other non-interactive environments, avoid browser login and pass a key directly:
+<Warning>
+  Tokens are bound to the server that issued them. A sandbox token is refused by production and the
+  reverse, so log in separately against each host and keep one developer key per environment.
+</Warning>
 
-```bash
-hevn login --api-key hvn_...
-HEVN_API_KEY=hvn_... hevn whoami --yaml
-```
+## Signing money movement
 
-If interactive login is attempted in non-interactive mode, the CLI exits with `AUTH_REQUIRED` and reports the supported auth methods.
+A token is enough to read data and write metadata. Moving money additionally needs a signature from
+the developer key, because that key — not HEVN alone — can authorize a spend from a client wallet.
+
+<Steps>
+  <Step title="Prepare">
+    The opening call — `POST /payouts`, `POST /transfers`, `POST /escrow/{escrowId}/actions` —
+    prices the payment, books it, builds the on-chain operation and answers `approval.payload`
+    plus a `debit` decoded from that operation.
+  </Step>
+  <Step title="Check and sign">
+    Compare `debit` with the payment your own system intended. Then base64-decode `payload` and sign
+    **those exact bytes**: ECDSA P-256 over SHA-256, DER-encoded, standard padded base64. Raw
+    `r‖s`, base64url and a re-serialized JSON body all produce `400 signature_invalid`.
+  </Step>
+  <Step title="Confirm">
+    Post `{signature}` to the matching confirm route. HEVN verifies it locally, co-signs and submits.
+    A `202` means the receipt has not landed — confirm again with the same body; never re-open.
+  </Step>
+</Steps>
+
+Approvals are short: 120 seconds for a payout or transfer, 60 seconds for an escrow action. The
+byte-level rules, the pitfalls and the retry table are in [Signing](/whitelabel/signing).
+
+<Warning>
+  The developer key can authorize a spend from every client wallet you control. Keep the private half
+  in a secret manager, never in a browser, and rehearse
+  [rotation](/whitelabel/developer-key#rotate-a-key) before you need it.
+</Warning>
 
 ## Idempotency
 
-Transfer and deposit writes can include:
+`Idempotency-Key` is accepted on every write and required on none. It matches
+`^[A-Za-z0-9._:-]{1,128}$`, is scoped to your account and the operation, and replays the first
+answer with `Idempotency-Replayed: true`. Omit it and the server derives one and echoes it.
 
-```http
-Idempotency-Key: <stable-operation-id>
-```
+## Rate limits
 
-CLI example:
-
-```bash
-hevn transfer contact \
-  --contact-id <contact-id> \
-  --amount 25 \
-  --idempotency-key <stable-operation-id>
-```
-
-`hevn transfer email` and `hevn transfer contact` generate an idempotency key automatically when you don't pass one; for `hevn transfer --invoice-id`, pass `--idempotency-key` explicitly if you need retry safety.
-
-## API-key introspection
-
-Use `whoami` to inspect the active API key, owning app, scopes, balance, and remaining spend limit:
-
-```bash
-hevn whoami --yaml
-```
-
-## Public mode
-
-`PublicApi` sends only:
-
-```http
-Accept: application/json
-```
-
-It is used for FX rates and public invoice lookup.
-
-<Warning>
-  Debug output may include authentication headers. Redact debug logs before sharing them.
-</Warning>
+Rate limits are per credential: 120 writes and 600 reads a minute, with their own per-IP, per-email
+and per-challenge windows on login. Over one is `429 rate_limited` with `Retry-After`. Every number
+is in [Limits](/whitelabel/reference/limits).

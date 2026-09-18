@@ -1,0 +1,196 @@
+---
+title: "Balances and transactions"
+description: "Read a client's balance, walk its ledger with a cursor, and export statements, confirmations and receipts."
+---
+
+import ActingAsSnippet from "/snippets/acting-as.mdx";
+
+Read a client through three surfaces: its balance, its ledger, and its exports.
+
+| Surface | Route | Answers |
+| --- | --- | --- |
+| **Balance** | `GET /v1/clients/{clientId}/balance` | What the client's wallet holds right now, read on chain |
+| **Ledger** | `GET /v1/transactions`, `GET /v1/transactions/{transactionId}`, `GET /v1/transactions/summary` | Every movement in or out, newest first, with totals for the same filters |
+| **Exports** | `GET /v1/transactions/export` | A file: a transaction list, an account statement, an account confirmation or a receipt |
+
+<ActingAsSnippet />
+
+The balance route is the exception: the client is in the path, so no header is needed, and a header that disagrees with the path id is refused.
+
+## Balance
+
+<CodeGroup>
+```bash cURL
+curl -s "$HEVN_API/clients/cl_7YQ2Kf3mN8/balance" \
+  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN"
+```
+
+```python Python
+balance = hevn.get(f"/clients/{CLIENT_ID}/balance")
+```
+
+```javascript Node
+const balance = await hevn.get(`/clients/${clientId}/balance`);
+```
+
+```go Go
+balance, err := api.Get("/clients/" + clientID + "/balance")
+```
+</CodeGroup>
+
+```json Response — 200
+{ "clientId": "cl_7YQ2Kf3mN8",
+  "baseSmartWallet": "0x2f1c…",
+  "tokens": [ { "token": "USDC", "balance": "1204.500000", "usdValue": "1204.50" },
+              { "token": "EURC", "balance": "459.310000", "usdValue": "496.55" } ],
+  "totalUsd": "1701.05" }
+```
+
+Every number is a decimal string in the major unit — no atomic units, no floats. `balance` carries the token's own precision, `usdValue` and `totalUsd` are rounded to cents. `baseSmartWallet` is the address funds live at and the address a crypto payer sends to; it is the only address on this surface.
+
+The read hits the chain, so it is the truth about spendable funds — and it is what `POST /v1/payouts` checks before it lets you sign. A payout refused with `insufficient_funds` and a balance that looks sufficient means the difference is an in-flight debit, not a stale cache.
+
+## Walk the ledger
+
+`GET /v1/transactions` is cursor-paged, newest first. Pass `nextCursor` back as `cursor` until it is gone. There is no `offset` and no total.
+
+<CodeGroup>
+```bash cURL
+curl -s "$HEVN_API/transactions?limit=50&incomeOnly=true" \
+  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+  -H "X-Hevn-Account: $HEVN_CLIENT_ID"
+```
+
+```python Python
+page = northwind.get("/transactions", params={"limit": 50, "incomeOnly": True})
+while page["nextCursor"]:
+    page = northwind.get("/transactions", params={"limit": 50, "cursor": page["nextCursor"]})
+```
+
+```javascript Node
+let page = await northwind.get("/transactions", { limit: 50, incomeOnly: true });
+while (page.nextCursor) {
+  page = await northwind.get("/transactions", { limit: 50, cursor: page.nextCursor });
+}
+```
+
+```go Go
+page, err := northwind.Get("/transactions", hevn.Query{"limit": "50", "incomeOnly": "true"})
+for page.Str("nextCursor") != "" {
+	page, err = northwind.Get("/transactions", hevn.Query{"limit": "50", "cursor": page.Str("nextCursor")})
+}
+```
+</CodeGroup>
+
+```json Response — 200
+{ "items": [
+    { "id": "txn_9e4…", "type": "sepa", "status": "success", "isIncome": false,
+      "from": { "amount": "500.00", "currency": "USD", "usdRate": "1.00" },
+      "to": { "amount": "459.31", "currency": "EUR", "usdRate": "1.0815" },
+      "fee": { "amount": "1.00", "currency": "USD" },
+      "counterparty": "Ardenne Fabrication SARL",
+      "paymentReference": "INV-2026-114",
+      "txHash": "0x4f1c…", "hasAttachments": false,
+      "createdAt": "2026-09-17T10:04:39Z" } ],
+  "nextCursor": "eyJ0IjoiMjAyNi0w…" }
+```
+
+`from` is what left the source side and `to` what arrived at the destination; on a same-asset movement they are equal. `isIncome` is the direction, `counterparty` is the resolved name of the other party, and `txHash` is the on-chain leg where there is one. A cursor belongs to the query that produced it: change a filter and start again, or the call answers `400 invalid_cursor`.
+
+### Filters
+
+Every filter is a query parameter, camelCase, and the list-shaped ones take comma-separated values.
+
+| Parameter | Takes |
+| --- | --- |
+| `type` | Transaction types: the rail method slugs (`sepa`, `ach`, `swift`, `fedwire`, …), `crypto` for on-chain movement, `refund` for a returned payment |
+| `status` | `pending`, `rfi`, `success`, `failed`, `refunded` |
+| `incomeOnly` | `true` for money in only |
+| `contactId` | One or more `ct_…`, the recipients you paid |
+| `bankId` | One or more `bnk_…`, the rails money arrived on |
+| `tag` | A category on the row, from the fixed set the ledger uses (`PAYROLL`, `CONTRACTORS`, `BANK_FEES`, …), or `UNTAGGED` |
+| `q` | Free text, at least two characters |
+| `from`, `to` | ISO-8601 timestamps bounding `createdAt` |
+| `limit`, `cursor` | Page size 1–100, default 50, and the opaque cursor |
+
+Values are matched exactly, case included. A value outside the set answers `400 invalid_request` with the offending one in `details.reason`, rather than returning a silently narrower page.
+
+### Totals for the same filters
+
+`GET /v1/transactions/summary` takes the same filters and answers the aggregate, in USD, settled and pending kept apart:
+
+```json Response — 200
+{ "inflowUsd": "12040.50", "inflowCount": 9,
+  "outflowUsd": "8300.00", "outflowCount": 14,
+  "pendingInflowUsd": "2000.00", "pendingInflowCount": 1,
+  "pendingOutflowUsd": "0.00", "pendingOutflowCount": 0 }
+```
+
+It is its own route, so an aggregate is never folded into a page and never depends on which page you asked for.
+
+### One transaction
+
+`GET /v1/transactions/{transactionId}` returns the same row plus `description`, `explorerUrl`, `traceNumber` and `attachmentIds` (`doc_…`). Use it when you have an id — from a payout's `transactionId`, from a sandbox credit, or from a row you are reconciling.
+
+## Exports
+
+`GET /v1/transactions/export` streams a file. The name arrives in `Content-Disposition`; there is no JSON body and no document to fetch afterwards.
+
+| `kind` | Also needs | `format` | Contents |
+| --- | --- | --- | --- |
+| omitted | — | `csv` (default), `xlsx`, `pdf` | The filtered transaction list, exactly what `GET /v1/transactions` would return |
+| `statement` | `bankId` | `pdf`, `xlsx` | An account statement for that rail over the period |
+| `confirmation` | `bankId` | `pdf`, `xlsx` | A confirmation of the account's existence and requisites |
+| `receipt` | `transactionId` | `pdf` | A receipt for one transaction |
+
+<CodeGroup>
+
+```bash cURL
+curl -s "$HEVN_API/transactions/export?kind=statement&bankId=bnk_88Hq3T&format=pdf&from=2026-09-01&to=2026-09-30" \
+  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+  -H "X-Hevn-Account: $HEVN_CLIENT_ID" \
+  -o statement.pdf
+```
+
+```python Python
+northwind.download("/transactions/export", {
+    "kind": "statement", "bankId": "bnk_88Hq3T", "format": "pdf",
+    "from": "2026-09-01", "to": "2026-09-30",
+}, "statement.pdf")
+```
+
+```javascript Node
+await northwind.download("/transactions/export", {
+  kind: "statement", bankId: "bnk_88Hq3T", format: "pdf",
+  from: "2026-09-01", to: "2026-09-30",
+}, "statement.pdf");
+```
+
+```go Go
+_, err := northwind.Download("/transactions/export", hevn.Query{
+	"kind": "statement", "bankId": "bnk_88Hq3T", "format": "pdf",
+	"from": "2026-09-01", "to": "2026-09-30",
+}, "statement.pdf")
+```
+
+</CodeGroup>
+
+`download` is the one method that writes bytes instead of parsing JSON —
+[the reference client](/whitelabel/reference/client#download-an-export) has it.
+
+Every ledger filter applies to an export as well, so a statement can be narrowed the same way a page can. A statement with no `from`/`to` covers the current month to now. Asking for a combination the table does not list — a `receipt` as `xlsx`, a `statement` without `bankId` — answers `422 validation_failed` naming the parameter at fault.
+
+## Reconciling
+
+The ledger is the durable record of everything the other pages produce: a confirmed payout, a transfer, a settled payin, a sandbox credit. Reconcile with a watermark rather than a re-read:
+
+1. Keep the newest `createdAt` you have processed, per client.
+2. Ask for `from=<watermark>` and walk the cursor to the end.
+3. Match your own records on `id`, and a payout on the `transactionId` its read returns — `txHash` identifies the on-chain leg, not the payment.
+4. Move the watermark only after the whole walk succeeded. Ids are stable, so replaying an overlap costs a comparison, and skipping a row costs a missing payment.
+
+Rows appear when the partner reports or the chain confirms, not when you call. A `pending` row is not an error; a row that never appears is, and its payin or payout id is where to look.
+
+<Card title="Next: Escrow" icon="arrow-right" href="/whitelabel/escrow">
+  Hold one client's money while another delivers: the marketplace order, end to end.
+</Card>

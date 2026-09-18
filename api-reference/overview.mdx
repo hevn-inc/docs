@@ -1,63 +1,115 @@
 ---
 title: "REST API overview"
-description: "REST endpoints used internally by HEVN CLI."
+description: "The generated contract for all 48 operations of the HEVN API, grouped the way the whitelabel guide is."
 ---
 
-The **Generated API Reference** below is a curated subset of the HEVN OpenAPI schema (`https://api.hevn.finance/openapi.json`): endpoint pages, request examples, and an interactive API Playground.
+This tab is generated from the HEVN OpenAPI document: **48 operations** over 40 paths, each with a
+schema, request examples and an interactive playground.
 
-## Base URL
+It is the machine-readable half of the [Whitelabel guide](/whitelabel/overview). The guide explains
+the model — your integrator account, the client accounts you create, the developer key that signs
+their money out. This reference is the exact contract for every call, and its groups follow the
+guide's order: log in, create a client, verify it, open a rail, move money, operate escrow.
 
-The generated OpenAPI reference uses:
+<CardGroup cols={2}>
+  <Card title="Whitelabel overview" icon="book-open" href="/whitelabel/overview">
+    What you can build, and the object graph behind it.
+  </Card>
+  <Card title="Quickstart" icon="rocket" href="/whitelabel/quickstart">
+    Nine steps in the sandbox, from an empty account to money that moved on chain.
+  </Card>
+</CardGroup>
 
-```bash
-https://api.hevn.finance
-```
+## Servers
 
-The CLI builds requests from the configured API base URL:
-
-```bash
-https://api.hevn.finance/api/v1
-```
-
-The base URL can be selected through `HEVN_ENV`, saved login config, or `HEVN_BASE_URL`.
-
-```bash
-export HEVN_ENV=prod
-export HEVN_BASE_URL=https://api.hevn.finance/api/v1
-```
-
-## API clients
-
-| Client | Auth mode | Used for |
+| Environment | Server | Notes |
 | --- | --- | --- |
-| `AppApi` | HEVN API key (`X-Api-Key`) | Account, profile, contacts, invoices, contracts, banks, cards, KYB, balance, quotes, transfers, transactions |
-| `PublicApi` | Public | FX rates and public invoices |
+| Production | `https://api.hevn.finance/v1` | Real money, Base. |
+| Sandbox | `https://sandbox-api.hevn.finance/v1` | Test funds, Base Sepolia, one emulated partner. |
 
-## Request behavior
+The base URL already carries the version, so every path in this reference is relative to it: a full
+URL is `https://api.hevn.finance/v1/banks`. The two servers are separate deployments with separate
+accounts, and a token issued by one is refused by the other. Pick the server in the playground's
+dropdown before you send a request.
 
-All requests:
+The four operations tagged **Sandbox** declare the sandbox server only; production answers `404` for
+them. The other 44 exist on both.
 
-- send `Accept: application/json`,
-- send the configured API key for authenticated clients,
-- use a 60 second HTTP timeout,
-- send query parameters only when their values are not `None`,
-- parse non-empty responses as JSON,
-- raise a CLI `HevnError` for HTTP status codes `>= 400`.
+## The bearer model
 
-When `--debug` or `HEVN_DEBUG=1` is enabled, error output can include the generated curl command.
+Every operation but the three under **Authentication** takes one header:
 
-Mutating HTTP methods (`POST`, `PUT`, `PATCH`, `DELETE`) are intercepted by `--dry-run` / `HEVN_DRY_RUN=1` before the network call is made.
+```http
+Authorization: Bearer <accessToken>
+```
 
-## Common response handling
+The access token is a short-lived JWT your backend mints for itself by signing a challenge with your
+developer key. That bearer is the only credential this API documents: `X-Api-Key` belongs to the
+[CLI](/cli/overview), is scoped by its own app, and can never authorize money — a key acting for one
+of your clients is clamped read-only and answers `403 account_read_only` on any write.
 
-The CLI does not enforce a shared backend response schema across endpoints. It passes backend JSON through to command formatters and wraps `--json` / `--yaml` command output in a CLI envelope.
+To act for one of your clients, send that client's id in a second header instead of minting a second
+token:
 
-For integration code, use the endpoint-specific objects returned by the backend and treat fields shown in command output as convenience projections rather than exhaustive schemas.
+```http
+X-Hevn-Account: cl_7YQ2Kf3mN8
+```
 
-## Endpoint index
+Operations that are about your own account by definition — `POST /clients`, `GET /clients` and all of
+**Escrow** — refuse the header with `400 account_scope_conflict`.
+Operations that already name a client in the path accept it only when it agrees with the path. The
+three under **Authentication** ignore it: a login has no account to act for yet. Each operation
+declares which it is in the `x-hevn-acting-as` extension (`self`, `client` or `either`). The full
+table is in [Sessions](/whitelabel/sessions#acting-as-a-client).
+
+## One error envelope
+
+Every refusal, on every route, has the same body:
+
+```json
+{
+  "error": {
+    "code": "insufficient_funds",
+    "message": "The account's USDC balance does not cover this transfer.",
+    "details": { "available": "3000000", "required": "5000000" }
+  }
+}
+```
+
+`code` is a stable lowercase slug — branch on it, never on `message`. Each operation publishes the
+slugs it can answer with in the `x-hevn-error-codes` extension, and the whole registry with what to
+do about each is in [Errors](/whitelabel/reference/errors). Every response carries an
+`X-Request-ID`; quote it in a support request.
+
+## Conventions this reference assumes
+
+Bodies, query parameters and response fields are camelCase; unknown keys are refused rather than
+ignored; null fields are omitted, so absent and null are the same thing. Money is always a decimal
+string in the asset's major unit (`"500.00"`), never a JSON number. Ids are opaque and prefixed by
+what they name. Lists page with a cursor. `Idempotency-Key` is accepted on every write and required
+on none. All seven rules, in one page:
+[Conventions](/whitelabel/conventions).
+
+## Money movement is signed
+
+Reading data and writing metadata need only a token. Moving money needs a signature from your
+developer key, and every such operation is a pair: an opening call that prices and builds the
+operation and hands you an `approval.payload`, then a confirm that carries your signature over the
+decoded bytes of that payload.
+
+| What moves | Prepare | Confirm |
+| --- | --- | --- |
+| Fiat out over a bank rail | `POST /payouts` | `POST /payouts/{payoutId}/confirm` |
+| USDC out on Base | `POST /transfers` | `POST /transfers/{transferId}/confirm` |
+| An escrow deal or action | `POST /escrow`, `POST /escrow/{escrowId}/actions` | `POST /escrow/{escrowId}/actions/{idempotencyKey}/confirm` |
+
+One mechanism, described once in [Signing](/whitelabel/signing).
 
 <CardGroup cols={2}>
   <Card title="Authentication" icon="key-round" href="/api-reference/authentication">
-    Header modes, login config, and idempotency headers.
+    The two login calls, the two tokens, and the header that picks the account.
+  </Card>
+  <Card title="HTTP client" icon="code" href="/whitelabel/reference/client">
+    A working client in Python, Node and Go: login, retries, signing, polling.
   </Card>
 </CardGroup>

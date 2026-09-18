@@ -1,0 +1,166 @@
+---
+title: "Conventions"
+description: "The seven rules that hold for every operation: money, ids, casing, idempotency, pagination, status codes and errors."
+---
+
+Seven rules hold for all 48 operations. Read them once and no endpoint will surprise you.
+
+| Rule | In one line |
+| --- | --- |
+| [Money](#money) | A decimal string in the asset's major unit, never a number |
+| [Ids](#ids) | Prefixed and opaque: `cl_`, `po_`, `tr_`, `pi_`, `txn_`, `ct_`, `bnk_`, `doc_`, `kyb_`, `esc_` |
+| [Casing](#casing) | camelCase everywhere, unknown keys refused, null fields omitted |
+| [`Idempotency-Key`](#idempotency-key) | Accepted on every write, required nowhere |
+| [Pagination](#pagination) | A cursor and a limit; no offset and no total |
+| [Status codes](#status-codes) | `201` creates, `200` replays, `202` polls, and every response has a body |
+| [Errors](#errors) | One envelope; branch on `code`, never on `message` |
+
+## Money
+
+Every amount on the wire is a **decimal string in the asset's major unit**: `"500.00"`, `"0.9247"`,
+`"1204.500000"`. Not a JSON number, not an atomic-unit integer, never exponent notation.
+
+Precision is refused, never rounded. More fractional digits than the asset allows answers
+`422 validation_failed` with `details.fields[0].code = "amount_precision"` — so a rounding error can
+never reach a payment. Rates and fees follow the same rule; `feeBps` is the one exception and is an
+integer number of basis points.
+
+Where an operation has two sides, you pin one and HEVN derives the other. Send `amount` to pin what
+leaves the balance or `amountTo` to pin what the recipient receives — one of them, never both.
+
+<Warning>
+  A decimal arrives in JavaScript and Go as a **string**. A `typeof x === "number"` guard silently
+  skips every amount this API returns; parse with a decimal type, not a float.
+</Warning>
+
+## Ids
+
+Every id is prefixed, opaque and safe to store as text:
+
+| Prefix | Resource | Prefix | Resource |
+| --- | --- | --- | --- |
+| `cl_` | client (and your own account) | `ct_` | contact |
+| `po_` | payout | `bnk_` | bank record of an open rail |
+| `tr_` | transfer | `doc_` | document |
+| `pi_` | payin | `kyb_` | KYB application |
+| `txn_` | transaction | `esc_` | escrow deal |
+
+Do not parse them, derive them or assume a length. An id of the wrong kind in a body or query field
+is `400 invalid_id` with the expected prefix in `details`; in a path it is that resource's own `404`,
+so an id from another namespace is never confirmable.
+
+Rail ids — `sepa_named-bank_a`, a stand-in for a real one — are the exception that proves the rule:
+they are opaque strings you copy from `GET /v1/banks`, they carry no prefix, and their shape is not
+a contract. See [Rails](/whitelabel/reference/rails).
+
+## Casing
+
+**camelCase everywhere**: request bodies, query parameters, response fields and the keys inside
+`error.details`. Two things are deliberately not field names and stay lowercase `snake_case` — an
+`error.code` slug, and an enum member such as `business_revenue`.
+
+Two consequences worth knowing before your first `422`:
+
+- **Unknown keys are refused.** A body with a field this version does not define answers
+  `422 validation_failed` with `code: "extra_forbidden"` rather than ignoring it, so a typo cannot
+  silently drop a payment reference. The two nested objects that predate this rule — a contact's
+  `address` and a requisite's `bank`/`payer` block — still ignore a key they do not know, so a
+  misspelt `streetAddress` there resurfaces one step later as `422 contact_details_invalid`
+  naming the field it never received.
+- **Null fields are omitted.** "Absent" and "null" are the same thing; a response never prints
+  `"phone": null`. Treat a missing key as unset.
+
+One corner is not camelCase and cannot be: the keys inside `fields` on
+`PUT /v1/documents/{documentId}/content` are the extractor's own field names —
+`registration_number`, `address.street_address` — because they are values read off a page rather
+than fields of this API. They are the keys the refusal that asks for them already named. See
+[Onboard a client](/whitelabel/onboarding#fill-a-documents-fields-by-hand).
+
+Timestamps are RFC 3339 in UTC with a `Z` suffix: `2026-09-17T10:04:11Z`.
+
+## Idempotency-Key
+
+Every write accepts `Idempotency-Key`, matching `^[A-Za-z0-9._:-]{1,128}$`. No operation requires it.
+
+Send one whenever a retry must not become a second payment. Derive it from an id your own system
+owns, and keep it identical across every retry of the same request.
+
+import Idempotency from "/snippets/idempotency.mdx";
+
+<Idempotency />
+
+When you omit it, HEVN derives a fingerprint from the request itself, answers with it as
+`idempotencyKey`, and treats an identical repeat as a replay. The difference is the window: a key you
+chose anchors the request for **7 days**, a derived one for **2 hours** — long enough for a retry,
+short enough that two genuinely separate payments of the same amount both happen.
+
+A key is scoped to your account and the operation, so two integrators can never collide and the same
+key on `POST /payouts` and `POST /contacts` is not a replay. Reusing one with a different body is
+`409 idempotency_key_reused`, and `details` names the resource the key already belongs to. A
+malformed one is `400 idempotency_key_invalid`.
+
+## Pagination
+
+Every list is a cursor page:
+
+```json
+{ "items": [ … ], "nextCursor": "eyJ2IjoiMjAyNi0wOS0xN1QxMDowNDoxMVoiLCJpIjoi…" }
+```
+
+Pass `limit` (1 to 100, default 50) and `cursor`. Pass back the `nextCursor` you were given, verbatim
+and unparsed; when it is absent you have reached the end. There is no `offset` and no total count
+anywhere, and a cursor that does not belong to the query it is sent to is `400 invalid_cursor`.
+
+Aggregates are their own route rather than a field on page one —
+`GET /v1/transactions/summary` takes the same filters as `GET /v1/transactions`.
+
+## Status codes
+
+| Code | When | What to read |
+| --- | --- | --- |
+| `200` | A read, an update, or a **replay** of a create | `Idempotency-Replayed: true` marks the replay |
+| `201` | A resource now exists | `Location` points at it |
+| `202` | Accepted, still settling | `status` and `pollUrl` in the body |
+| `4xx` / `5xx` | Refused | the error envelope below |
+
+There is no `204`: every response has a body. `Location` and `pollUrl` are paths from the host root
+and already include the `/v1` prefix.
+
+## Errors
+
+One envelope, for every refusal, on every route:
+
+```json
+{
+  "error": {
+    "code": "insufficient_funds",
+    "message": "The account's USDC balance does not cover this transfer.",
+    "details": { "available": "3000000", "required": "5000000" }
+  }
+}
+```
+
+`code` is a stable lowercase slug — branch on it. `message` is written for a human reading a log and
+may be reworded at any time. `details` is optional, camelCased, and carries the fields that make the
+refusal actionable: `blockers` on a rail, `fields` on a validation failure, `transactionHash` on a
+payment that already went through, `requestId` on a `5xx` — quote that one to support.
+
+<Warning>
+  `details` is diagnostic, not part of the money contract: the funding refusals report
+  `available` and `required` in **atomic units** (`"3000000"` is 3 USDC), which is the one place an
+  amount is not a major-unit decimal string. Read them for a log line, not for arithmetic.
+</Warning>
+
+Field-level failures collapse into one shape, so you can render them next to your form inputs:
+
+```json
+{ "error": { "code": "validation_failed", "message": "The request body is invalid.",
+  "details": { "fields": [ { "field": "phone", "code": "string_pattern_mismatch", "message": "Use E.164, for example +13125550142." } ] } } }
+```
+
+The whole slug registry, grouped by resource, is in [Errors](/whitelabel/reference/errors); the
+numbers behind every limit are in [Limits](/whitelabel/reference/limits).
+
+<Card title="Next: Signing" icon="pen-tool" href="/whitelabel/signing">
+  Prepare, check, sign, confirm — the one mechanism behind every payment.
+</Card>

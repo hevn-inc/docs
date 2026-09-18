@@ -1,0 +1,61 @@
+<CodeGroup>
+
+```python Python
+import base64, os
+from cryptography.hazmat.primitives import serialization
+
+
+def load_key():
+    with open(os.environ["HEVN_KEY_PEM"], "rb") as handle:
+        return serialization.load_pem_private_key(handle.read(), password=None)
+
+
+def public_key_b64(key) -> str:
+    spki = key.public_key().public_bytes(
+        serialization.Encoding.DER,
+        serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    return base64.b64encode(spki).decode()
+```
+
+```javascript Node
+import { createPrivateKey, createPublicKey } from "node:crypto";
+import { readFileSync } from "node:fs";
+
+export function loadKey() {
+  return createPrivateKey(readFileSync(process.env.HEVN_KEY_PEM));
+}
+
+export function publicKeyB64(key) {
+  return createPublicKey(key).export({ type: "spki", format: "der" }).toString("base64");
+}
+```
+
+```go Go
+func LoadKey() (*ecdsa.PrivateKey, error) {
+	armored, err := os.ReadFile(os.Getenv("HEVN_KEY_PEM"))
+	if err != nil {
+		return nil, err
+	}
+	block, _ := pem.Decode(armored)
+	parsed, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, err
+	}
+	key, ok := parsed.(*ecdsa.PrivateKey)
+	if !ok {
+		return nil, errors.New("hevn: not a P-256 key")
+	}
+	return key, nil
+}
+
+func PublicKeyB64(key *ecdsa.PrivateKey) (string, error) {
+	spki, err := x509.MarshalPKIXPublicKey(&key.PublicKey)
+	if err != nil {
+		return "", err
+	}
+	return base64.StdEncoding.EncodeToString(spki), nil
+}
+```
+
+</CodeGroup>
