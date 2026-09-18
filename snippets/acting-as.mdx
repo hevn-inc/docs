@@ -1,5 +1,7 @@
-Send `X-Hevn-Account: cl_…` with your own access token to act for one client. Omit the header and
-the call acts on your integrator account instead.
+Send `X-Hevn-Account: cl_…` with your own access token to act for one client. On a resource route
+like `GET /banks` the header is optional: omit it and the call acts on your integrator account
+instead. The singular `/client*` routes **require** it — the header is the only thing that names the
+account — and `/clients` and `/escrow*` refuse it.
 
 <CodeGroup>
 
@@ -26,5 +28,5 @@ rails, err := northwind.Get("/banks")
 
 </CodeGroup>
 
-Details, and the routes that refuse the header, are in
-[Sessions](/whitelabel/sessions#acting-as-a-client).
+The whole table — where the header is optional, where it is required and where it is refused — is
+in [Sessions](/whitelabel/sessions#acting-as-a-client).

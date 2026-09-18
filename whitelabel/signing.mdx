@@ -8,8 +8,8 @@ same terms again at confirm — your job is to check the echo and sign, not to a
 
 <Steps>
   <Step title="Prepare" icon="file-text">
-    You call the opening route — `POST /v1/payouts` or
-    `POST /v1/escrow/{escrowId}/actions`. HEVN prices the payment, books it, builds the on-chain
+    You call the opening route — `POST /dapi/v1/payouts` or
+    `POST /dapi/v1/escrow/{escrowId}/actions`. HEVN prices the payment, books it, builds the on-chain
     operation and stores an approval. The response carries `quote`, `approval` and `debit`.
   </Step>
   <Step title="Check" icon="scale">
@@ -31,13 +31,13 @@ sequenceDiagram
     participant S as Your server
     participant H as HEVN API
     participant B as Base bundler
-    S->>H: POST /v1/payouts — contactId, amount, publicKey
+    S->>H: POST /dapi/v1/payouts — contactId, amount, publicKey
     Note over H: prices it, books it with the partner,<br/>builds the operation, stores the approval
     H-->>S: quote + approval.payload + debit
     Note over S: assert debit.amount, debit.token and debit.address<br/>against your own record, then sign base64decode(payload)
     Note over H: approval.expiresAt is 120 s after prepare
     loop safe to repeat — never re-open unless it expired
-        S->>H: POST /v1/payouts/{payoutId}/confirm — signature
+        S->>H: POST /dapi/v1/payouts/{payoutId}/confirm — signature
         H->>B: signature verified locally, operation submitted
         B-->>H: receipt
         H-->>S: 200 settled + transactionHash, or 202 submitted — confirm again
@@ -48,9 +48,9 @@ sequenceDiagram
 
 | What moves | Prepare | Confirm | Approval window |
 | --- | --- | --- | --- |
-| Fiat out over a bank rail | `POST /v1/payouts` | `POST /v1/payouts/{payoutId}/confirm` | 120 s |
-| USDC out on Base | `POST /v1/payouts` with a wallet recipient | `POST /v1/payouts/{payoutId}/confirm` | 120 s |
-| An escrow deal, and every escrow action | `POST /v1/escrow`, `POST /v1/escrow/{escrowId}/actions` | `POST /v1/escrow/{escrowId}/actions/{idempotencyKey}/confirm` | 60 s |
+| Fiat out over a bank rail | `POST /dapi/v1/payouts` | `POST /dapi/v1/payouts/{payoutId}/confirm` | 120 s |
+| USDC out on Base | `POST /dapi/v1/payouts` with a wallet contact | `POST /dapi/v1/payouts/{payoutId}/confirm` | 120 s |
+| An escrow deal, and every escrow action | `POST /dapi/v1/escrow`, `POST /dapi/v1/escrow/{escrowId}/actions` | `POST /dapi/v1/escrow/{escrowId}/actions/{idempotencyKey}/confirm` | 60 s |
 
 Payouts act on a client — send `X-Hevn-Account`. Escrow is always operated by you, so it
 refuses that header. Every confirm body is the same two fields:
@@ -59,7 +59,8 @@ refuses that header. Every confirm body is the same two fields:
 { "signature": "MEUCIQD…", "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE…" }
 ```
 
-`publicKey` is optional; it only saves HEVN a scan over your registered keys.
+`publicKey` is optional; it only saves HEVN a scan over your registered keys. A key that is not one
+of them is `403 key_not_registered` — see [Developer key](/whitelabel/developer-key#when-a-key-is-refused).
 
 Every other call in these guides carries a cURL tab. The confirms do not: a signature is produced by
 your key over bytes HEVN just handed you, so a curl block could only show a stale one. The prepare
@@ -128,7 +129,7 @@ You are not trusted to describe the operation, and you are not asked to. At prep
   that is not in a fundable state;
 - checks that your account controls the client's wallet and that the wallet's live on-chain owner is
   your signer;
-- builds a **single stablecoin transfer** from the client's wallet, with the amount and recipient
+- builds a **single stablecoin transfer** from the client's wallet, with the amount and destination
   taken from what it just booked, and checks the balance covers it;
 - re-validates that built operation against the stored terms before it hands you anything to sign;
 - pins an idempotency key of its own on the authorization, so the same signature cannot be replayed
@@ -139,6 +140,12 @@ You are not trusted to describe the operation, and you are not asked to. At prep
 At confirm, your signature is verified **locally** against the stored bytes before anything is
 consumed. A wrong signature is a refusal that costs you nothing: the approval survives, and you can
 fix the signing and confirm again.
+
+The credential is re-checked at both ends. Every request on this API re-reads the developer-key
+registration behind your session and the address the request came from, and the confirm re-checks
+them once more immediately before HEVN co-signs — so a registration paused between the prepare and
+the confirm, or a confirm sent from an address outside its allowlist, is a `403` and nothing is
+signed. See [Developer key](/whitelabel/developer-key#the-ip-allowlist).
 
 <Tip>
   Check the echo anyway. `debit.amount`, `debit.amountAtomic`, `debit.token`, `debit.chainId` and

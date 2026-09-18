@@ -10,25 +10,35 @@ Authorization: Bearer <accessToken>
 Content-Type: application/json
 ```
 
-The access token is a short-lived JWT your backend mints for itself, and the only credential this
-API documents. The refresh token is taken by `POST /auth/refresh` alone, and `X-Api-Key` belongs to
-the [CLI](/cli/overview): it cannot sign, and acting for a client with one is read-only
-(`403 account_read_only` on a write).
+The access token is a short-lived JWT your backend mints for itself, and the only credential this API accepts. Its
+audience is `platform`, it carries a `developer_key_id` claim, and `/dapi/v1` refuses anything else before routing —
+`401 unauthenticated` with no bearer, `403 forbidden` with `details.reason: "developerSessionRequired"` for an ordinary
+token or a refresh token on a business route. The refresh token, audience `platform-refresh`, is taken by
+`POST /auth/refresh` alone. The optional `x-api-key` the schema shows on every operation is an artefact of a shared
+dependency: an API key belongs to the [CLI](/cli/overview) and cannot authenticate here at all.
 
 This page is the reference summary. [Sessions](/whitelabel/sessions) is the same flow with runnable
 Python, Node and Go.
 
-## Three credentials
+## Four credentials
 
 | Credential | Where it lives | Lifetime | What it authorizes |
 | --- | --- | --- | --- |
-| **Developer key** — a P-256 keypair you generate | Your servers. HEVN stores only the public half | Until you rotate it | Logging in without a browser, and signing money movement |
-| **Refresh token** | Your secret store | 60 days | Only `POST /auth/refresh` |
-| **Access token** | In memory | 60 minutes (`expiresIn: 3600`) | Every other operation |
+| **Developer key** — a P-256 keypair you generate | Your servers. HEVN stores only the public half | Until you pause its registration | Logging in without a browser, and signing money movement |
+| **Its registration** — a `dk_…` row with an IP allowlist and a scope | HEVN's database | Until you pause it | Which key may log in, and from which source addresses |
+| **Refresh token** (`platform-refresh`) | Your secret store | 60 days | Only `POST /auth/refresh` |
+| **Access token** (`platform`, carrying `developer_key_id`) | In memory | 60 minutes (`expiresIn: 3600`) | Every other operation |
 
-The public half is registered once per environment from the HEVN app, because registration changes
-your account's signer and needs your own browser session. Everything after that is code — see
+Registration is two steps, both once per environment. The public half joins your account's signer, which changes what
+may sign for your wallets and needs your own browser session. Then the same key is registered with
+`POST /api/v1/developer/api-keys` — an ordinary owner JWT, a body of `{publicKey, ipAllowlist, scope}` — and that call
+returns the `dk_…` id. Only the second step makes login work. `ipAllowlist` and `scope` are immutable, so rotation is
+register-then-pause rather than edit. Everything after that is code — see
 [Developer key](/whitelabel/developer-key).
+
+Every `/dapi/v1` request re-reads the registration: it must still be active, and the call must come from an address the
+allowlist covers. A paused key stops the sessions it already minted on their next request, and the same check runs
+again on `POST /auth/refresh` and immediately before HEVN co-signs.
 
 ## Log in
 
@@ -52,9 +62,14 @@ Two calls, neither of which needs a token.
   </Step>
 </Steps>
 
-A challenge is single-use and expires within minutes. Every credential problem — unknown email,
-unregistered key, detached signer, bad signature — answers the same `401 invalid_credentials`, so
-probing learns nothing; only an expiry outside the window differs, as `400 request_expired`.
+A challenge is single-use and expires within minutes. Every credential problem — unknown email, unregistered key,
+detached signer, bad signature, a paused registration, a source IP the allowlist does not cover — answers the same
+`401 invalid_credentials`, so probing learns nothing; only an expiry outside the window differs, as
+`400 request_expired`.
+
+`POST /auth/token` also takes the challenge-free form directly: the same `{email, publicKey, nonce, requestExpiry,
+signature}` body `POST /auth/challenge` takes, signed over the same proof string, in one call instead of two. The
+two-call exchange above is the documented path because it binds the session to a payload HEVN chose.
 
 ## Re-mint an access token
 
@@ -86,18 +101,20 @@ Authorization: Bearer <accessToken>
 X-Hevn-Account: cl_7YQ2Kf3mN8
 ```
 
-Omit the header and the same call acts on your integrator account. One token covers every client you
-control, so there is nothing to cache per client. Each operation declares whether it accepts, refuses
-or path-scopes the header in the `x-hevn-acting-as` extension; the table of which is which is in
+Omit the header and most calls act on your integrator account. One token covers every client you control, so there is
+nothing to cache per client. No operation names a client in its path any more, so the header is the only selector:
+`/client`, `/client/balance`, `/client/kyb` and `/client/kyb/complete` **require** it, `POST /clients`, `GET /clients`
+and every escrow route **refuse** it, and everything else takes it or leaves it. The table of which is which is in
 [Sessions](/whitelabel/sessions#acting-as-a-client).
 
-Sending the header where it is refused is an error, not a silent no-op:
-`400 account_header_invalid`, `400 account_scope_conflict`, `404 account_not_found` and
-`403 account_forbidden` are the four you will meet.
+Sending the header where it is refused is an error, not a silent no-op, and so is omitting it where it is required:
+`400 account_header_invalid`, `400 account_scope_conflict`, `404 account_not_found`, `403 account_forbidden` and
+`422 validation_failed` on the missing header are the five you will meet.
 
 <Warning>
   Tokens are bound to the server that issued them. A sandbox token is refused by production and the
-  reverse, so log in separately against each host and keep one developer key per environment.
+  reverse, so log in separately against each host, and keep one developer key — and one registration, with that
+  environment's egress IPs — per environment.
 </Warning>
 
 ## Signing money movement
@@ -107,7 +124,7 @@ the developer key, because that key — not HEVN alone — can authorize a spend
 
 <Steps>
   <Step title="Prepare">
-    The opening call — `POST /payouts`, `POST /transfers`, `POST /escrow/{escrowId}/actions` —
+    The opening call — `POST /payouts`, `POST /escrow`, `POST /escrow/{escrowId}/actions` —
     prices the payment, books it, builds the on-chain operation and answers `approval.payload`
     plus a `debit` decoded from that operation.
   </Step>
@@ -122,8 +139,9 @@ the developer key, because that key — not HEVN alone — can authorize a spend
   </Step>
 </Steps>
 
-Approvals are short: 120 seconds for a payout or transfer, 60 seconds for an escrow action. The
-byte-level rules, the pitfalls and the retry table are in [Signing](/whitelabel/signing).
+Approvals are short: 120 seconds for a payout, 60 seconds for an escrow action. HEVN re-checks the key's registration
+and your source IP immediately before it co-signs, so a key paused between prepare and confirm fails the confirm with a
+`403`. The byte-level rules, the pitfalls and the retry table are in [Signing](/whitelabel/signing).
 
 <Warning>
   The developer key can authorize a spend from every client wallet you control. Keep the private half

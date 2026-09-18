@@ -5,13 +5,13 @@ description: "A summary of HEVN's trust boundaries: what each party can do, what
 
 HEVN's security posture follows from one design decision: **the platform never holds keys or funds**. What the system does rely on is mapped honestly in [Trust assumptions](/general/trust-assumptions). Everything else — the [Privy key layer](/general/privy-wallets), the [Base smart wallet](/general/smart-wallets), [one-time payout addresses](/general/deposits-and-payouts), [1Click passive deposits](/general/cross-chain) — exists to keep that invariant true on every flow.
 
-## Custody matrix
+## Who controls what
 
 | Asset | Where it lives | Who controls it |
 | --- | --- | --- |
 | Private key | Sharded (Shamir) across the user's session and Privy's TEE infrastructure; never assembled outside a TEE | User only |
 | USDC balance | The user's smart wallet contract on Base | Onchain owners only (the user, plus anyone they [explicitly added](/general/shared-access)) |
-| Bank details, invoices, contacts | HEVN backend | HEVN, scoped by the user's JWT / API keys |
+| Virtual account details, invoices, contacts | HEVN backend | HEVN, scoped by the user's JWT / API keys |
 | Funds in a fiat payout | Banking partner's one-time address, then bank rails | Banking partner, for that payout only |
 | Funds in a cross-chain swap | 1Click settlement layer, per one-time quote | NEAR Intents protocol, for that swap only |
 
@@ -72,4 +72,4 @@ Your email (or Google account) is the root of your HEVN identity. Recommended ba
 
 ## Responsible disclosure
 
-Found a vulnerability? Report it privately to **[p@gethevn.com](mailto:p@gethevn.com)** — include reproduction steps and impact. We triage every report and keep you updated through the fix. Good-faith research conducted this way will never result in legal action from HEVN.
+Found a vulnerability? Report it privately to **[p@gethevn.com](mailto:p@gethevn.com)** — include reproduction steps and impact. We triage every report and keep you updated through the fix. We will not pursue legal action for good-faith research that follows this policy.

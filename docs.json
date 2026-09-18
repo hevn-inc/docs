@@ -42,7 +42,7 @@
             ]
           },
           {
-            "group": "Custody & wallets",
+            "group": "Keys & wallets",
             "pages": [
               "general/privy-wallets",
               "general/smart-wallets",
@@ -80,7 +80,7 @@
           {
             "group": "Core concepts",
             "pages": [
-              "whitelabel/accounts-and-custody",
+              "whitelabel/accounts-and-control",
               "whitelabel/developer-key",
               "whitelabel/sessions",
               "whitelabel/conventions",
@@ -180,22 +180,24 @@
             "pages": [
               "POST /clients",
               "GET /clients",
-              "GET /clients/{clientId}",
-              "PATCH /clients/{clientId}"
+              "GET /client",
+              "PATCH /client",
+              "GET /client/balance"
             ]
           },
           {
             "group": "Verification",
             "openapi": "openapi.json",
             "pages": [
-              "PUT /clients/{clientId}/kyb",
-              "GET /clients/{clientId}/kyb",
-              "POST /clients/{clientId}/kyb/submit",
-              "POST /documents"
+              "PUT /client/kyb",
+              "GET /client/kyb",
+              "POST /client/kyb/complete",
+              "POST /documents",
+              "PUT /documents/{documentId}/content"
             ]
           },
           {
-            "group": "Bank accounts",
+            "group": "Virtual accounts",
             "openapi": "openapi.json",
             "pages": [
               "GET /banks",
@@ -219,13 +221,13 @@
             "openapi": "openapi.json",
             "pages": [
               "POST /payouts",
+              "POST /payouts/preview",
               "POST /payouts/{payoutId}/confirm",
-              "GET /payouts/{payoutId}",
-              "POST /payouts/preview"
+              "GET /payouts/{payoutId}"
             ]
           },
           {
-            "group": "Recipients",
+            "group": "Contacts",
             "openapi": "openapi.json",
             "pages": [
               "POST /contacts",
@@ -237,10 +239,9 @@
             ]
           },
           {
-            "group": "Balances and transactions",
+            "group": "Transactions",
             "openapi": "openapi.json",
             "pages": [
-              "GET /clients/{clientId}/balance",
               "GET /transactions",
               "GET /transactions/{transactionId}",
               "GET /transactions/summary",
@@ -346,6 +347,10 @@
     {
       "source": "/whitelabel/kyb",
       "destination": "/whitelabel/onboarding"
+    },
+    {
+      "source": "/whitelabel/accounts-and-custody",
+      "destination": "/whitelabel/accounts-and-control"
     },
     {
       "source": "/whitelabel/errors",

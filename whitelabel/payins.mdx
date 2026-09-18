@@ -7,23 +7,24 @@ import ActingAsSnippet from "/snippets/acting-as.mdx";
 import PollSnippet from "/snippets/poll.mdx";
 import SandboxCapsSnippet from "/snippets/sandbox-caps.mdx";
 
-Money arrives three ways: a quoted deposit you priced, an unsolicited wire to open requisites, or crypto sent straight to the wallet. All three end as one income row on the client's ledger.
+Money arrives four ways: a quoted deposit you priced, a quoted on-chain transfer you priced, an unsolicited wire to open requisites, or crypto sent straight to the wallet. All four end as one income row on the client's ledger.
 
 | Shape | What you call | What the payer needs |
 | --- | --- | --- |
-| **Quoted deposit** | `POST /v1/payins`, then `POST /v1/payins/{payinId}/instructions` | The instructions that quote returns, payment reference included |
-| **Unsolicited wire** | Nothing — the rail is a standing account | The `requisites` on the client's active rail from `GET /v1/banks` |
+| **Quoted deposit** | `POST /dapi/v1/payins` with `rail`, then `POST /dapi/v1/payins/{payinId}/instructions` | The instructions that quote returns, payment reference included |
+| **Quoted on-chain transfer** | `POST /dapi/v1/payins` with `originChainId`, then the same instructions call | The `address`, `chainId` and `memo` the instructions return |
+| **Unsolicited wire** | Nothing — the requisites stay live | The `requisites` on the client's active rail from `GET /dapi/v1/banks` |
 | **Crypto** | Nothing | The client's `baseSmartWallet` address |
 
-Quote a deposit when you need the rate and the fee pinned before the payer pays, and when you want their transfer attributed to one order. Take the unsolicited path when the client publishes its own bank details and reconciles afterwards.
+Quote a payin when you need the rate and the fee pinned before the payer pays, and when you want their transfer attributed to one order. Take an unquoted path when the client publishes its own details and reconciles afterwards.
 
 ```mermaid
 flowchart LR
-    Q["POST /v1/payins<br/>price the deposit"] --> I["POST /v1/payins/pi_2b7/instructions<br/>what the payer needs"]
+    Q["POST /dapi/v1/payins<br/>price the deposit"] --> I["POST /dapi/v1/payins/pi_2b7/instructions<br/>what the payer needs"]
     I --> W["Payer wires"]
     W --> C["Partner converts"]
     C --> B["Client's wallet credited<br/>+ income row"]
-    W -.->|"sandbox"| S["POST /v1/sandbox/payins/pi_2b7/complete"]
+    W -.->|"sandbox"| S["POST /dapi/v1/sandbox/payins/pi_2b7/complete"]
     S --> C
 ```
 
@@ -31,7 +32,7 @@ flowchart LR
 
 ## Quote a deposit
 
-The client needs an **active rail** in the currency the payer sends — see [Bank accounts](/whitelabel/bank-accounts).
+The client needs an **active rail** in the currency the payer sends — see [Virtual accounts](/whitelabel/bank-accounts).
 
 <Steps>
   <Step title="Price the deposit">
@@ -72,7 +73,7 @@ The client needs an **active rail** in the currency the payer sends — see [Ban
     ```
     </CodeGroup>
 
-    ```json Response — 201, Location: /v1/payins/pi_2b7…
+    ```json Response — 201, Location: /dapi/v1/payins/pi_2b7…
     { "id": "pi_2b7…", "status": "pending", "rail": "sepa",
       "quote": { "amount": "2000.00", "currency": "EUR",
                  "settlementAmount": "1989.50", "settlementToken": "EURC",
@@ -80,11 +81,12 @@ The client needs an **active rail** in the currency the payer sends — see [Ban
       "expiresAt": "2026-09-17T10:06:11Z", "createdAt": "2026-09-17T10:04:11Z" }
     ```
 
-    Three decisions:
+    Four decisions:
 
     - **`amount` or `amountTo`, exactly one.** `amount` is what the payer sends in `currency`; `amountTo` is what should land on the wallet, and HEVN grosses the payer's side up to reach it.
-    - **`rail` here is a payment *method*** — `sepa`, `ach`, `swift`, `fedwire`, `pix`, … — not the rail id you opened with `POST /v1/banks`. The two are different vocabularies; [Rails](/whitelabel/reference/rails) lists both.
-    - **`settlementToken`** is the stablecoin the deposit is delivered in, `USDC` (the default) or `EURC`. It has to be a token one of the client's matching rails settles into; when it is not, the call refuses with the pairs that work (see below).
+    - **`rail` or `originChainId`, exactly one.** `rail` prices money arriving over a payment method; `originChainId` prices money arriving on a chain. Sending both, or neither, is refused.
+    - **`rail` here is a payment *method*** — `sepa`, `ach`, `swift`, `fedwire`, `pix`, … — not the rail id you opened with `POST /dapi/v1/banks`. The two are different vocabularies; [Rails](/whitelabel/reference/rails) lists both.
+    - **`settlementToken`** is the stablecoin the payin is delivered in, `USDC` (the default) or `EURC`. It has to be a token one of the client's matching rails settles into; when it is not, the call refuses with the pairs that work (see below).
 
     The price holds until `expiresAt`. Read it; do not cache a quote.
   </Step>
@@ -122,13 +124,13 @@ The client needs an **active rail** in the currency the payer sends — see [Ban
 
     Hand `requisites` to the payer verbatim, **`paymentReference` included** — on a pooled account it is the only thing that attributes the money to this payin.
 
-    `kind` says where the payer acts: `bank_transfer` (use `requisites`), `qr_code` (`qrPayload`), `hosted_page` (`url`) or `manual`. `singleUse: true` means these instructions belong to this payin alone.
+    `kind` says where the payer acts: `bank_transfer` (use `requisites`), `qr_code` (`qrPayload`), `hosted_page` (`url`), `manual`, or `onchain` (`address`, `chainId` and `memo`). `singleUse: true` means these instructions belong to this payin alone.
 
     Opening the same payin again returns the same instructions — that is the safe retry, not a way to create a second payin. Once the price stops holding it answers `410 payin_expired`; quote again.
   </Step>
 
   <Step title="Watch it settle">
-    `GET /v1/payins/{payinId}` carries the payin through its whole life. Settlement is driven by the partner's own reports, so poll it rather than waiting on a response.
+    `GET /dapi/v1/payins/{payinId}` carries the payin through its whole life. Settlement is driven by the partner's own reports, so poll it rather than waiting on a response.
 
     <PollSnippet />
 
@@ -144,13 +146,33 @@ The client needs an **active rail** in the currency the payer sends — see [Ban
   </Step>
 </Steps>
 
+## Quote an on-chain transfer
+
+`originChainId` in place of `rail` prices money arriving on a chain instead of through a bank. The body is otherwise the same call:
+
+```json
+{ "amount": "2000.00", "currency": "USDC", "originChainId": "arb", "settlementToken": "USDC" }
+```
+
+`PayinView` then carries `originChainId` — the network the payer funds from — and `destinationChainId`, the network the payin settles on. Open it with the same `POST /dapi/v1/payins/{payinId}/instructions`, and the instructions answer `kind: "onchain"` with the three fields a sender needs:
+
+```json Response — 200
+{ "payinId": "pi_5d3…", "kind": "onchain",
+  "amount": "2000.00", "currency": "USDC", "singleUse": true,
+  "address": "0x9b41…", "chainId": "arb", "memo": null }
+```
+
+`memo` is the destination tag some networks route on. When it is present it is as load-bearing as a `paymentReference` — a transfer that omits it cannot be attributed. `ChainCode` is the same vocabulary a wallet contact uses; `base`, `arb`, `sol` and the rest are listed on the [rail reference](/whitelabel/reference/rails).
+
+This is the quoted arm of crypto-in. The unquoted arm — send straight to the wallet, no call at all — is further down.
+
 ## What a rail converts at
 
-`GET /v1/banks/{rail}/rate` answers `{currency, rate, fixedFee, fixedFeeCurrency}` — the indicative price of a deposit over that rail. On a rail the client has not opened, only `currency` comes back. Use it to show a rate in your own UI before the payer commits to an amount. It is indicative: `POST /v1/payins` returns the number you are held to.
+`GET /dapi/v1/banks/{rail}/rate` answers `{currency, rate, fixedFee, fixedFeeCurrency}` — the indicative price of a deposit over that rail. On a rail the client has not opened, only `currency` comes back. Use it to show a rate in your own UI before the payer commits to an amount. It is indicative: `POST /dapi/v1/payins` returns the number you are held to.
 
 ## When the payer has to be named
 
-Some rails require the payer's own account so the receiving bank can check the sender. `POST /v1/payins/{payinId}/instructions` takes it:
+Some rails require the payer's own account so the receiving bank can check the sender. `POST /dapi/v1/payins/{payinId}/instructions` takes it:
 
 ```json
 { "payer": { "method": "sepa",
@@ -169,11 +191,11 @@ A currency and method the client cannot be paid in answers `422 payin_not_availa
 
 ## Unsolicited wires to the client's requisites
 
-An active rail is a standing account. Anyone can wire to it with no quote and no API call from you.
+An active rail's requisites stay live between payments. Anyone can wire to them with no quote and no API call from you.
 
-1. Read `requisites` for the active rail from `GET /v1/banks`.
+1. Read `requisites` for the active rail from `GET /dapi/v1/banks`.
 2. Give the payer the fields it carries, plus `paymentReference` when one is set.
-3. The deposit lands as an income row on `GET /v1/transactions`, carrying `remitter` where the partner reports the sender, `paymentReference`, and the receiving requisites.
+3. The deposit lands as an income row on `GET /dapi/v1/transactions`, carrying `remitter` where the partner reports the sender, `paymentReference`, and the receiving requisites.
 
 <Note>
   Some partners report no sender at all. When `remitter` is absent on a settled deposit, the sender cannot be recovered from the API — treat it as unknown rather than retrying.
@@ -181,7 +203,7 @@ An active rail is a standing account. Anyone can wire to it with no quote and no
 
 ## Crypto straight to the wallet
 
-The client's smart wallet is an ordinary address on Base. Read it from `GET /v1/clients/{clientId}/balance` as `baseSmartWallet` and publish it; anything sent there is the client's.
+The client's smart wallet is an ordinary address on Base. Read it from `GET /dapi/v1/client/balance` — with the client id in `X-Hevn-Account` — as `baseSmartWallet` and publish it; anything sent there is the client's. Nothing is quoted on this path, and there is no payin record: use the quoted on-chain arm above when you need a price or an attributed transfer.
 
 <Warning>
   Only **USDC and EURC on Base** are tracked. Other tokens, and the same tokens on other chains, sit at the address without ever becoming a balance or a transaction.
@@ -217,7 +239,7 @@ settled, err := northwind.Post("/sandbox/payins/"+payin.Str("id")+"/complete",
 
 </CodeGroup>
 
-`POST /v1/sandbox/deposits` covers the other two shapes: with `bankId` it emulates an unsolicited wire to that rail, without one it credits the smart wallet with tokens. Both are in [Sandbox](/whitelabel/sandbox#mint-money).
+`POST /dapi/v1/sandbox/deposits` covers the other two unquoted shapes: with `bankId` it emulates an unsolicited wire to that rail, without one it credits the smart wallet with tokens. Both are in [Sandbox](/whitelabel/sandbox#mint-money).
 
 <SandboxCapsSnippet />
 

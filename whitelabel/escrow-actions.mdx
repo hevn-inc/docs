@@ -5,7 +5,7 @@ description: "Every escrow action: the amount it takes, the window it is legal i
 
 import SignPayloadSnippet from "/snippets/sign-payload.mdx";
 
-Six actions, one resource. `POST /v1/escrow/{escrowId}/actions` prepares one and returns a payload to sign; `POST /v1/escrow/{escrowId}/actions/{idempotencyKey}/confirm` submits the signature. This page is the matrix.
+Six actions, one resource. `POST /dapi/v1/escrow/{escrowId}/actions` prepares one and returns a payload to sign; `POST /dapi/v1/escrow/{escrowId}/actions/{idempotencyKey}/confirm` submits the signature. This page is the matrix.
 
 ## The matrix
 
@@ -18,13 +18,13 @@ Six actions, one resource. `POST /v1/escrow/{escrowId}/actions` prepares one and
 | `reclaim` | refused | ignored | after `holdUntil`, while `capturableAmount > 0` | `reclaimed` | the buyer's |
 | `refund` | required | ignored | before `refundableUntil`, `0 < amount ≤ refundableAmount`, repeatable | `partiallyRefunded`, then `refunded` | yours |
 
-`approve` is not a verb you send: it is prepared for you by `POST /v1/escrow` and confirmed under the create's own key. Sending an `amount` with `void` or `reclaim` answers `409 amount_not_allowed`; omitting it on the four that need it answers `422 validation_failed`.
+`approve` is not a verb you send: it is prepared for you by `POST /dapi/v1/escrow` and confirmed under the create's own key. Sending an `amount` with `void` or `reclaim` answers `409 amount_not_allowed`; omitting it on the four that need it answers `422 validation_failed`.
 
 `charge` is `authorize` and `capture` in one on-chain action — the money goes straight to the seller with no hold in between. Use it when there is nothing to wait for.
 
 ## Preparing an action
 
-```json Request — POST /v1/escrow/esc_5Qb4e17c9d/actions, Idempotency-Key: order-A-1187-capture
+```json Request — POST /dapi/v1/escrow/esc_5Qb4e17c9d/actions, Idempotency-Key: order-A-1187-capture
 { "action": "capture", "amount": "40.00", "feeBps": 250 }
 ```
 
@@ -50,18 +50,21 @@ Sign the decoded `approval.payload` bytes — never the base64 string, never a r
 
 <SignPayloadSnippet />
 
-```json Request — POST /v1/escrow/esc_5Qb4e17c9d/actions/order-A-1187-capture/confirm
+```json Request — POST /dapi/v1/escrow/esc_5Qb4e17c9d/actions/order-A-1187-capture/confirm
 { "signature": "MEUCIQDk3f8Zc0xq2w1Yv7pB9nH4mJ6sR2tL5uD8aE0cQ1oXgAIg…" }
 ```
 
 `publicKey` is optional and only skips a scan of your registered keys. HEVN verifies the signature locally, against the payload it stored, **before** it consumes the approval — a wrong signature costs nothing but the call.
 
+HEVN re-checks the developer key registration behind the session immediately before it co-signs: a key paused between prepare and confirm, or a confirm sent from an IP outside the key's allowlist, answers `403` and signs nothing. The prepared action is untouched, so a confirm from an allowlisted host still works.
+
 | Answer | Meaning | What to do |
 | --- | --- | --- |
 | `200`, action `confirmed` | Mined. The body carries the projected deal and the `events` it produced. | Done. |
 | `200`, action `reverted` | Mined, but the contract rejected it. | Read the deal; nothing moved. Prepare again with a **new** key. |
-| `202`, `pollUrl` | With the bundler, no receipt yet. | `pollUrl` is the deal read, `GET /v1/escrow/{escrowId}`; `POST /v1/escrow/{escrowId}/sync` is the one that reconciles against the chain. Sync until the action settles. |
+| `202`, `pollUrl` | With the bundler, no receipt yet. | `pollUrl` is the deal read, `GET /dapi/v1/escrow/{escrowId}`; `POST /dapi/v1/escrow/{escrowId}/sync` is the one that reconciles against the chain. Sync until the action settles. |
 | `400 signature_invalid` | The signature does not verify. | The approval is untouched. Sign the decoded payload again. |
+| `403 forbidden` | The developer key registration was paused, or the confirm left an IP outside its allowlist. | Nothing was signed. Register a key that covers this host, or resume from an allowlisted one. |
 | `410 approval_expired` | The 60-second approval closed, or the action has no open approval left. | Prepare the action again with the **same** key; you get a fresh approval on the same record. |
 | `409 approval_consumed` | That approval already signed something. | Prepare again with the same key, then read the deal before you sign anything else. |
 | `409 action_in_flight` | Another action of yours is still on chain. | Sync this deal, then retry. The refusal carries no `details`; the deal to sync is the one you are acting on. |
@@ -119,7 +122,7 @@ func ConfirmAction(c *hevn.Client, escrowID, idemKey, payload string, key *hevn.
 
 ### One action in flight
 
-A signing wallet runs one on-chain action at a time — across every deal it signs for, not just this one. While one of yours is `signing` or `submitted`, the next prepare or confirm answers `409 action_in_flight`. The refusal names no deal, so a worker that drives many deals has to know which one it left in flight: serialise your actions per signing wallet and keep the in-flight deal id on your side, then `POST /v1/escrow/{escrowId}/sync` it before retrying.
+A signing wallet runs one on-chain action at a time — across every deal it signs for, not just this one. While one of yours is `signing` or `submitted`, the next prepare or confirm answers `409 action_in_flight`. The refusal names no deal, so a worker that drives many deals has to know which one it left in flight: serialise your actions per signing wallet and keep the in-flight deal id on your side, then `POST /dapi/v1/escrow/{escrowId}/sync` it before retrying.
 
 ## Statuses
 
@@ -128,7 +131,7 @@ The deal's status is a label for the last thing that landed. Decide with `availa
 | Deal status | Meaning |
 | --- | --- |
 | `draft` | Created. Nothing held. The buyer's approval does not change this. |
-| `authorized` | The hold is in the contract. `capturableAmount` is positive. |
+| `authorized` | The on-chain hold is in the contract. `capturableAmount` is positive. |
 | `charged` | Held and paid out in one action. Only a refund moves it back. |
 | `partiallyCaptured` | Part of the hold reached the seller, the rest is still capturable. |
 | `captured` | Nothing is capturable any more. |
@@ -149,7 +152,7 @@ The deal's status is a label for the last thing that landed. Decide with `availa
 
 ## Reads
 
-`GET /v1/escrow/{escrowId}` returns one deal with its last action. `GET /v1/escrow` lists the deals you operate, newest first, cursor-paged:
+`GET /dapi/v1/escrow/{escrowId}` returns one deal with its last action. `GET /dapi/v1/escrow` lists the deals you operate, newest first, cursor-paged:
 
 <CodeGroup>
 
@@ -177,7 +180,7 @@ openDeals := page.List("items")
 `status` repeats, so it goes in the path rather than the client's parameter map, which holds one
 value per name. Filters are `status`, `senderClientId` and `receiverClientId`. The envelope is `{ "items": [...], "nextCursor": "…" }`; pass `nextCursor` back as `cursor` until it is absent. A cursor from another query answers `400 invalid_cursor`.
 
-`POST /v1/escrow/{escrowId}/sync` reconciles the deal against the chain and returns the same shape plus `consistent`. It reads the chain at most once every 15 seconds per deal; calls in between answer the stored projection, which is why polling it in a tight loop buys nothing.
+`POST /dapi/v1/escrow/{escrowId}/sync` reconciles the deal against the chain and returns the same shape plus `consistent`. It reads the chain at most once every 15 seconds per deal; calls in between answer the stored projection, which is why polling it in a tight loop buys nothing.
 
 There is no separate action list: the deal read carries the last action, and every action is addressable by the key you chose.
 
@@ -188,5 +191,5 @@ There is no separate action list: the deal read carries the last action, and eve
 One shape worth knowing: a closed window or an over-large amount arrives today as a bare `400 invalid_request` — the contract-level reason (`preApprovalExpiry has been reached`, `amount exceeds available amount`) is logged on our side but not published, so `message` is the generic one and `details` is absent. Treat it exactly like `window_closed` and `amount_out_of_range`: re-read the deal and pick from `availableActions`, which is computed from the same windows and amounts.
 
 <Card title="Next: Sandbox" icon="flask" href="/whitelabel/sandbox">
-  The same 48 operations against an emulated partner on Base Sepolia.
+  The same 45 operations against an emulated partner on Base Sepolia.
 </Card>

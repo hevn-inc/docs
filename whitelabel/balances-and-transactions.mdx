@@ -9,32 +9,33 @@ Read a client through three surfaces: its balance, its ledger, and its exports.
 
 | Surface | Route | Answers |
 | --- | --- | --- |
-| **Balance** | `GET /v1/clients/{clientId}/balance` | What the client's wallet holds right now, read on chain |
-| **Ledger** | `GET /v1/transactions`, `GET /v1/transactions/{transactionId}`, `GET /v1/transactions/summary` | Every movement in or out, newest first, with totals for the same filters |
-| **Exports** | `GET /v1/transactions/export` | A file: a transaction list, an account statement, an account confirmation or a receipt |
+| **Balance** | `GET /dapi/v1/client/balance` | What the client's wallet holds right now, read on chain |
+| **Ledger** | `GET /dapi/v1/transactions`, `GET /dapi/v1/transactions/{transactionId}`, `GET /dapi/v1/transactions/summary` | Every movement in or out, newest first, with totals for the same filters |
+| **Exports** | `GET /dapi/v1/transactions/export` | A file: a transaction list, an account statement, an account confirmation or a receipt |
 
 <ActingAsSnippet />
 
-The balance route is the exception: the client is in the path, so no header is needed, and a header that disagrees with the path id is refused.
+The balance route is the strictest of the three: no client id appears in the path, so `X-Hevn-Account` is **required** rather than optional. Omit it and the call answers `422 validation_failed` for a missing header — reading your own account means sending your own `cl_…`.
 
 ## Balance
 
 <CodeGroup>
 ```bash cURL
-curl -s "$HEVN_API/clients/cl_7YQ2Kf3mN8/balance" \
-  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN"
+curl -s "$HEVN_API/client/balance" \
+  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+  -H "X-Hevn-Account: cl_7YQ2Kf3mN8"
 ```
 
 ```python Python
-balance = hevn.get(f"/clients/{CLIENT_ID}/balance")
+balance = northwind.get("/client/balance")
 ```
 
 ```javascript Node
-const balance = await hevn.get(`/clients/${clientId}/balance`);
+const balance = await northwind.get("/client/balance");
 ```
 
 ```go Go
-balance, err := api.Get("/clients/" + clientID + "/balance")
+balance, err := northwind.Get("/client/balance")
 ```
 </CodeGroup>
 
@@ -48,11 +49,11 @@ balance, err := api.Get("/clients/" + clientID + "/balance")
 
 Every number is a decimal string in the major unit — no atomic units, no floats. `balance` carries the token's own precision, `usdValue` and `totalUsd` are rounded to cents. `baseSmartWallet` is the address funds live at and the address a crypto payer sends to; it is the only address on this surface.
 
-The read hits the chain, so it is the truth about spendable funds — and it is what `POST /v1/payouts` checks before it lets you sign. A payout refused with `insufficient_funds` and a balance that looks sufficient means the difference is an in-flight debit, not a stale cache.
+The read hits the chain, so it is the truth about spendable funds — and it is what `POST /dapi/v1/payouts` checks before it lets you sign. A payout refused with `insufficient_funds` and a balance that looks sufficient means the difference is an in-flight debit, not a stale cache.
 
 ## Walk the ledger
 
-`GET /v1/transactions` is cursor-paged, newest first. Pass `nextCursor` back as `cursor` until it is gone. There is no `offset` and no total.
+`GET /dapi/v1/transactions` is cursor-paged, newest first. Pass `nextCursor` back as `cursor` until it is gone. There is no `offset` and no total.
 
 <CodeGroup>
 ```bash cURL
@@ -106,7 +107,7 @@ Every filter is a query parameter, camelCase, and the list-shaped ones take comm
 | `type` | Transaction types: the rail method slugs (`sepa`, `ach`, `swift`, `fedwire`, …), `crypto` for on-chain movement, `refund` for a returned payment |
 | `status` | `pending`, `rfi`, `success`, `failed`, `refunded` |
 | `incomeOnly` | `true` for money in only |
-| `contactId` | One or more `ct_…`, the recipients you paid |
+| `contactId` | One or more `ct_…`, the contacts you paid |
 | `bankId` | One or more `bnk_…`, the rails money arrived on |
 | `tag` | A category on the row, from the fixed set the ledger uses (`PAYROLL`, `CONTRACTORS`, `BANK_FEES`, …), or `UNTAGGED` |
 | `q` | Free text, at least two characters |
@@ -117,7 +118,7 @@ Values are matched exactly, case included. A value outside the set answers `400 
 
 ### Totals for the same filters
 
-`GET /v1/transactions/summary` takes the same filters and answers the aggregate, in USD, settled and pending kept apart:
+`GET /dapi/v1/transactions/summary` takes the same filters and answers the aggregate, in USD, settled and pending kept apart:
 
 ```json Response — 200
 { "inflowUsd": "12040.50", "inflowCount": 9,
@@ -130,15 +131,15 @@ It is its own route, so an aggregate is never folded into a page and never depen
 
 ### One transaction
 
-`GET /v1/transactions/{transactionId}` returns the same row plus `description`, `explorerUrl`, `traceNumber` and `attachmentIds` (`doc_…`). Use it when you have an id — from a payout's `transactionId`, from a sandbox credit, or from a row you are reconciling.
+`GET /dapi/v1/transactions/{transactionId}` returns the same row plus `description`, `explorerUrl`, `traceNumber` and `attachmentIds` (`doc_…`). Use it when you have an id — from a payout's `transactionId`, from a sandbox credit, or from a row you are reconciling.
 
 ## Exports
 
-`GET /v1/transactions/export` streams a file. The name arrives in `Content-Disposition`; there is no JSON body and no document to fetch afterwards.
+`GET /dapi/v1/transactions/export` streams a file. The name arrives in `Content-Disposition`; there is no JSON body and no document to fetch afterwards.
 
 | `kind` | Also needs | `format` | Contents |
 | --- | --- | --- | --- |
-| omitted | — | `csv` (default), `xlsx`, `pdf` | The filtered transaction list, exactly what `GET /v1/transactions` would return |
+| omitted | — | `csv` (default), `xlsx`, `pdf` | The filtered transaction list, exactly what `GET /dapi/v1/transactions` would return |
 | `statement` | `bankId` | `pdf`, `xlsx` | An account statement for that rail over the period |
 | `confirmation` | `bankId` | `pdf`, `xlsx` | A confirmation of the account's existence and requisites |
 | `receipt` | `transactionId` | `pdf` | A receipt for one transaction |
@@ -192,5 +193,5 @@ The ledger is the durable record of everything the other pages produce: a confir
 Rows appear when the partner reports or the chain confirms, not when you call. A `pending` row is not an error; a row that never appears is, and its payin or payout id is where to look.
 
 <Card title="Next: Escrow" icon="arrow-right" href="/whitelabel/escrow">
-  Hold one client's money while another delivers: the marketplace order, end to end.
+  Lock one client's funds in an on-chain contract while another delivers: the marketplace order, end to end.
 </Card>

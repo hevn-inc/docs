@@ -3,12 +3,12 @@ title: "Conventions"
 description: "The seven rules that hold for every operation: money, ids, casing, idempotency, pagination, status codes and errors."
 ---
 
-Seven rules hold for all 48 operations. Read them once and no endpoint will surprise you.
+Seven rules hold for all 45 operations. Read them once and no endpoint will surprise you.
 
 | Rule | In one line |
 | --- | --- |
 | [Money](#money) | A decimal string in the asset's major unit, never a number |
-| [Ids](#ids) | Prefixed and opaque: `cl_`, `po_`, `pi_`, `txn_`, `ct_`, `bnk_`, `doc_`, `kyb_`, `esc_` |
+| [Ids](#ids) | Prefixed and opaque: `cl_`, `po_`, `pi_`, `txn_`, `ct_`, `bnk_`, `doc_`, `kyb_`, `esc_`, `dk_` |
 | [Casing](#casing) | camelCase everywhere, unknown keys refused, null fields omitted |
 | [`Idempotency-Key`](#idempotency-key) | Accepted on every write, required nowhere |
 | [Pagination](#pagination) | A cursor and a limit; no offset and no total |
@@ -26,7 +26,7 @@ never reach a payment. Rates and fees follow the same rule; `feeBps` is the one 
 integer number of basis points.
 
 Where an operation has two sides, you pin one and HEVN derives the other. Send `amount` to pin what
-leaves the balance or `amountTo` to pin what the recipient receives — one of them, never both.
+leaves the balance or `amountTo` to pin what the beneficiary receives — one of them, never both.
 
 <Warning>
   A decimal arrives in JavaScript and Go as a **string**. A `typeof x === "number"` guard silently
@@ -43,21 +43,28 @@ Every id is prefixed, opaque and safe to store as text:
 | `po_` | payout, over a bank rail or on chain | `doc_` | document |
 | `pi_` | payin | `kyb_` | KYB application |
 | `txn_` | transaction | `esc_` | escrow deal |
-| `ct_` | contact | | |
+| `ct_` | contact | `dk_` | developer key registration |
+
+A `dk_…` is the one id you never send to this API: it names a developer key registration and belongs
+to the management routes on the ordinary API ([Developer key](/whitelabel/developer-key)).
 
 Do not parse them, derive them or assume a length. An id of the wrong kind in a body or query field
 is `400 invalid_id` with the expected prefix in `details`; in a path it is that resource's own `404`,
 so an id from another namespace is never confirmable.
 
 Rail ids — `sepa_named-bank_a`, a stand-in for a real one — are the exception that proves the rule:
-they are opaque strings you copy from `GET /v1/banks`, they carry no prefix, and their shape is not
-a contract. See [Rails](/whitelabel/reference/rails).
+they are opaque strings you copy from `GET /dapi/v1/banks`, they carry no prefix, and their shape is
+not a contract. See [Rails](/whitelabel/reference/rails).
 
 ## Casing
 
 **camelCase everywhere**: request bodies, query parameters, response fields and the keys inside
-`error.details`. Two things are deliberately not field names and stay lowercase `snake_case` — an
-`error.code` slug, and an enum member such as `business_revenue`.
+`error.details`. Two things are deliberately not field names. An `error.code` slug is always
+lowercase `snake_case`. An enum member usually is too — `business_revenue` — but an enum member is a
+literal, not a naming convention: `HighRiskActivity` members are SCREAMING_SNAKE_CASE
+(`MONEY_SERVICES`, `PRECIOUS_METALS_STONES_JEWELRY`), and `FiatTransactionCount` members are the
+ranges they read as (`<10`, `10-50`, `50-200`, `200-1,000`, `1,000+`, punctuation included). Send and
+compare enum values exactly as the spec prints them, and never case-fold them.
 
 Two consequences worth knowing before your first `422`:
 
@@ -71,7 +78,7 @@ Two consequences worth knowing before your first `422`:
   `"phone": null`. Treat a missing key as unset.
 
 One corner is not camelCase and cannot be: the keys inside `fields` on
-`PUT /v1/documents/{documentId}/content` are the extractor's own field names —
+`PUT /dapi/v1/documents/{documentId}/content` are the extractor's own field names —
 `registration_number`, `address.street_address` — because they are values read off a page rather
 than fields of this API. They are the keys the refusal that asks for them already named. See
 [Onboard a client](/whitelabel/onboarding#fill-a-documents-fields-by-hand).
@@ -112,7 +119,7 @@ and unparsed; when it is absent you have reached the end. There is no `offset` a
 anywhere, and a cursor that does not belong to the query it is sent to is `400 invalid_cursor`.
 
 Aggregates are their own route rather than a field on page one —
-`GET /v1/transactions/summary` takes the same filters as `GET /v1/transactions`.
+`GET /dapi/v1/transactions/summary` takes the same filters as `GET /dapi/v1/transactions`.
 
 ## Status codes
 
@@ -124,7 +131,9 @@ Aggregates are their own route rather than a field on page one —
 | `4xx` / `5xx` | Refused | the error envelope below |
 
 There is no `204`: every response has a body. `Location` and `pollUrl` are paths from the host root
-and already include the `/v1` prefix.
+and already include the `/dapi/v1` prefix. One of them names no resource: a client's `pollUrl` is
+literally `/dapi/v1/client`, so poll it with the `cl_…` you were just given in `X-Hevn-Account` —
+the URL alone identifies nothing.
 
 ## Errors
 

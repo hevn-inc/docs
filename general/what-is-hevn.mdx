@@ -1,11 +1,11 @@
 ---
 title: "What is HEVN"
-description: "HEVN is a non-custodial financial platform: your money lives in a smart wallet only you own, while HEVN provides the banking-grade tooling around it."
+description: "HEVN is a non-custodial financial platform: your money lives in a smart wallet only you own, while HEVN provides the payment tooling around it."
 ---
 
-HEVN is a financial platform for global payments built on USDC. It gives individuals and businesses the tools of a modern bank — invoices, contacts, contracts, bank payouts, cards, and statements — without ever taking custody of their money.
+HEVN is a financial platform for global payments built on USDC. It gives individuals and businesses the tools a finance team expects — invoices, contacts, contracts, payouts to bank accounts, cards, and statements — without ever taking custody of their money.
 
-Every HEVN account is a [Base Smart Wallet](https://docs.base.org/base-account/overview/what-is-base-account) on the Base network, owned exclusively by a key that only the user controls. HEVN the platform stores metadata (contacts, invoices, bank details) and orchestrates workflows, but it **cannot move, freeze, or access user funds**.
+Every HEVN account is a [Base Smart Wallet](https://docs.base.org/base-account/overview/what-is-base-account) on the Base network, owned exclusively by a key that only the user controls. HEVN the platform stores metadata (contacts, invoices, virtual account details) and orchestrates workflows, but it **cannot move, freeze, or access user funds**.
 
 <CardGroup cols={2}>
   <Card title="Architecture" icon="layers" href="/general/architecture">
@@ -56,7 +56,7 @@ Because each step is deterministic, HEVN can compute the wallet address for any 
 The HEVN API (and the JWT it issues) covers everything that is *not* money movement:
 
 - Contact book, invoicing, and contract management
-- Bank details (virtual IBANs / account numbers) issuance
+- Virtual account details (IBANs / account numbers) requested from partner banks and surfaced to you
 - KYC/KYB, statements, analytics
 - Team and multi-user access administration
 

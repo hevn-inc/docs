@@ -8,7 +8,7 @@ One developer key, two calls to log in, one header to act as a client.
 ```mermaid
 sequenceDiagram
     participant S as Your server
-    participant H as HEVN /v1/auth
+    participant H as HEVN /dapi/v1/auth
     S->>H: POST /auth/challenge — email, publicKey, nonce, requestExpiry, signature
     Note over S,H: the proof is your signature over<br/>hevn-developer-key-login:email:nonce:requestExpiry
     H-->>S: challengeId, payload, expiresAt
@@ -16,7 +16,7 @@ sequenceDiagram
     S->>H: POST /auth/token — challengeId, signature
     Note over H: the challenge is single-use<br/>and expires within minutes
     H-->>S: accessToken (1 h), refreshToken (60 d), userId
-    S->>H: GET /v1/banks — Authorization: Bearer …, X-Hevn-Account: cl_7YQ2Kf3mN8
+    S->>H: GET /dapi/v1/banks — Authorization: Bearer …, X-Hevn-Account: cl_7YQ2Kf3mN8
     H-->>S: the rails of that client
 ```
 
@@ -24,7 +24,7 @@ sequenceDiagram
 
 Two calls, two signatures, no browser.
 
-**`POST /v1/auth/challenge`** proves you hold the key. Sign the proof string
+**`POST /dapi/v1/auth/challenge`** proves you hold the key. Sign the proof string
 `hevn-developer-key-login:{email}:{nonce}:{requestExpiry}` with your developer key and send it with
 the public key you registered. `nonce` is any integer you have not used before; `requestExpiry` is a
 millisecond timestamp at most five minutes in the future.
@@ -45,7 +45,7 @@ The answer is a payload HEVN built for you:
 { "challengeId": "9f2c1ab8-4d7e-4f1f-a3c6-5b0e7d9a2c41", "payload": "eyJib2R5Ijp…", "expiresAt": "2026-09-17T10:06:10Z" }
 ```
 
-**`POST /v1/auth/token`** exchanges your signature over that payload for a session. Sign the
+**`POST /dapi/v1/auth/token`** exchanges your signature over that payload for a session. Sign the
 *decoded* bytes of `payload`, exactly as at payment time — [Signing](/whitelabel/signing) is the same
 mechanism.
 
@@ -67,10 +67,18 @@ import LoginSnippet from "/snippets/login.mdx";
 
 ## Two tokens, two jobs
 
-| Token | Lifetime | What it is for |
-| --- | --- | --- |
-| `accessToken` | **1 hour** (`expiresIn: 3600`) | Every call: `Authorization: Bearer <accessToken>` |
-| `refreshToken` | **60 days** | One route only: `POST /v1/auth/refresh`, to mint a new access token |
+| Token | Lifetime | Audience | What it is for |
+| --- | --- | --- | --- |
+| `accessToken` | **1 hour** (`expiresIn: 3600`) | `platform` | Every call: `Authorization: Bearer <accessToken>` |
+| `refreshToken` | **60 days** | `platform-refresh` | One route only: `POST /dapi/v1/auth/refresh`, to mint a new access token |
+
+Both carry a `developer_key_id` claim naming the key registration that established the session, and
+the two audiences do not cross. `/dapi/v1` refuses anything that is not a platform access token
+carrying that claim: no bearer at all is `401 unauthenticated`, and an ordinary app token, a refresh
+token on a business route or a token with no registration behind it is `403 forbidden` with
+`details.reason = "developerSessionRequired"`. The ordinary `/api/v1` refuses a platform token
+symmetrically, which is why the routes that register a developer key are not on this API — see
+[Developer key](/whitelabel/developer-key#register-it-once-per-environment).
 
 Re-mint with the refresh token as the bearer and an empty body:
 
@@ -123,8 +131,9 @@ it is refused.
 ## Acting as a client
 
 Send `X-Hevn-Account: cl_…` alongside your own access token, and the call reads and writes that
-client. Omit it and the same call acts on your integrator account. One token covers every client you
-control, so there is nothing to cache per client.
+client. On most routes you may omit it, and the same call acts on your integrator account; on the
+singular `/client*` routes the header is required, so reading your *own* account there means sending
+your own `cl_…`. One token covers every client you control, so there is nothing to cache per client.
 
 <CodeGroup>
 
@@ -148,15 +157,16 @@ rows, err := api.ActingAs("cl_7YQ2Kf3mN8").Get("/transactions", hevn.Query{"limi
 
 </CodeGroup>
 
-The header is read exactly where the resource has no owner of its own in the path:
+No path names a client any more — there is no `{clientId}` parameter left in the API — so the header
+is the only thing that selects an account, and each route treats it one of four ways:
 
 | Routes | The header |
 | --- | --- |
-| `/banks*`, `/payins*`, `/payouts*`, `/contacts*`, `/transactions*`, `/documents`, and the `/sandbox` money routes | **Accepted, optional.** Without it the call acts on your account |
-| `/clients/{clientId}` and everything under it — `/kyb`, `/kyb/submit`, `/balance` | **Refused** unless it equals the client id already in the path. The path is the scope |
-| `POST /clients`, `GET /clients` | **Refused.** These are about your own account by definition |
-| `/auth/*` | **Ignored.** A login has no account to act for yet, so the header is neither read nor refused |
+| `/banks*`, `/payins*`, `/payouts*`, `/contacts*`, `/transactions*`, `/documents*`, and the `/sandbox/*` routes | **Accepted, optional.** Without it the call acts on your account |
+| `GET /client`, `PATCH /client`, `GET /client/balance`, `GET /client/kyb`, `PUT /client/kyb`, `POST /client/kyb/complete` | **Required.** These are the singular, acting client; the header is the selector, including when the account you want is your own |
+| `POST /clients`, `GET /clients` | **Refused.** The collection is yours by definition |
 | All of `/escrow*` | **Refused.** A deal names `senderClientId` and `receiverClientId` in the body; the operator is always you |
+| `/auth/*` | **Ignored.** A login has no account to act for yet, so the header is neither read nor refused |
 
 Sending the header where it is refused is an error rather than a silent no-op, so you find out in
 development:
@@ -164,22 +174,27 @@ development:
 | Status | `code` | Cause |
 | --- | --- | --- |
 | 400 | `account_header_invalid` | The value is not a `cl_…` client id |
-| 400 | `account_scope_conflict` | The route is scoped to your account, or the header disagrees with the path |
+| 400 | `account_scope_conflict` | The route is self-scoped: you sent the header to `/clients` or `/escrow*`, or you used a token that was already acting for another account there. `details.reason` is `selfScopedRoute` |
+| 422 | `validation_failed` | The header is missing on a `/client*` route, where it is required. `details.fields` names it |
 | 404 | `account_not_found` | Not one of your clients — unknown and foreign are indistinguishable on purpose |
 | 403 | `account_forbidden` | The client exists and is yours, but your integrator standing or the relationship is not current |
 
 <Note>
-  `POST /v1/auth/refresh` also accepts `{"userId": "cl_…"}` and mints an access token scoped to that
-  one client. It still works, and it is no longer the documented path: it costs one token mint per
+  `POST /dapi/v1/auth/refresh` also accepts `{"userId": "cl_…"}` and mints an access token scoped to
+  that one client. It still works, and it is no longer the documented path: it costs one token mint per
   client per hour and buys nothing the header does not give you.
 </Note>
 
 ## What a session is bound to
 
 - **An environment.** Sandbox tokens are refused in production and the reverse.
-- **Your key's standing at the time of the call.** Rotating or revoking a developer key stops new
-  signatures immediately; it does not cut tokens already issued. See
-  [Developer key](/whitelabel/developer-key#rotate-a-key).
+- **The key registration behind it, on every single request.** The `developer_key_id` in the token is
+  re-read before the request is served: the registration must still be active, and the call must come
+  from an address inside its immutable allowlist. Pausing a registration therefore **does** cut the
+  tokens already minted from it — the next call is a `403`, and so is the refresh that would have
+  replaced it. See [Developer key](/whitelabel/developer-key#rotate-a-key).
+- **A set of source addresses.** A deploy from a new egress IP fails every call with `403` even
+  though the key, the signature and the token are all correct.
 - **A budget.** Reads and writes are limited per credential, and login has its own per-IP and
   per-email windows — over them is `429` with `Retry-After`. The numbers are in
   [Limits](/whitelabel/reference/limits#rate-limits). Logging in on a loop is the fastest way to lock

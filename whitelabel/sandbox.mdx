@@ -1,13 +1,13 @@
 ---
 title: "Sandbox"
-description: "The one place /v1/sandbox/* is documented: read the treasury, mint money, settle a payin and move a payout."
+description: "The one place /dapi/v1/sandbox/* is documented: read the faucet account, mint money, settle a payin and move a payout."
 ---
 
 import ActingAsSnippet from "/snippets/acting-as.mdx";
 import EnvSnippet from "/snippets/env.mdx";
 import SandboxCapsSnippet from "/snippets/sandbox-caps.mdx";
 
-The sandbox is the same API against one emulated partner on Base Sepolia. Same paths, same bodies, same slugs, same signatures — only the counterparty is fake, and four extra routes let you play it: the 44 operations production serves, plus these.
+The sandbox is the same API against one emulated partner on Base Sepolia. Same paths, same bodies, same slugs, same signatures — only the counterparty is fake, and four extra routes let you play it: the 41 operations production serves, plus these four.
 
 <EnvSnippet />
 
@@ -17,15 +17,16 @@ The sandbox is the same API against one emulated partner on Base Sepolia. Same p
 | --- | --- |
 | Chain | Base Sepolia. Balances, wallets, signatures and transaction hashes are real; the tokens are testnet USDC and EURC. |
 | Fiat partner | One emulator answers for every rail. It issues checksum-valid requisites — `SBOX…` BICs, DE/AE/GB IBANs, ABA routing numbers, a PIX key, an 18-digit SPEI number. |
-| Money in and out | Paid by a shared HEVN treasury on demand, through the routes below. Nothing arrives on its own. |
+| Money in and out | Paid by a shared testnet faucet account on demand, through the routes below. Nothing arrives on its own. |
 | FX | A fixed table: USD 1, EUR 1.08, GBP 1.27, AED 0.2723, and so on, with USDC pegged to USD and EURC to EUR. |
 | Verification | A submitted KYB application is approved immediately. Rails open without a compliance queue. |
 | Background work | Off. Every call projects its own rows before it returns, so there is nothing to wait for that you did not ask for. |
 | Cards, swaps, cross-chain routing | Disabled. They are not part of the whitelabel API. |
+| Your source IP | As real as in production. Every call is checked against the allowlist you registered with the developer key, so a sandbox host on a new egress IP answers `403` on every route. |
 
 <SandboxCapsSnippet />
 
-Three of these four routes move a client's money, and the header is how you pick which client. `GET /v1/sandbox/treasury` accepts it and reports the same shared treasury either way.
+Three of these four routes move a client's money, and the header is how you pick which client. `GET /dapi/v1/sandbox/treasury` accepts it and reports the same shared faucet account either way.
 
 <ActingAsSnippet />
 
@@ -33,9 +34,9 @@ None of these routes exist in production; there they answer `404`.
 
 ## What the sandbox does not grant
 
-Being an integrator, being allowed to create clients, and being allowed to operate escrow are flags on your account, and nothing in the API sets them — in the sandbox as in production, HEVN does. There is no self-enrolment call. Until the flags are on, `POST /v1/clients` answers `403 integrator_inactive` or `403 client_creation_not_enabled`; `GET /v1/clients` answering an empty page is the cheapest confirmation that they are.
+Being an integrator, being allowed to create clients, and being allowed to operate escrow are flags on your account, and nothing in the API sets them — in the sandbox as in production, HEVN does. There is no self-enrolment call. Until the flags are on, `POST /dapi/v1/clients` answers `403 integrator_inactive` or `403 client_creation_not_enabled`; `GET /dapi/v1/clients` answering an empty page is the cheapest confirmation that they are.
 
-## Read the treasury
+## Read the faucet account
 
 Every emulated credit is paid by one account, and every emulated payout is booked against it.
 
@@ -66,11 +67,11 @@ treasury, err := api.Get("/sandbox/treasury")
                 { "token": "EURC", "tokenAddress": "0x808456…", "balance": "310.00" } ] }
 ```
 
-`maxCredit` is the live per-call ceiling. When the treasury is empty or out of gas, credits answer `503 provider_unavailable` with `details.treasuryAddress` and `details.token` — that is a faucet problem, not your bug.
+`maxCredit` is the live per-call ceiling. When the faucet account is empty or out of gas, credits answer `503 provider_unavailable` with `details.treasuryAddress` and `details.token` — that is a faucet problem, not your bug.
 
 ## Mint money
 
-`POST /v1/sandbox/deposits` has two arms, and `bankId` picks between them.
+`POST /dapi/v1/sandbox/deposits` has two arms, and `bankId` picks between them.
 
 - **With `bankId`** it is an unsolicited bank transfer into that rail's requisites: `amount` is in the rail's currency, the emulator converts at the fixed rate and delivers the settlement token to the client's wallet. `remitter` and `paymentReference` are the payer's name and message.
 - **Without `bankId`** it is a token transfer straight to the client's wallet. `token` is `USDC` (default) or `EURC`, and it is the fastest way to fund a client before a payout test.
@@ -116,7 +117,7 @@ A bank deposit answers the same shape with the fiat side filled in — `amount` 
 
 The key is optional here, as everywhere. Send one and a retry replays it (`200` with `Idempotency-Replayed: true`); send none and HEVN derives one from the request and echoes it as `idempotencyKey`. Two identical un-keyed deposits always replay, whatever the gap between them, so pass an explicit key when you want a second identical credit.
 
-`202` means the treasury's transfer has not confirmed yet. Repeat the same request until it is `settled`; nothing is ever credited twice.
+`202` means the faucet account's transfer has not confirmed yet. Repeat the same request until it is `settled`; nothing is ever credited twice.
 
 ## Settle a payin
 
@@ -148,7 +149,7 @@ settled, err := northwind.Post("/sandbox/payins/"+payin.Str("id")+"/complete",
 
 </CodeGroup>
 
-The body is optional and `remitter` is the only field in it — it becomes the payer name on the resulting income row, which is what you want if you are testing reconciliation. The payin must be open: one you never opened with `POST /v1/payins/{payinId}/instructions` answers `409 quote_not_submitted`.
+The body is optional and `remitter` is the only field in it — it becomes the payer name on the resulting income row, which is what you want if you are testing reconciliation. The payin must be open: one you never opened with `POST /dapi/v1/payins/{payinId}/instructions` answers `409 quote_not_submitted`.
 
 ## Move a payout
 
@@ -182,7 +183,7 @@ moved, err := northwind.Post("/sandbox/payouts/"+payout.Str("id")+"/status",
 | `submitted` | yes | The partner accepted the payment. |
 | `settled` | yes | The payout is done and the ledger row becomes a success. |
 | `failed` | no | Allowed at any point. The money does **not** come back. |
-| `refunded` | yes | The status flips, then the treasury returns the source token to the client's wallet. |
+| `refunded` | yes | The status flips, then the faucet account returns the source token to the client's wallet. |
 
 "Funded" means the on-chain debit you signed has landed. Asking for anything but `failed` before that answers `409 payout_not_fundable`. An illegal move — `settled` back to `submitted` — answers `409 conflict`. `refunded` answers `202` until the return lands; call it again until `refundTxHash` is set, and the same send is resumed, never duplicated.
 

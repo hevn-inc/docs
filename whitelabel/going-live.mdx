@@ -10,18 +10,18 @@ Production differs in four ways: what HEVN must enable for you, what you re-crea
 ```mermaid
 flowchart TB
     subgraph Sandbox
-        SA["sandbox.gethevn.com<br/>register the key here"]
-        SB["sandbox-api.hevn.finance/v1"]
-        SC["Base Sepolia · one emulated partner<br/>instant rails · instant KYB · /v1/sandbox/*"]
+        SA["sandbox.gethevn.com<br/>add the key to the signer here"]
+        SB["sandbox-api.hevn.finance/dapi/v1"]
+        SC["Base Sepolia · one emulated partner<br/>instant rails · instant KYB · /dapi/v1/sandbox/*"]
         SA --- SB --- SC
     end
     subgraph Production
-        PA["app.gethevn.com<br/>register the key here"]
-        PB["api.hevn.finance/v1"]
-        PC["Base · real partners<br/>reviewed rails · reviewed KYB · no /v1/sandbox/*"]
+        PA["app.gethevn.com<br/>add the key to the signer here"]
+        PB["api.hevn.finance/dapi/v1"]
+        PC["Base · real partners<br/>reviewed rails · reviewed KYB · no /dapi/v1/sandbox/*"]
         PA --- PB --- PC
     end
-    Sandbox -. "nothing crosses: developer keys, clients,<br/>tokens, rail ids, contacts, escrow deals" .-> Production
+    Sandbox -. "nothing crosses: developer keys and their allowlists,<br/>clients, tokens, rail ids, contacts, escrow deals" .-> Production
 ```
 
 <EnvSnippet />
@@ -32,24 +32,26 @@ Four things are granted by HEVN rather than by the API — in the sandbox exactl
 
 | What | Without it | Ask for it when |
 | --- | --- | --- |
-| An active integrator profile | `403 integrator_inactive` on `POST /v1/clients`, and `403 account_forbidden` on every call that acts for a client you already have | Before you write production code. It follows a partnership review, off-platform. |
-| Client creation | `403 client_creation_not_enabled` on `POST /v1/clients` | Same conversation. It is granted separately from the profile. |
-| Escrow operation | Escrow actions are refused | Only if you hold money between your own customers. |
-| The rails you need | `403 rail_not_available` on `POST /v1/banks` | Name the currencies and countries you sell into. Rail availability is per integrator, per client and per partner. |
+| An active integrator profile | `403 integrator_inactive` on `POST /dapi/v1/clients`, and `403 account_forbidden` on every call that acts for a client you already have | Before you write production code. It follows a partnership review, off-platform. |
+| Client creation | `403 client_creation_not_enabled` on `POST /dapi/v1/clients` | Same conversation. It is granted separately from the profile. |
+| Escrow operation | Escrow actions are refused | Only if funds must be locked on chain between your own customers. |
+| The rails you need | `403 rail_not_available` on `POST /dapi/v1/banks` | Name the currencies and countries you sell into. Rail availability is per integrator, per client and per partner. |
 
-Confirm all four the same way you would in the sandbox: create one client, read `GET /v1/banks` for it, and check that the rails you expect are listed.
+Confirm all four the same way you would in the sandbox: create one client, read `GET /dapi/v1/banks` for it, and check that the rails you expect are listed.
 
 ## Nothing carries over
 
 | Re-create in production | Why |
 | --- | --- |
-| The developer keypair | Keys are registered per environment, in that environment's app. Generate a fresh P-256 key for production; the sandbox key is unknown there. Registering it is the one browser step, once. |
+| The developer keypair and its registration | Keys are registered per environment. Generate a fresh P-256 key for production, add its public half to that account's signer, then register it with `POST /api/v1/developer/api-keys` carrying the **production** egress IPs in `ipAllowlist`. The sandbox key, and the sandbox allowlist, are both unknown in production. |
 | Every client | A `cl_…` from the sandbox does not exist in production, and neither does anything hanging off it: KYB, rails, contacts, escrow deals. |
 | Tokens | Access and refresh tokens are environment-scoped. |
-| Rail ids | Rail ids are opaque strings you copy from `GET /v1/banks`. Never hardcode one you saw in the sandbox; read them per client, per environment. |
+| Rail ids | Rail ids are opaque strings you copy from `GET /dapi/v1/banks`. Never hardcode one you saw in the sandbox; read them per client, per environment. |
 | Idempotency keys | Keys are scoped to your account and the environment. A key that replayed a sandbox payout means nothing in production. |
 
 Keep both sets of credentials loadable at once and choose by `HEVN_API`: a deploy that points a production key at the sandbox host fails at login with `401 invalid_credentials`, which is a confusing way to learn you swapped a variable.
+
+The allowlist is the second variable that fails this way. A registration is pinned to the source IPs you gave it and cannot be edited, so a production deploy behind a different NAT answers `403` on every call although the key, the signature and the token are all correct. Enumerate the egress addresses of every host that will call HEVN — including the ones an autoscaler adds — before you register the production key.
 
 ## What stops being instant
 
@@ -57,12 +59,12 @@ In the sandbox every row exists by the time the call returns. In production most
 
 | Step | Sandbox | Production |
 | --- | --- | --- |
-| Client provisioning | seconds | seconds — poll `GET /v1/clients/{clientId}` until `ready` |
-| KYB decision | approved on submit | a review. Poll `GET /v1/clients/{clientId}/kyb`; expect `rfi` at least as often as `approved` |
-| Rail activation | `active` with requisites immediately | `preparing` until the partner publishes the account details. Poll `GET /v1/banks` |
-| Payin settlement | you call `/v1/sandbox/payins/{payinId}/complete` | the payer's bank moves on its own clock; the income row appears when it lands |
-| Payout settlement | you call `/v1/sandbox/payouts/{payoutId}/status` | the partner drives it. `settled` means accepted and debited, not delivered |
-| Ledger rows | written before the call returns | written when the money moves. Reconcile from `GET /v1/transactions`, not from the response you got an hour ago |
+| Client provisioning | seconds | seconds — poll `GET /dapi/v1/client` with `X-Hevn-Account` until `ready` |
+| KYB decision | approved on completion | a review. Poll `GET /dapi/v1/client/kyb` with `X-Hevn-Account`; expect `rfi` at least as often as `approved` |
+| Rail activation | `active` with requisites immediately | `preparing` until the partner publishes the account details. Poll `GET /dapi/v1/banks` |
+| Payin settlement | you call `/dapi/v1/sandbox/payins/{payinId}/complete` | the payer's bank moves on its own clock; the income row appears when it lands |
+| Payout settlement | you call `/dapi/v1/sandbox/payouts/{payoutId}/status` | the partner drives it. `settled` means accepted and debited, not delivered |
+| Ledger rows | written before the call returns | written when the money moves. Reconcile from `GET /dapi/v1/transactions`, not from the response you got an hour ago |
 
 Every one of those is the same fix: a poller with backoff and a deadline, keyed on your own record. Both of the shapes you need are on the pages that produce them — `poll_until` in the guides and the full loop in [HTTP client](/whitelabel/reference/client).
 
@@ -70,8 +72,8 @@ Every one of those is the same fix: a poller with backoff and a deadline, keyed 
 
 Refusals your sandbox runs never produced, because the emulator never argues:
 
-- **`422 recipient_details_invalid`** — the receiving bank does not recognise the beneficiary. Usually the name. Correct the contact with `PATCH /v1/contacts/{contactId}` and book again.
-- **`422 rail_requirements_unmet` and `422 phone_required`** — a rail wants something the client has not given yet. `GET /v1/banks/{rail}/requirements` lists it.
+- **`422 contact_payment_details_invalid`** — the receiving bank does not recognise the beneficiary. Usually the name. Correct the contact with `PATCH /dapi/v1/contacts/{contactId}` and book again.
+- **`422 rail_requirements_unmet` and `422 phone_required`** — a rail wants something the client has not given yet. `GET /dapi/v1/banks/{rail}/requirements` lists it.
 - **`422 amount_below_minimum` and `422 amount_above_maximum`** — real rail minimums replace the sandbox's `0.10`.
 - **`attention: {"kind": "rfi"}` on a payout** — the partner is holding the transfer pending a question. Nothing you sign moves it until the question is answered.
 - **`503 provider_unavailable`** — a partner is down. Retry with backoff; do not re-book.
@@ -81,15 +83,15 @@ Refusals your sandbox runs never produced, because the emulator never argues:
 
 <Steps>
   <Step title="Point at the production host">
-    Set `HEVN_API` to `https://api.hevn.finance/v1`. Nothing else in your code changes.
+    Set `HEVN_API` to `https://api.hevn.finance/dapi/v1`. Nothing else in your code changes.
   </Step>
   <Step title="Get the flags">
     Integrator profile, client creation, escrow if you need it, and the rails for your markets. Verify by listing rails for a real client, not by being told.
   </Step>
   <Step title="Register a production developer key">
-    A new P-256 keypair, generated on the machine that will hold it, mode `0600`, registered once at `https://app.gethevn.com`. Never copy the sandbox key.
+    A new P-256 keypair, generated on the machine that will hold it, mode `0600`. Add the public half to the production account's signer, then register it with `POST /api/v1/developer/api-keys` and the production egress IPs. Never copy the sandbox key, and never assume the sandbox allowlist carries over.
   </Step>
-  <Step title="Delete every /v1/sandbox call">
+  <Step title="Delete every /dapi/v1/sandbox call">
     There are four, and all four answer `404` in production. Whatever they drove — a deposit, a payin settling, a payout moving — now happens because a bank did it.
   </Step>
   <Step title="Replace instant reads with polling">
@@ -102,15 +104,15 @@ Refusals your sandbox runs never produced, because the emulator never argues:
     Especially the four funding codes: `already_funded` is success, `funding_in_progress` means wait, `funding_attempt_expired` means re-open with the same key, and `funding_state_unknown` means stop and ask. See [Errors](/whitelabel/reference/errors#funding-a-payment).
   </Step>
   <Step title="Rehearse losing the key">
-    Register a second key before you need it, book a payout naming the new `publicKey`, and confirm it. Rotation is a field on `POST /v1/payouts`, not a migration — but only if the second key is already registered.
+    Register a second key before you need it, book a payout naming the new `publicKey`, and confirm it. Rotation is a field on `POST /dapi/v1/payouts`, not a migration — but only if the second key is already registered **and** its allowlist covers the hosts that will use it. Pause the old registration once the new one has carried a payment.
   </Step>
   <Step title="Fund what production makes you fund">
-    Escrow refunds leave your own wallet, and a payout debits the client's. The sandbox treasury covered both; now your balances do.
+    Escrow refunds leave your own wallet, and a payout debits the client's. The sandbox faucet account covered both; now your balances do.
   </Step>
 </Steps>
 
 <Warning>
-  Run one real payment end to end before you point customers at it: one client, one rail, one small payout to an account you control, reconciled from `GET /v1/transactions`. Every difference on this page shows up in that one run.
+  Run one real payment end to end before you point customers at it: one client, one rail, one small payout to an account you control, reconciled from `GET /dapi/v1/transactions`. Every difference on this page shows up in that one run.
 </Warning>
 
 <Card title="Next: Rails" icon="building-columns" href="/whitelabel/reference/rails">

@@ -1,6 +1,6 @@
 ---
 title: "Developer key"
-description: "Generate a P-256 keypair, register the public half with HEVN once, and rotate it without downtime."
+description: "Generate a P-256 keypair, register it with the addresses it may be used from, and rotate it without downtime."
 ---
 
 Your backend holds one credential: a P-256 keypair. The private half never leaves your server and is
@@ -11,10 +11,11 @@ what logs you in and signs every payment. HEVN stores only the public half.
 | Property | Requirement |
 | --- | --- |
 | Curve | **P-256**, also called `secp256r1` or `prime256v1` |
-| Public key on the wire | **base64** (standard alphabet, padded) of the **DER SubjectPublicKeyInfo** |
+| Public key on the wire | **base64** (standard alphabet, padded) of the **DER SubjectPublicKeyInfo**, at most 4096 characters |
 | Signature on the wire | **base64** of the **ASN.1 DER** ECDSA `(r, s)` over **SHA-256** of the message |
-| Keys per account | up to **5** registered at once, so a rotation never needs downtime |
+| Keys per account | up to **5** in the account's signer at once, so a rotation never needs downtime |
 | Identifier | the key's fingerprint, `sha256:<hex of sha256(DER)>` |
+| Registration id | a `dk_…` id, returned when you register the key |
 
 <Warning>
   PEM armor in the `publicKey` field is rejected, base64url is rejected, and a raw 64-byte `r‖s`
@@ -34,29 +35,135 @@ import KeyLoad from "/snippets/key-load.mdx";
 
 The single line it prints — `MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE…` — is what you register.
 
-## Register it in the app, once per environment
+## Register it, once per environment
 
-Registration attaches the key to your account's signer, which changes what can authorize money from
-every wallet you control. That change is authorized by your own account, from your own browser
-session, so it is the one step in this guide that is not an API call.
+Registration is two things, and the key works only when both are done:
 
 <Steps>
-  <Step title="Open the app">
-    `https://sandbox.gethevn.com` for the sandbox, `https://app.gethevn.com` for production. Sign in
-    as the account that will be your integrator account.
+  <Step title="Add the key to your account's signer">
+    This is what makes the key able to authorize money from every wallet you control, so it is
+    authorized by your own account rather than by the key itself: open the developer-key screen at
+    `https://sandbox.gethevn.com`, or `https://app.gethevn.com` in production, and paste the base64
+    public key. The same thing over HTTP is the `/api/v1/developer/api-keys/signer` family:
+    `GET .../signer` provisions and reads the signer, `POST .../signer/prepare` and
+    `POST .../signer/confirm` replace the list of public keys, and `POST .../signer/attach/prepare`
+    and `POST .../signer/attach/confirm` attach the signer to the account wallet. The list holds at
+    most five keys and is **replaced wholesale**, never merged.
   </Step>
-  <Step title="Paste the public key">
-    Open the developer-key screen and add the base64 public key you just printed. The app produces the
-    signature that registers it and attaches the signer.
+  <Step title="Register the key for API access">
+    `POST /api/v1/developer/api-keys`, on the ordinary API and with an ordinary owner session, is
+    what creates the `dk_…` registration the API authenticates against. It carries the public key,
+    the **source IPs** the key may be used from, and `scope` — a free-form JSON object HEVN stores
+    with the registration and hands back unchanged on every read, for you to interpret.
   </Step>
   <Step title="Log in from code">
-    A successful `POST /v1/auth/challenge` is the proof that registration worked. See
+    A successful `POST /dapi/v1/auth/challenge` is the proof that both halves are in place. See
     [Sessions](/whitelabel/sessions).
   </Step>
 </Steps>
 
 One registered key covers every client: when you create a client, its wallet is deployed with your
 signer already attached, so no per-client setup exists.
+
+<Note>
+  The registration routes are **not** part of `/dapi/v1`. They live on the ordinary API —
+  `https://sandbox-api.hevn.finance/api/v1`, `https://api.hevn.finance/api/v1` — and take an owner
+  session from the app, because a platform token cannot register the key that mints platform tokens.
+  They answer in the ordinary API's error shape, not the
+  [platform envelope](/whitelabel/conventions#errors).
+</Note>
+
+`HEVN_OWNER_JWT` below is that ordinary session — the bearer your browser holds after you sign in,
+never a token this API minted.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST "https://sandbox-api.hevn.finance/api/v1/developer/api-keys" \
+  -H "Authorization: Bearer $HEVN_OWNER_JWT" -H "Content-Type: application/json" \
+  -d "{\"publicKey\":\"$HEVN_PUBLIC_KEY\",\"ipAllowlist\":[\"203.0.113.10/32\"],\"scope\":{}}"
+```
+
+```python Python
+registration = httpx.post(
+    "https://sandbox-api.hevn.finance/api/v1/developer/api-keys",
+    json={"publicKey": public_key_b64(key), "ipAllowlist": ["203.0.113.10/32"], "scope": {}},
+    headers={"Authorization": f"Bearer {owner_jwt}"},
+).raise_for_status().json()
+```
+
+```javascript Node
+const response = await fetch("https://sandbox-api.hevn.finance/api/v1/developer/api-keys", {
+  method: "POST",
+  headers: { authorization: `Bearer ${ownerJwt}`, "content-type": "application/json" },
+  body: JSON.stringify({
+    publicKey: publicKeyB64(key), ipAllowlist: ["203.0.113.10/32"], scope: {},
+  }),
+});
+const registration = await response.json();
+```
+
+```go Go
+var registration hevn.Payload
+err := hevn.PostJSON("https://sandbox-api.hevn.finance/api/v1/developer/api-keys", map[string]any{
+	"publicKey": publicKey, "ipAllowlist": []string{"203.0.113.10/32"}, "scope": map[string]any{},
+}, &registration, hevn.Bearer(ownerJWT))
+```
+
+</CodeGroup>
+
+```json Response
+{
+  "id": "dk_5c8a1f27b0e34d69ac1f8e5b7d20c934",
+  "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE…",
+  "fingerprint": "sha256:9f2c1ab84d7e4f1fa3c65b0e7d9a2c41…",
+  "ipAllowlist": ["203.0.113.10/32"],
+  "scope": {},
+  "isActive": true,
+  "lastUsedAt": null,
+  "createdAt": "2026-09-17T10:04:11Z",
+  "pausedAt": null
+}
+```
+
+Registering the same public key twice on one account is `409` — a registration is created, never
+edited. Registering at all needs the integrator standing HEVN switches on for your account; without
+an active developer profile the call is `403`. See
+[Going live](/whitelabel/going-live#what-hevn-must-enable).
+
+## The IP allowlist
+
+`ipAllowlist` is the set of source addresses the key may be used from. It is required, holds between
+1 and 64 entries, and each entry is an IPv4 address, an IPv6 address or a CIDR network; HEVN
+canonicalises every entry and drops duplicates, so `203.0.113.10` is stored as `203.0.113.10/32`.
+
+Every request re-checks it. A call from an address outside the list is `403`, and so is a call whose
+source address HEVN cannot determine — the same answer a paused key gets, on a read as on a payment.
+
+<Warning>
+  `ipAllowlist` and `scope` are **immutable**. There is no `PATCH`: moving to a new egress range
+  means registering a new key and pausing the old one. Register with the addresses your deployment
+  will actually call from — a new NAT gateway is the confusing way to learn that a perfectly good key
+  and a perfectly good signature can still answer `403`.
+</Warning>
+
+Your edge must strip caller-supplied `X-Forwarded-For`, `X-Real-IP` and `CF-Connecting-IP` before
+they reach HEVN, or the allowlist is checking a header the caller controls.
+
+## Read and pause your registrations
+
+`GET /api/v1/developer/api-keys` answers `{"data": [ … ]}` with every registration on your account,
+paused ones included — each one the shape above, so `isActive`, `lastUsedAt` and `ipAllowlist` tell
+you which key a deployment is really using.
+
+`POST /api/v1/developer/api-keys/{developerKeyId}/pause` stops one registration authenticating **and**
+authorizing signatures. It leaves the allowlist and the scope alone, and an id that is not yours is
+`404`, the same answer an unknown id gets.
+
+```bash
+curl -X POST "https://sandbox-api.hevn.finance/api/v1/developer/api-keys/dk_5c8a…/pause" \
+  -H "Authorization: Bearer $HEVN_OWNER_JWT"
+```
 
 ## Load it in your server
 
@@ -66,53 +173,76 @@ Every example on these pages reads the key from `HEVN_KEY_PEM`.
 
 ## When a key is refused
 
-Login answers the same refusal for every key problem — an unknown email, an unregistered key, a
-signer that is not attached, a bad signature — so an attacker learns nothing from probing:
+Login answers the same refusal for every key problem — an unknown email, a key that is not in the
+signer, a key with no registration, a paused registration, a call from an address outside the
+allowlist, a signer that is not attached, a bad signature — so an attacker learns nothing from
+probing:
 
 | Status | `code` | What to check |
 | --- | --- | --- |
-| 401 | `invalid_credentials` | The email, that the key is registered on that account, and that you signed the proof string with it |
+| 401 | `invalid_credentials` | The email, that the key is in the account's signer **and** registered, that the registration is active, that you are calling from an allowlisted address, and that you signed the proof string with that key |
 | 400 | `request_expired` | `requestExpiry` must be in the future and at most 5 minutes ahead |
 
-At payment time the refusals are specific, because by then you are authenticated:
-`403 key_not_registered`, `409 signer_not_attached`, `400 signature_invalid`. The full list is in
-[Errors](/whitelabel/reference/errors#authentication-and-signing).
+Once you are authenticated the refusals are specific, because by then HEVN knows who you are:
+
+| Status | `code` | Cause |
+| --- | --- | --- |
+| 403 | `forbidden` | The registration behind this session is paused, or the request came from an address outside its allowlist. Every `/dapi/v1` request re-checks both |
+| 403 | `forbidden`, `details.reason = "developerSessionRequired"` | The bearer is not a platform access token — an ordinary API token, a refresh token, or a token with no key registration behind it |
+| 403 | `key_not_registered` | The `publicKey` on a payment is not one of this account's registered keys |
+| 409 | `signer_not_attached` | The signer exists but is not attached to the wallet being spent from |
+| 400 | `signature_invalid` | Wrong bytes or wrong encoding — see [Signing](/whitelabel/signing#signature-format) |
+
+The full list is in [Errors](/whitelabel/reference/errors#authentication-and-signing).
 
 ## Rotate a key
 
-Saving keys in the app **replaces** the stored list; it does not merge. Rotation is therefore a
-three-step roll, and both keys work while both are registered.
+Registrations are immutable and additive, so a rotation is a roll rather than an edit, and both keys
+work while both are live.
 
 <Steps>
-  <Step title="Add the new key beside the old one">
-    Save a list holding both public keys. Nothing changes for running code.
+  <Step title="Register the new key">
+    Add the new public key to the account's signer beside the old one — the signer list is replaced
+    wholesale, so save both keys together — then `POST /api/v1/developer/api-keys` with the new
+    public key and the allowlist your servers call from. Nothing changes for running code.
   </Step>
   <Step title="Switch your servers">
     Deploy the new PEM. Payments start carrying the new `publicKey`. An approval is bound to your
     signer rather than to one key, so anything prepared just before the switch can still be confirmed
-    with either key while both are registered.
+    with either key while both are live.
   </Step>
-  <Step title="Drop the old key">
-    Save a list holding only the new key. The old key immediately stops being able to log in and to
-    authorize money.
+  <Step title="Pause the old registration">
+    `POST /api/v1/developer/api-keys/{developerKeyId}/pause`. The old key stops logging in and stops
+    authorizing money on the next request that uses it. Drop it from the signer list too, in the same
+    wholesale save, when you want it gone from the wallet quorum as well.
   </Step>
 </Steps>
 
-To revoke everything at once, save an empty list: no key can log in or sign for your clients
-afterwards.
-
 <Warning>
-  Removing a key does not cut sessions that already exist. An access token stays valid for its hour
-  and a refresh token for up to 60 days. Rotating stops the money paths immediately; for a leaked
-  *token*, rotate the key and contact HEVN to cut the sessions.
+  Pausing a registration **does** cut the sessions already minted from it. Every platform request
+  re-reads the registration, so the next call on an access token minted from a paused key is a `403`
+  — as is the `POST /dapi/v1/auth/refresh` that would have replaced it. That is the control to reach
+  for when a *token* leaks, not only when a key does.
 </Warning>
+
+## Co-signing outside the payment routes
+
+The same registration authorizes wallet operations that are not payouts or escrow actions:
+`POST /api/v1/developer/api-keys/sign/payload` prepares one and answers `{approvalId, payload}`, and
+`POST /api/v1/developer/api-keys/sign` executes it with your co-signature and answers `{result}`.
+Both re-check that the registration is active and that the source address is allowlisted immediately
+before signing. The money routes in these guides do not need them — they carry their own prepare and
+confirm — but the mechanism and the bytes you sign are the same as
+[Signing](/whitelabel/signing).
 
 ## Habits worth keeping
 
 - Keep the PEM in a secret manager and mount it at runtime; keep it out of images, repositories and
   logs.
 - One key per environment, and one per deployment if you can — the `publicKey` on each payment tells
-  you which one signed.
+  you which one signed, and `lastUsedAt` on each registration tells you which ones are still alive.
+- Keep `ipAllowlist` as narrow as the deployment allows, and register the new range before you move
+  traffic to it.
 - Never sign in a browser. The key can spend from every client balance you control; a browser is the
   wrong place for it.
 - Rehearse the roll before you need it. A rotation you have never run is not a control.

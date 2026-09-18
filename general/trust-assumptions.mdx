@@ -15,7 +15,7 @@ Every real system relies on something. Rather than claim HEVN is "trustless", th
 | Licensed banking partners | Fiat legs: deposits and payouts | A payout in progress depends on the partner completing the fiat leg | [One-time addresses](/general/deposits-and-payouts) per payout; HEVN never holds the money; no pooled balances |
 | [NEAR Intents / 1Click](/general/cross-chain) | Cross-chain swaps; in-flight settlement | Failed or expired intents follow the refund flow — for withdrawals, back to your HEVN wallet | One-time quote-bound addresses; trust scoped to one swap at a time |
 | [CDP Paymaster](https://docs.cdp.coinbase.com/paymaster/docs/welcome) | Gas sponsorship for gasless USDC | Unavailability delays operations; it can never initiate or alter them | A paymaster only pays fees under ERC-4337 |
-| HEVN platform | Metadata (contacts, invoices, bank details) and the UI you see | Metadata tampering; display is protected by [signed provider responses](/general/architecture#provider-isolation-signed-responses) | No keys, no owner role, no custody — [cannot sign a wallet operation](/general/security-model#failure-scenarios) |
+| HEVN platform | Metadata (contacts, invoices, virtual account details) and the UI you see | Metadata tampering; display is protected by [signed provider responses](/general/architecture#provider-isolation-signed-responses) | No keys, no owner role, no custody — [cannot sign a wallet operation](/general/security-model#failure-scenarios) |
 
 ## What HEVN deliberately does NOT rely on
 

@@ -19,7 +19,7 @@ and Go. Copy it once and each guide fits in three to eight lines.
 
 | What you want | Python | Node | Go |
 | --- | --- | --- | --- |
-| Act for a client | `hevn.acting_as(client_id)` | `hevn.actingAs(clientId)` | `api.ActingAs(clientID)` |
+| Act for a client, or for yourself | `hevn.acting_as(client_id)` | `hevn.actingAs(clientId)` | `api.ActingAs(clientID)` |
 | Read | `hevn.get(path, params={…})` | `hevn.get(path, {…})` | `api.Get(path, hevn.Query{…})` |
 | Write | `hevn.post(path, body, idempotency_key="…")` | `hevn.post(path, body, { idempotencyKey })` | `api.Post(path, hevn.Body{…}, hevn.IdempotencyKey("…"))` |
 | Read a response field | `payout["approval"]["payload"]` | `payout.approval.payload` | `payout.Str("approval.payload")` |
@@ -31,13 +31,52 @@ and Go. Copy it once and each guide fits in three to eight lines.
 | Download an export | `hevn.download(path, params, into)` | `hevn.download(path, params, into)` | `api.Download(path, hevn.Query{…}, into)` |
 
 It reads three environment variables — `HEVN_API`, `HEVN_KEY_PEM` and `HEVN_EMAIL` — set up in the
-[Quickstart](/whitelabel/quickstart). Nothing below hardcodes a host.
+[Quickstart](/whitelabel/quickstart). Nothing below hardcodes a host. `HEVN_API` ends in `/dapi/v1`
+(`https://sandbox-api.hevn.finance/dapi/v1`); the old `/v1` base answers `404` rather than redirecting, so a helper
+that asserts the suffix at start-up turns a whole run of mystery `404`s into one clear failure.
 
 <Note>
   In the Go tabs the client is a variable called `api` and `hevn` is the package: `api.Post(…)` is a
   call on your client, `hevn.Body{…}` is a type from the package. Naming the variable `hevn` shadows
   the package and stops the file compiling.
 </Note>
+
+## Binding an account
+
+`acting_as` is the only thing that sets `X-Hevn-Account`, and three kinds of route read it differently:
+
+| Routes | The header |
+| --- | --- |
+| `/banks*`, `/payins*`, `/payouts*`, `/contacts*`, `/transactions*`, `/documents*`, `/sandbox/*` | optional — bound client, or your own account when unbound |
+| `/client`, `/client/balance`, `/client/kyb`, `/client/kyb/complete` | **required** — the header is the only selector |
+| `POST /clients`, `GET /clients`, every `/escrow*` | refused — `400 account_scope_conflict` |
+
+The middle row is the one that changes how you use the client. There is no client id in any path any more, so reading
+**your own** account means binding your own `cl_…` too — the `userId` the login answered:
+
+<CodeGroup>
+
+```python Python
+me = hevn.acting_as(os.environ["HEVN_USER_ID"])   # the userId login answered
+mine = me.get("/client/balance")
+```
+
+```javascript Node
+const me = hevn.actingAs(process.env.HEVN_USER_ID);   // the userId login answered
+const mine = await me.get("/client/balance");
+```
+
+```go Go
+me := api.ActingAs(os.Getenv("HEVN_USER_ID")) // the userId login answered
+mine, err := me.Get("/client/balance")
+```
+
+</CodeGroup>
+
+An unbound client calling `/client*` sends no header at all, which is a `422 validation_failed` with
+`details.location: "header"` and `X-Hevn-Account` in `details.fields` — not a read of your own account. A bound client
+calling `POST /clients` or any escrow route is the mirror image, `400 account_scope_conflict` with
+`details.reason: "selfScopedRoute"`, so keep the unbound client for those.
 
 ## Install
 
@@ -271,7 +310,7 @@ bound.
 
 ## Download an export
 
-`GET /v1/transactions/export` streams a file rather than JSON, so it gets its own method: same
+`GET /dapi/v1/transactions/export` streams a file rather than JSON, so it gets its own method: same
 headers, same typed error, bytes to disk instead of a parsed body.
 
 <DownloadSnippet />
@@ -416,20 +455,23 @@ func asAPIError(status int, payload Payload) *APIError {
 
 ```python Python
 key = Key()
-hevn = Hevn(Session(key))                      # acts on your integrator account
-northwind = hevn.acting_as("cl_7YQ2Kf3mN8")    # acts on one client
+hevn = Hevn(Session(key))                      # unbound: /clients and /escrow
+northwind = hevn.acting_as("cl_7YQ2Kf3mN8")    # bound to one client
+me = hevn.acting_as(os.environ["HEVN_USER_ID"])  # bound to your own account, for /client*
 ```
 
 ```javascript Node
 const key = new Key();
-const hevn = new Hevn(new Session(key));
-const northwind = hevn.actingAs("cl_7YQ2Kf3mN8");
+const hevn = new Hevn(new Session(key));                 // unbound: /clients and /escrow
+const northwind = hevn.actingAs("cl_7YQ2Kf3mN8");       // bound to one client
+const me = hevn.actingAs(process.env.HEVN_USER_ID);     // bound to your own account
 ```
 
 ```go Go
 key, err := hevn.NewKey()
 api := &hevn.Client{API: os.Getenv("HEVN_API"), HTTP: http.DefaultClient, Session: &hevn.Session{Key: key}}
 northwind := api.ActingAs("cl_7YQ2Kf3mN8")
+me := api.ActingAs(os.Getenv("HEVN_USER_ID"))
 ```
 
 </CodeGroup>

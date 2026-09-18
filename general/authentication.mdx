@@ -8,7 +8,7 @@ HEVN separates two completely different kinds of authorization:
 | | Platform authorization | Money authorization |
 | --- | --- | --- |
 | Credential | HEVN JWT | Signature from a wallet owner key, or from an [API key](#api-keys-cli-rest-api-agents) within its onchain spend allowance |
-| Grants | Contacts, invoices, contracts, bank details, KYC, statements, analytics | Transfers and any onchain state change |
+| Grants | Contacts, invoices, contracts, virtual account details, KYC, statements, analytics | Transfers and any onchain state change |
 | Issued by | HEVN backend | The signer's own key, per operation |
 | If leaked | Metadata exposure; **funds untouched** | Owner key is never exposed (see [Privy](/general/privy-wallets)); a leaked API key is capped by its onchain allowance and revocable |
 
@@ -35,7 +35,7 @@ There is no password database to breach and nothing HEVN stores that could be re
 
 ## What the JWT can and cannot do
 
-The JWT authorizes the HEVN API surface: creating contacts, issuing and paying *requests* for invoices, generating contracts, requesting bank details, reading balances and statements.
+The JWT authorizes the HEVN API surface: creating contacts, issuing and paying *requests* for invoices, generating contracts, requesting virtual account details, reading balances and statements.
 
 <Warning>
   The JWT is **not** a spending credential. Even a fully compromised JWT cannot produce a wallet signature, and the wallet contract only accepts operations signed by an [onchain owner](/general/smart-wallets#ownership-verifiable-onchain). Money movement always terminates in a signature from an authorized key — the owner's, a teammate's, or an API key acting within its allowance.
@@ -45,7 +45,7 @@ The JWT authorizes the HEVN API surface: creating contacts, issuing and paying *
 
 For automation, HEVN issues app-scoped `hvn_...` API keys (see [CLI authentication](/cli/overview#authentication-model)). They are a CLI and agent credential: the [whitelabel REST API](/api-reference/authentication) uses developer keys and JWT sessions instead, and rejects `X-Api-Key`. An API key is more than a bearer token — it is a **full EVM-compatible keypair**, and its spending ability is governed onchain, by the same standard as [teammate access](/general/shared-access):
 
-1. **Platform scope.** The key is certified by HEVN for the platform API of one specific app: contacts, invoices, contracts, bank details, statements. This is the same trust level as the JWT.
+1. **Platform scope.** The key is certified by HEVN for the platform API of one specific app: contacts, invoices, contracts, virtual account details, statements. This is the same trust level as the JWT.
 2. **Spending scope — optional, granted onchain.** The key's EVM address can be granted a [Spend Permission](/general/shared-access#limited-access-spend-permissions) by the account owner, exactly like a human teammate with limited access. The owner signs a `SpendPermission` naming the key's address as `spender`, with an explicit allowance and period.
 
 The consequences of this design:

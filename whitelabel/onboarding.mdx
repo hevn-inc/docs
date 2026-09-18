@@ -1,6 +1,6 @@
 ---
 title: "Onboard a client"
-description: "Fill the client's KYB document, upload its papers, submit it for review, and answer an RFI — all from your backend."
+description: "Fill the client's KYB document, upload its papers, complete the submission for review, and answer an RFI — all from your backend."
 ---
 
 import ActingAsSnippet from "/snippets/acting-as.mdx";
@@ -9,17 +9,19 @@ A client can receive money once it has passed four gates. Three of them are one 
 
 ```mermaid
 flowchart LR
-    G1["1 · Client ready<br/>GET /v1/clients/{clientId}"]
-    G2["2 · Phone set and document complete<br/>PUT /v1/clients/{clientId}/kyb → ready: true"]
-    G3["3 · Application approved<br/>GET /v1/clients/{clientId}/kyb"]
-    G4["4 · Rail active<br/>GET /v1/banks"]
+    G1["1 · Client ready<br/>GET /dapi/v1/client"]
+    G2["2 · Phone set and document complete<br/>PUT /dapi/v1/client/kyb → ready: true"]
+    G3["3 · Application approved<br/>GET /dapi/v1/client/kyb"]
+    G4["4 · Rail active<br/>GET /dapi/v1/banks"]
     G1 --> G2 --> G3 --> G4
     G2 -.->|"sandbox: the review is emulated"| G4
 ```
 
 Gate 1 is [creating the client](/whitelabel/clients). Gate 4 is [opening a rail](/whitelabel/bank-accounts). This page is gates 2 and 3: one document, one readiness list, one submission.
 
-Every route here names the client in its path, so you do not send `X-Hevn-Account` with it — the one exception is document upload, which is a client-scoped route and does. Your own access token is the only credential any of this needs. Examples use the client from [HTTP client](/whitelabel/reference/client).
+No route here names the client in its path. `PUT /dapi/v1/client/kyb`, `GET /dapi/v1/client/kyb` and `POST /dapi/v1/client/kyb/complete` all **require** `X-Hevn-Account`, and document upload accepts the same header. Your own access token is the only credential any of this needs. Examples use the client from [HTTP client](/whitelabel/reference/client).
+
+<ActingAsSnippet />
 
 ## One document, written until it is complete
 
@@ -27,10 +29,10 @@ The client's verification data is a single JSON document. You `PUT` the whole th
 
 ```mermaid
 flowchart LR
-    W["PUT /v1/clients/{clientId}/kyb"] --> R{"ready?"}
+    W["PUT /dapi/v1/client/kyb"] --> R{"ready?"}
     R -->|"false"| F["Fix the paths in missing[]"]
     F --> W
-    R -->|"true"| S["POST /v1/clients/{clientId}/kyb/submit"]
+    R -->|"true"| S["POST /dapi/v1/client/kyb/complete"]
 ```
 
 The write is idempotent by construction. Every person carries a `key` you choose, HEVN derives that person's id from it, and the same body written twice touches the same records instead of creating a second Jane Doe. `Idempotency-Key` is accepted and unnecessary here — a `PUT` is already safe to repeat.
@@ -49,7 +51,7 @@ You send all three in one body, or any subset of them. Writing `company` alone l
 
 <Step title="Write the company">
 
-Send what you know. Required values, their accepted enum members and the exact spelling of each field live in the [KYB field reference](/whitelabel/reference/kyb-fields).
+Send what you know. Required values, their accepted enum members and the exact spelling of each field live in the [KYB field reference](/whitelabel/reference/kyb-fields). The example below is the required core; the document also takes some forty optional fields a reviewer often asks for later — `identityDocuments`, `operatingCountries`, `highRiskActivities`, `hasPep`, `isRegulated` and the per-method volume split among them. Filling the ones you already hold turns most RFIs into no RFI at all.
 
 ```json
 {
@@ -80,22 +82,23 @@ Send what you know. Required values, their accepted enum members and the exact s
 <CodeGroup>
 
 ```bash cURL
-curl -X PUT "$HEVN_API/clients/$HEVN_CLIENT_ID/kyb" \
+curl -X PUT "$HEVN_API/client/kyb" \
   -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+  -H "X-Hevn-Account: $HEVN_CLIENT_ID" \
   -H "Content-Type: application/json" \
   --data @document.json
 ```
 
 ```python Python
-readiness = hevn.put(f"/clients/{client_id}/kyb", document)
+readiness = northwind.put("/client/kyb", document)
 ```
 
 ```javascript Node
-const readiness = await hevn.put(`/clients/${clientId}/kyb`, document);
+const readiness = await northwind.put("/client/kyb", document);
 ```
 
 ```go Go
-readiness, err := api.Put("/clients/"+clientID+"/kyb", document)
+readiness, err := northwind.Put("/client/kyb", document)
 ```
 
 </CodeGroup>
@@ -173,9 +176,7 @@ Sending `people` replaces the roster: a person you created and then omit is remo
 
 <Step title="Upload the papers">
 
-Upload a file once, then file its id into a slot. `POST /v1/documents` takes JSON, with the file base64-encoded in `content` and the slot in `slot`. Uploads are scoped to the client, so send `X-Hevn-Account`.
-
-<ActingAsSnippet />
+Upload a file once, then file its id into a slot. `POST /dapi/v1/documents` takes JSON, with the file base64-encoded in `content` and the slot in `slot`. Uploads act on a client, so send `X-Hevn-Account` here too.
 
 <CodeGroup>
 
@@ -191,8 +192,6 @@ curl -X POST "$HEVN_API/documents" \
 ```python Python
 import base64, pathlib
 
-northwind = hevn.acting_as(CLIENT_ID)
-
 upload = northwind.post("/documents", {
     "slot": "certificate_of_incorporation",
     "fileName": "incorporation.pdf",
@@ -201,8 +200,6 @@ upload = northwind.post("/documents", {
 ```
 
 ```javascript Node
-const northwind = hevn.actingAs(clientId);
-
 const upload = await northwind.post("/documents", {
   slot: "certificate_of_incorporation",
   fileName: "incorporation.pdf",
@@ -211,8 +208,6 @@ const upload = await northwind.post("/documents", {
 ```
 
 ```go Go
-northwind := api.ActingAs(clientID)
-
 file, err := os.ReadFile("incorporation.pdf")
 upload, err := northwind.Post("/documents", hevn.Body{
 	"slot":     "certificate_of_incorporation",
@@ -242,7 +237,7 @@ Re-filing the same upload in the same slot is a no-op. A different upload in an 
 
 <Step title="Read the document back">
 
-`GET /v1/clients/{clientId}/kyb` returns readiness, the application if one is filed, and the whole document projected back, so you can diff your own state against HEVN's:
+`GET /dapi/v1/client/kyb` returns readiness, the application if one is filed, and the whole document projected back, so you can diff your own state against HEVN's:
 
 ```json
 {
@@ -257,47 +252,48 @@ Re-filing the same upload in the same slot is a no-op. A different upload in an 
 }
 ```
 
-`ready: true` means submission will succeed. Nothing else does — the list is deliberately stricter than the minimum a reviewer would accept, so that a document that reads ready never fails at the gate.
+`ready: true` means completion will succeed. Nothing else does — the list is deliberately stricter than the minimum a reviewer would accept, so that a document that reads ready never fails at the gate.
 
 The `document` block is projected from what HEVN holds, not echoed from what you sent, which makes it the thing to diff against your own record. It is also where `people[].id` becomes stable: index positions in `missing[]` refer to this array, in this order.
 
 </Step>
 
-<Step title="Submit it">
+<Step title="Complete the submission">
 
 <CodeGroup>
 
 ```bash cURL
-curl -X POST "$HEVN_API/clients/$HEVN_CLIENT_ID/kyb/submit" \
-  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN"
+curl -X POST "$HEVN_API/client/kyb/complete" \
+  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+  -H "X-Hevn-Account: $HEVN_CLIENT_ID"
 ```
 
 ```python Python
-application = hevn.post(f"/clients/{client_id}/kyb/submit")
+application = northwind.post("/client/kyb/complete")
 ```
 
 ```javascript Node
-const application = await hevn.post(`/clients/${clientId}/kyb/submit`);
+const application = await northwind.post("/client/kyb/complete");
 ```
 
 ```go Go
-application, err := api.Post("/clients/"+clientID+"/kyb/submit", nil)
+application, err := northwind.Post("/client/kyb/complete", nil)
 ```
 
 </CodeGroup>
 
-No body. `201 Created`, `Location: /v1/clients/cl_7YQ2Kf3mN8/kyb`:
+No body. Completing is the only operation that starts a review — every write before it edits a draft. `201 Created`, `Location: /dapi/v1/client/kyb`:
 
 ```json
 {
   "applicationId": "kyb_9F4tRb",
   "status": "pending",
   "attemptNo": 1,
-  "pollUrl": "/v1/clients/cl_7YQ2Kf3mN8/kyb"
+  "pollUrl": "/dapi/v1/client/kyb"
 }
 ```
 
-Submitting again with nothing changed replays: `200` with `Idempotency-Replayed: true` and the same application id. Submitting an incomplete document answers `422 kyb_incomplete` with the same `details.missing` list the document read returns.
+Completing again with nothing changed replays: `200` with `Idempotency-Replayed: true` and the same application id. Completing an incomplete document answers `422 kyb_incomplete` with the same `details.missing` list the document read returns.
 
 </Step>
 
@@ -305,14 +301,14 @@ Submitting again with nothing changed replays: `200` with `Idempotency-Replayed:
 
 ## Track the application
 
-Poll `GET /v1/clients/{clientId}/kyb`. There is no webhook; `kybStatus` on the [client row](/whitelabel/clients) carries the same value if you are already reading that.
+Poll `GET /dapi/v1/client/kyb`. There is no webhook; `kybStatus` on the [client row](/whitelabel/clients) carries the same value if you are already reading that.
 
 | `status` | What it means | What you do |
 | --- | --- | --- |
-| `notStarted` | No application filed yet. | Complete the document and submit. |
+| `notStarted` | No application filed yet. | Complete the document, then complete the submission. |
 | `pending` | Filed and under review. | Poll. Minutes to days, depending on the jurisdiction and the papers. |
-| `approved` | The client is verified. | Open its rails. |
-| `rfi` | The reviewer asked for something. | Read `application.comment`, fix the document, submit again. |
+| `approved` | The partner accepted the application. | Open its rails. |
+| `rfi` | The reviewer asked for something. | Read `application.comment`, fix the document, complete again. |
 | `rejected` | The application was refused. | Read `application.comment`. A new attempt needs new facts, not a resubmission. |
 
 The application block is the review's own record:
@@ -334,16 +330,16 @@ How long `pending` lasts is the reviewer's, not the API's. A clean US or EU comp
 
 ## Answer an RFI
 
-An RFI is the same loop, once more. Read `application.comment`, write the correction into the document, and submit again.
+An RFI is the same loop, once more. Read `application.comment`, write the correction into the document, and complete the submission again.
 
-The correction is a normal write. A replacement paper is a new upload filed into the slot it belongs in — a new upload id in an occupied slot replaces what was there, so there is nothing to delete first. A wrong date of birth is a `PUT` with that person's `key` and the right value. Then submit: `attemptNo` increments, `comment` is replaced by the next reviewer's, and `kybStatus` returns to `pending`.
+The correction is a normal write. A replacement paper is a new upload filed into the slot it belongs in — a new upload id in an occupied slot replaces what was there, so there is nothing to delete first. A wrong date of birth is a `PUT` with that person's `key` and the right value. Then complete: `attemptNo` increments, `comment` is replaced by the next reviewer's, and `kybStatus` returns to `pending`.
 
-Two refusals to expect at submit time:
+Two refusals to expect at completion time:
 
 | Refusal | What happened | What to do |
 | --- | --- | --- |
 | `422 kyb_incomplete` | The document is not `ready`. | `details.missing` is the same list the document read returns. Fix those paths. |
-| `422 document_fields_missing` | The papers are attached, but HEVN could not read the values a reviewer needs off one of them. | `details.documents` names each gap. Fill them with `PUT /v1/documents/{documentId}/content`, then submit again. |
+| `422 document_fields_missing` | The papers are attached, but HEVN could not read the values a reviewer needs off one of them. | `details.documents` names each gap. Fill them with `PUT /dapi/v1/documents/{documentId}/content`, then complete again. |
 
 ### Fill a document's fields by hand
 
@@ -395,8 +391,8 @@ The phone on the account and the phone in the document are different fields with
 
 | Field | Written by | Read by |
 | --- | --- | --- |
-| Account phone | `POST /v1/clients` or `PATCH /v1/clients/{clientId}` | The rail requirements check. A company with no account phone reports the `phone_required` blocker on every rail. |
-| `company.phone` | `PUT /v1/clients/{clientId}/kyb` | The KYB gate. Either phone satisfies it. |
+| Account phone | `POST /dapi/v1/clients` or `PATCH /dapi/v1/client` | The rail requirements check. A company with no account phone reports the `phone_required` blocker on every rail. |
+| `company.phone` | `PUT /dapi/v1/client/kyb` | The KYB gate. Either phone satisfies it. |
 
 Set the account phone at creation and this never comes up.
 
@@ -404,6 +400,6 @@ Set the account phone at creation and this never comes up.
 
 The flat document covers a company owned directly by people — one subject, its papers, and the humans above it. A structure with holding companies in the chain is written through the entity-graph routes instead; the two models coexist, because the document only owns the people it created. When a gap belongs to an entity the document does not own, `missing[]` reports it as `graph.entities.<id>.<field>` rather than a `people[…]` path. Contact HEVN before you build against the graph routes.
 
-<Card title="Next: Bank accounts" icon="arrow-right" href="/whitelabel/bank-accounts">
+<Card title="Next: Virtual accounts" icon="arrow-right" href="/whitelabel/bank-accounts">
   Check a rail's requirements, open it, and read the requisites the client's payers wire to.
 </Card>

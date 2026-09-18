@@ -11,28 +11,32 @@ Authenticated windows are keyed per **credential** — the access token's creden
 
 | Window | Limit | Keyed on | Applies to |
 | --- | --- | --- | --- |
-| Writes | 120 per minute | credential | every `POST`, `PUT`, `PATCH`, `DELETE` under `/v1` |
-| Reads | 600 per minute | credential | every `GET` under `/v1` |
-| Login | 20 per 5 minutes | client IP | `POST /v1/auth/challenge`, `POST /v1/auth/token` |
-| Login, per email | 10 per 5 minutes | the email in the body | `POST /v1/auth/challenge` |
-| Login, per challenge | 10 per 5 minutes | `challengeId` | `POST /v1/auth/token` |
-| Sandbox money | 60 per hour | account | `POST /v1/sandbox/deposits`, `/payins/{payinId}/complete`, `/payouts/{payoutId}/status` |
+| Writes | 120 per minute | credential | every `POST`, `PUT`, `PATCH`, `DELETE` under `/dapi/v1` |
+| Reads | 600 per minute | credential | every `GET` under `/dapi/v1` |
+| Login | 20 per 5 minutes | client IP | `POST /dapi/v1/auth/challenge`, `POST /dapi/v1/auth/token` |
+| Login, per email | 10 per 5 minutes | the email in the body | `POST /dapi/v1/auth/challenge` |
+| Login, per challenge | 10 per 5 minutes | `challengeId` | `POST /dapi/v1/auth/token` |
+| Sandbox money | 60 per hour | account | `POST /dapi/v1/sandbox/deposits`, `/payins/{payinId}/complete`, `/payouts/{payoutId}/status` |
+
+The three login windows cover `POST /auth/challenge` and `POST /auth/token` only. `POST /auth/refresh` carries no
+login limiter — it is an ordinary write, and it re-checks the developer key registration behind the session before it
+mints anything.
 
 Exceeding one answers `429 rate_limited` with `Retry-After` in seconds. Sleep for it and retry — the helper in [HTTP client](/whitelabel/reference/client) does this for you.
 
-Two consequences worth designing for: a payroll run of 500 payouts is 1,000 writes and needs pacing, and a poller that reads every client every second will exhaust the read budget long before the data changes. Poll with backoff, and batch what you can into `GET /v1/transactions` for the whole account.
+Two consequences worth designing for: a payroll run of 500 payouts is 1,000 writes and needs pacing, and a poller that reads every client every second will exhaust the read budget long before the data changes. Poll with backoff, and batch what you can into `GET /dapi/v1/transactions` for the whole account.
 
 ## Windows
 
 | What | Lives for | When it expires |
 | --- | --- | --- |
 | Login challenge | up to 5 minutes, and you choose it with `requestExpiry` | `410 challenge_expired` |
-| Access token | 60 minutes | `401 token_expired` — re-mint with `POST /v1/auth/refresh` |
+| Access token | 60 minutes | `401 token_expired` — re-mint with `POST /dapi/v1/auth/refresh` |
 | Refresh token | 60 days | log in again |
 | Payout or payin price | at most 2 minutes | `409 quote_expired` |
 | Payout and transfer approval | 120 seconds | `409 funding_attempt_expired` — re-open with the same key |
 | Escrow action approval | 60 seconds | `410 approval_expired` on confirm — prepare the action again with the same key |
-| Escrow on-chain refresh | one chain read per 15 seconds per deal | extra `POST /v1/escrow/{escrowId}/sync` calls answer the stored projection |
+| Escrow on-chain refresh | one chain read per 15 seconds per deal | extra `POST /dapi/v1/escrow/{escrowId}/sync` calls answer the stored projection |
 | Escrow deal windows | `approveWithin` 1h, `holdFor` 14d, `refundableFor` 90d by default, each from the end of the previous one | the action leaves `availableActions` |
 
 An approval is short because it is a signed instruction to move money. Nothing in this API is designed for a human to approve a payload later: prepare, sign and confirm inside one request of your own.
@@ -45,12 +49,12 @@ The key is scoped to `(your account, the operation)`. The same string on two ope
 
 | Route | What the key anchors |
 | --- | --- |
-| `POST /v1/payouts` | the payment. For a bank recipient it anchors the booking and its price; for a wallet recipient it is part of the `po_` id, so the same key always names the same payment. A retry replays; different terms answer `409 idempotency_key_reused`. |
-| `POST /v1/escrow` | the deal, its resolved windows and its `approve` action. The **raw** key is echoed as `action.idempotencyKey`. |
-| `POST /v1/escrow/{escrowId}/actions` | the action. The raw key is the address in the confirm URL. |
-| `POST /v1/sandbox/deposits`, `/payins/{payinId}/complete`, `/payouts/{payoutId}/status` | the emulated credit or status move. |
-| `POST /v1/contacts`, `PATCH`, `DELETE /v1/contacts/{contactId}` | nothing: a contact is deduplicated by its own requisites. |
-| `POST /v1/clients`, `POST /v1/banks`, `PUT /v1/clients/{clientId}/kyb`, `POST /v1/clients/{clientId}/kyb/submit`, `POST /v1/payins`, `POST /v1/payins/{payinId}/instructions` | nothing: each is identified by its own natural key — the email, the rail, the client, the payin. Sending a key is harmless. |
+| `POST /dapi/v1/payouts` | the payment. For a bank contact it anchors the booking and its price; for a wallet contact it is part of the `po_` id, so the same key always names the same payment. A retry replays; different terms answer `409 idempotency_key_reused`. |
+| `POST /dapi/v1/escrow` | the deal, its resolved windows and its `approve` action. The **raw** key is echoed as `action.idempotencyKey`. |
+| `POST /dapi/v1/escrow/{escrowId}/actions` | the action. The raw key is the address in the confirm URL. |
+| `POST /dapi/v1/sandbox/deposits`, `/payins/{payinId}/complete`, `/payouts/{payoutId}/status` | the emulated credit or status move. |
+| `POST /dapi/v1/contacts`, `PATCH`, `DELETE /dapi/v1/contacts/{contactId}` | nothing: a contact is deduplicated by its own requisites. |
+| `POST /dapi/v1/clients`, `POST /dapi/v1/banks`, `PUT /dapi/v1/client/kyb`, `POST /dapi/v1/client/kyb/complete`, `POST /dapi/v1/payins`, `POST /dapi/v1/payins/{payinId}/instructions` | nothing: each is identified by its own natural key — the email, the rail, the client, the payin. Sending a key is harmless. |
 
 Send no key and the server derives one from the request itself, echoes it as `idempotencyKey`, and you can pin that value from then on. A derived key replays for **2 hours**; an explicit key replays for **7 days**. That is why two genuinely distinct payouts of the same amount, minutes apart, both need explicit keys.
 
@@ -66,22 +70,29 @@ A response that replayed a create answers `200` with `Idempotency-Replayed: true
 | `paymentReference` | 140 characters |
 | `purpose` | 64 characters |
 | `documentIds` on a payout | 10 |
-| `publicKey` | 512 characters |
+| `publicKey` on a payout | 512 characters |
 | `signature` | 2,048 characters |
 | Escrow duration | `^\d{1,4}[smhd]$` — up to 9999 seconds, minutes, hours or days |
+| `publicKey` on a developer key registration | 4,096 characters |
+| `ipAllowlist` on a developer key registration | 1 to 64 addresses or CIDR networks |
 
 There is no `offset` anywhere. Walk a list by passing `nextCursor` back as `cursor` until it is absent.
 
+The two developer-key caps are the only ones you cannot raise by calling again: `ipAllowlist` and `scope` are frozen
+when the registration is created, so a network the allowlist does not cover needs a second registration, not an edit.
+The `publicKey` cap there is the DER-encoded public half, which is a different field from the 512-character
+`publicKey` a payout carries.
+
 ## Sandbox
 
-Every emulated credit is paid by one shared treasury, so the sandbox caps what a single account can mint. See [Sandbox](/whitelabel/sandbox).
+Every emulated credit is paid by one shared faucet account, so the sandbox caps what a single account can mint. See [Sandbox](/whitelabel/sandbox).
 
 | Limit | Value | Refusal |
 | --- | --- | --- |
 | Smallest emulated credit | `0.10` of the token | `422 amount_below_minimum` |
-| Largest emulated credit, per call | `100`, live as `maxCredit` on `GET /v1/sandbox/treasury` | `422 amount_above_maximum`, with `details.maxCredit` |
+| Largest emulated credit, per call | `100`, live as `maxCredit` on `GET /dapi/v1/sandbox/treasury` | `422 amount_above_maximum`, with `details.maxCredit` |
 | Money calls | 60 per account per hour | `429 rate_limited` |
-| Treasury balance | must cover the credit, and gas must be non-zero | `503 provider_unavailable` |
+| Faucet account balance | must cover the credit, and gas must be non-zero | `503 provider_unavailable` |
 
 Keep two test payouts more than `0.20` apart in amount: returned money is attributed to a refunded payout by amount, within a `0.20` tolerance, so two near-identical test payouts can end up labelled with each other's refund.
 

@@ -11,10 +11,16 @@ them out of its own wallet, signed by your key. Nine steps, all in the sandbox.
 - **Create a sandbox account in a browser.** Sign up at
   [`https://sandbox.gethevn.com`](https://sandbox.gethevn.com) with your work email. Sandbox and
   production are separate accounts; nothing you do here touches real money.
-- **Register a developer key on that account, in the same browser.** Generate a P-256 keypair on
-  your machine and paste the **public** key into the app's developer-key screen. This is the one
-  step that is not an API call, because it changes what can authorize money from your account.
-  Walk-through: [Developer key](/whitelabel/developer-key).
+- **Generate a developer key and add it to your account's signer, in the same browser.** Generate a
+  P-256 keypair on your machine and paste the **public** key into the app's developer-key screen.
+  That screen changes what can authorize money from your account, so it is authorized by your own
+  browser session rather than by the key.
+- **Register the key for API access.** `POST /api/v1/developer/api-keys`, with an owner session from
+  that same browser, carries the public key and — in `ipAllowlist` — the egress address of the
+  machine that will run this quickstart. Nothing logs in until that registration exists, and every
+  later call is re-checked against the allowlist: a request from an address you did not list is a
+  `403` however correct the key and the signature are. Walk-through:
+  [Developer key](/whitelabel/developer-key).
 - **Set the environment and install two dependencies.** Everything after that is code.
 
 import Env from "/snippets/env.mdx";
@@ -33,8 +39,8 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
 
 <Steps>
   <Step title="Log in">
-    Two calls: `POST /v1/auth/challenge` returns a payload built by HEVN, and `POST /v1/auth/token`
-    exchanges your signature over it for a session. The helpers this uses —
+    Two calls: `POST /dapi/v1/auth/challenge` returns a payload built by HEVN, and
+    `POST /dapi/v1/auth/token` exchanges your signature over it for a session. The helpers this uses —
     `load_key`, `public_key_b64`, `sign_bytes`, `sign_payload` — are on
     [Developer key](/whitelabel/developer-key) and [Signing](/whitelabel/signing).
 
@@ -55,7 +61,8 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
   <Step title="Check that your account may create clients">
     Being an integrator is not something the API grants — HEVN switches it on for your account, in
     the sandbox as in production. The cheapest confirmation is a list that answers instead of
-    refusing:
+    refusing. `GET /clients` is the collection you own, so it is the one call on this page that must
+    **not** carry `X-Hevn-Account`; sending it is `400 account_scope_conflict`.
 
     <CodeGroup>
 
@@ -127,33 +134,39 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
 
     </CodeGroup>
 
-    The `201` answers `status: "provisioning"` and an id you can already read. Poll it every two
-    seconds; it becomes `ready` in about thirty seconds, when the client's wallet exists.
+    The `201` answers `status: "provisioning"`, an id you can already read, and a `pollUrl` of
+    `/dapi/v1/client` — a path that names no account by itself. The id goes in `X-Hevn-Account`
+    instead, which is how every read of one client works. Poll it every two seconds; it becomes
+    `ready` in about thirty seconds, when the client's wallet exists.
 
     <CodeGroup>
 
     ```bash cURL
     export HEVN_CLIENT_ID=cl_7YQ2Kf3mN8
-    curl -s "$HEVN_API/clients/$HEVN_CLIENT_ID" \
-      -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" | jq '{status, baseSmartWallet}'
+    curl -s "$HEVN_API/client" \
+      -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+      -H "X-Hevn-Account: $HEVN_CLIENT_ID" | jq '{status, baseSmartWallet}'
     ```
 
     ```python Python
     client_id = client["id"]
-    ready = poll_until(lambda: hevn.get(f"/clients/{client_id}"),
+    northwind = hevn.acting_as(client_id)
+    ready = poll_until(lambda: northwind.get("/client"),
                        lambda seen: seen["status"] != "provisioning")
     ```
 
     ```javascript Node
     const clientId = client.id;
-    const ready = await pollUntil(() => hevn.get(`/clients/${clientId}`),
+    const northwind = hevn.actingAs(clientId);
+    const ready = await pollUntil(() => northwind.get("/client"),
       (seen) => seen.status !== "provisioning");
     ```
 
     ```go Go
     clientID := client.Str("id")
+    northwind := api.ActingAs(clientID)
     ready, err := hevn.PollUntil(
-    	func() (hevn.Payload, error) { return api.Get("/clients/" + clientID) },
+    	func() (hevn.Payload, error) { return northwind.Get("/client") },
     	func(seen hevn.Payload) bool { return seen.Str("status") != "provisioning" },
     	2*time.Minute,
     )
@@ -168,7 +181,8 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
 
   <Step title="Fund the client's wallet">
     The sandbox mints emulated money. Without `bankId` this is a token transfer straight to the
-    client's wallet; the `X-Hevn-Account` header is what makes the call act for the client.
+    client's wallet; the `X-Hevn-Account` header that `northwind` carries is what makes the call act
+    for the client.
 
     <CodeGroup>
 
@@ -181,20 +195,17 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
     ```
 
     ```python Python
-    northwind = hevn.acting_as(client_id)
     credit = northwind.post("/sandbox/deposits", {"amount": "6.00", "token": "USDC"},
                             idempotency_key="quickstart-deposit-1")
     ```
 
     ```javascript Node
-    const northwind = hevn.actingAs(clientId);
     const credit = await northwind.post("/sandbox/deposits",
       { amount: "6.00", token: "USDC" },
       { idempotencyKey: "quickstart-deposit-1" });
     ```
 
     ```go Go
-    northwind := api.ActingAs(clientID)
     credit, err := northwind.Post("/sandbox/deposits", hevn.Body{"amount": "6.00", "token": "USDC"},
     	hevn.IdempotencyKey("quickstart-deposit-1"))
     ```
@@ -206,23 +217,27 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
   </Step>
 
   <Step title="Read the balance you just created">
+    `/client/balance` names no client in its path either: the header picks the account, and leaving
+    it out is a `422` for a missing header rather than a read of your own wallet.
+
     <CodeGroup>
 
     ```bash cURL
-    curl -s "$HEVN_API/clients/$HEVN_CLIENT_ID/balance" \
-      -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" | jq
+    curl -s "$HEVN_API/client/balance" \
+      -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+      -H "X-Hevn-Account: $HEVN_CLIENT_ID" | jq
     ```
 
     ```python Python
-    balance = hevn.get(f"/clients/{client_id}/balance")
+    balance = northwind.get("/client/balance")
     ```
 
     ```javascript Node
-    const balance = await hevn.get(`/clients/${clientId}/balance`);
+    const balance = await northwind.get("/client/balance");
     ```
 
     ```go Go
-    balance, err := api.Get("/clients/" + clientID + "/balance")
+    balance, err := northwind.Get("/client/balance")
     ```
 
     </CodeGroup>
@@ -239,15 +254,17 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
     That balance is read from Base Sepolia, not from a HEVN table.
   </Step>
 
-  <Step title="Save a recipient">
+  <Step title="Save a contact">
     Pay the money to an address you control: your own account's wallet. Read it with the same
-    balance route, using the `userId` from step 1.
+    balance route, acting as yourself — the `userId` from step 1 goes in `X-Hevn-Account`, because
+    that header is the only thing that selects an account on `/client*`.
 
     <CodeGroup>
 
     ```bash cURL
-    export HEVN_OWN_WALLET=$(curl -s "$HEVN_API/clients/$HEVN_USER_ID/balance" \
-      -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" | jq -r .baseSmartWallet)
+    export HEVN_OWN_WALLET=$(curl -s "$HEVN_API/client/balance" \
+      -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+      -H "X-Hevn-Account: $HEVN_USER_ID" | jq -r .baseSmartWallet)
 
     curl -X POST "$HEVN_API/contacts" \
       -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" -H "X-Hevn-Account: $HEVN_CLIENT_ID" \
@@ -256,7 +273,7 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
     ```
 
     ```python Python
-    own_wallet = hevn.get(f"/clients/{user_id}/balance")["baseSmartWallet"]
+    own_wallet = hevn.acting_as(user_id).get("/client/balance")["baseSmartWallet"]
     contact = northwind.post("/contacts", {
         "name": "Treasury",
         "crypto": {"chain": "base", "token": "USDC", "address": own_wallet},
@@ -264,7 +281,7 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
     ```
 
     ```javascript Node
-    const { baseSmartWallet: ownWallet } = await hevn.get(`/clients/${userId}/balance`);
+    const { baseSmartWallet: ownWallet } = await hevn.actingAs(userId).get("/client/balance");
     const contact = await northwind.post("/contacts", {
       name: "Treasury",
       crypto: { chain: "base", token: "USDC", address: ownWallet },
@@ -272,7 +289,7 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
     ```
 
     ```go Go
-    own, err := api.Get("/clients/" + userID + "/balance")
+    own, err := api.ActingAs(userID).Get("/client/balance")
     ownWallet := own.Str("baseSmartWallet")
     contact, err := northwind.Post("/contacts", hevn.Body{
     	"name":   "Treasury",
@@ -329,15 +346,18 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
       "approval": { "id": "…", "payload": "eyJib2R5Ijp…", "expiresAt": "2026-09-17T10:06:10Z" },
       "debit": { "address": "0x8f3bd1c7a0e94f25b6d1c83a5e07f4b219ad6e80", "amount": "5.00",
                  "amountAtomic": "5000000", "token": "USDC", "chainId": 84532 },
-      "recipient": { "contactId": "ct_3K9…", "name": "Treasury", "address": "0x8f3bd1c7a0e94f25b6d1c83a5e07f4b219ad6e80" },
+      "contact": { "contactId": "ct_3K9…", "name": "Treasury",
+                   "address": "0x8f3bd1c7a0e94f25b6d1c83a5e07f4b219ad6e80",
+                   "chainId": "base", "token": "USDC" },
       "idempotencyKey": "quickstart-payout-1"
     }
     ```
 
     A contact that is a wallet address makes this an on-chain payout — `kind` says `onchain`, there is
-    no conversion, and `quote` carries no rate and no fee. `debit` is what will actually leave the
-    wallet, decoded from the operation you are about to sign, and for a wallet recipient its
-    `address` is the recipient. `approval.payload` is the bytes to sign, live for 120 seconds.
+    no conversion, and `quote` carries no rate and no fee. `contact` is the snapshot of the saved
+    destination, fixed when the payment was booked. `debit` is what will actually leave the wallet,
+    decoded from the operation you are about to sign, and for a wallet contact its `address` is that
+    destination. `approval.payload` is the bytes to sign, live for 120 seconds.
 
     `quickstart-payout-1` names this payment. Re-run this step with the same key and you replay
     the payout you already have, at the same price; change the key and you send twice.
@@ -418,7 +438,8 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
     rather than a single `amount`. On this payout both are `5.000000 USDC`.
 
     The 5 USDC that left in step 8 is there with its `txHash`, and the same 5 USDC are now in your
-    own account's balance — read it with the balance call from step 5, pointed at `$HEVN_USER_ID`.
+    own account's balance — read it with the balance call from step 5, with `$HEVN_USER_ID` in
+    `X-Hevn-Account`.
   </Step>
 </Steps>
 
@@ -428,7 +449,7 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
   a second signature over an operation HEVN built. Neither exposes a secret you could leak twice.
   See [Signing](/whitelabel/signing).
 - **The client is a real account.** It has its own wallet, its own ledger and its own legal identity —
-  you act for it with one header. See [Accounts and custody](/whitelabel/accounts-and-custody).
+  you act for it with one header. See [Accounts and control](/whitelabel/accounts-and-control).
 - **The money is real testnet money.** It moved on Base Sepolia; `transactionHash` is on chain.
 - **Every constant came out of an earlier response.** Client id, wallet address, contact id, approval
   payload — nothing was invented.
@@ -437,11 +458,11 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
 
 ## What this quickstart did not do
 
-It never touched fiat. Giving the client bank requisites, and paying a bank account with a currency
-conversion, needs a verified client: the KYB document filled and its rail open. That is the next
+It never touched fiat. Getting the client its own virtual account requisites, and paying a bank account with a currency
+conversion, needs a client the partner has approved: the KYB document filled and its rail open. That is the next
 piece of work — [Onboard a client](/whitelabel/onboarding), then
-[Bank accounts](/whitelabel/bank-accounts) and [Payouts](/whitelabel/payouts).
+[Virtual accounts](/whitelabel/bank-accounts) and [Payouts](/whitelabel/payouts).
 
-<Card title="Next: Accounts and custody" icon="shield" href="/whitelabel/accounts-and-custody">
+<Card title="Next: Accounts and control" icon="shield" href="/whitelabel/accounts-and-control">
   Who can move a client's money, and what happens if your key leaks.
 </Card>

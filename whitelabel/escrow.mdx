@@ -1,15 +1,15 @@
 ---
 title: "Escrow"
-description: "Hold one client's money while another delivers: the states a deal passes through, the windows it lives in, and a marketplace order end to end."
+description: "Lock one client's funds in an on-chain contract while another delivers: the states a deal passes through, the windows it lives in, and a marketplace order end to end."
 ---
 
 import IdempotencySnippet from "/snippets/idempotency.mdx";
 
-Escrow lets you hold one client's money while another delivers. The buyer's money stays in the buyer's own wallet until you authorize a hold, it sits in the escrow contract where neither party can spend it, and it reaches the seller only when you capture.
+Escrow locks one client's funds in an on-chain contract while another delivers. The buyer's funds stay in the buyer's own wallet until you authorize a lock, they then sit in the escrow contract where neither party — and neither HEVN nor you — can spend them outside its rules, and they reach the seller only when you capture.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> draft: POST /v1/escrow
+    [*] --> draft: POST /dapi/v1/escrow
     draft --> authorized: authorize — the hold leaves the buyer's wallet
     draft --> charged: charge — hold and pay out in one action
     authorized --> partiallyCaptured: capture (part)
@@ -28,7 +28,7 @@ stateDiagram-v2
 
 A `voided` or `reclaimed` deal can still be refunded, if something was captured before the hold was released.
 
-Every transition is one `POST /v1/escrow/{escrowId}/actions` that you sign with your developer key. You are the **operator** of every deal you create; escrow is the one resource that never takes `X-Hevn-Account`, because the caller is always you.
+Every transition is one `POST /dapi/v1/escrow/{escrowId}/actions` that you sign with your developer key. You are the **operator** of every deal you create; escrow never takes `X-Hevn-Account`, because the caller is always you. It is one of two self-scoped families — the other is `POST /clients` and `GET /clients` — and both refuse the header the same way, with `400 account_scope_conflict` and `details.reason = "selfScopedRoute"`. See [Sessions](/whitelabel/sessions#acting-as-a-client).
 
 ## The states money is in
 
@@ -49,7 +49,7 @@ Amounts are decimal strings in the token's major unit, rendered at the token's p
 | Receiver | another of your clients, the seller | Receives what you capture. |
 | Operator | you, the integrator | Authorize, charge, capture, void, refund and reclaim. Every action, one key. |
 
-All three must be different accounts, and both parties must be clients you created — a stranger's account id answers `422 receiver_not_a_client` or `404 client_not_found`. The addresses are each party's Base smart wallet at creation time, and the deal is immutable: its terms are hashed into an on-chain payment record.
+All three must be different accounts, and both parties must be clients you created. HEVN binds sender and receiver through the sub-user relationship that `POST /clients` writes, so only accounts you provisioned through this API qualify; an account you merely referred never does, and a stranger's account id answers `422 receiver_not_a_client` or `404 client_not_found`. The addresses are each party's Base smart wallet at creation time, and the deal is immutable: its terms are hashed into an on-chain payment record.
 
 ## The three windows
 
@@ -76,7 +76,7 @@ gantt
 | `holdFor` | `14d` | `windows.holdUntil` | Your delivery window. `capture` is legal until it ends; after it the buyer can `reclaim`. |
 | `refundableFor` | `90d` | `windows.refundableUntil` | Your returns window. `refund` is legal until it ends. |
 
-A duration is `^\d{1,4}[smhd]$` — `30m`, `1h`, `14d`. You never compute a timestamp, which is what makes a retry safe: repeating `POST /v1/escrow` with the same `Idempotency-Key` returns the same deal with the same absolute windows, no matter how much later it arrives. Different durations under the same key answer `409 idempotency_key_reused` with `details.escrowId`.
+A duration is `^\d{1,4}[smhd]$` — `30m`, `1h`, `14d`. You never compute a timestamp, which is what makes a retry safe: repeating `POST /dapi/v1/escrow` with the same `Idempotency-Key` returns the same deal with the same absolute windows, no matter how much later it arrives. Different durations under the same key answer `409 idempotency_key_reused` with `details.escrowId`.
 
 `void` is the exception with no clock on it: while anything is capturable, you can always hand it back.
 
@@ -94,6 +94,7 @@ HEVN sponsors the gas for every action and charges nothing on top.
 - Your account may operate escrow. HEVN enables that, in the sandbox as in production; nothing in the API grants it. Without it every escrow call is refused — see [Going live](/whitelabel/going-live#what-hevn-must-enable).
 - The buyer's wallet holds the token when you authorize, not when you create. Creating a deal moves nothing.
 - Call escrow with your own access token and **no** `X-Hevn-Account` — the header answers `400 account_scope_conflict` on every escrow route.
+- Your developer key registration is active and the call leaves an allowlisted source IP. Both are re-checked on every request, and again immediately before HEVN co-signs an action — see [Developer key](/whitelabel/developer-key).
 
 <IdempotencySnippet />
 
@@ -158,7 +159,7 @@ Order `A-1187`: Northwind Trading Ltd (`cl_7YQ2Kf3mN8`) buys 100 USDC of parts f
     ```
     </CodeGroup>
 
-    ```json Response — 201, Location: /v1/escrow/esc_5Qb4e17c9d
+    ```json Response — 201, Location: /dapi/v1/escrow/esc_5Qb4e17c9d
     {
       "id": "esc_5Qb4e17c9d",
       "status": "draft",
@@ -181,7 +182,7 @@ Order `A-1187`: Northwind Trading Ltd (`cl_7YQ2Kf3mN8`) buys 100 USDC of parts f
     Nothing has moved. `availableActions` becomes `["authorize", "charge"]` once the approval lands on chain — if the confirm answers `202`, poll it to settlement first ([Escrow actions](/whitelabel/escrow-actions#confirming-an-action)).
   </Step>
 
-  <Step title="Hold the buyer's money">
+  <Step title="Lock the buyer's funds in the contract">
     `authorize` pulls the amount out of the buyer's wallet into the escrow contract. It happens **once** per deal: authorize less than `maxAmount` and the remainder is unusable, so authorize the order total.
 
     <CodeGroup>

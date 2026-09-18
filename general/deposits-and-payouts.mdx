@@ -3,13 +3,13 @@ title: "Deposits & fiat payouts"
 description: "All deposits land directly in your smart wallet, and fiat payouts are executed by a licensed banking partner — HEVN never holds the money."
 ---
 
-Every funding rail in HEVN resolves to the same place: the user's own [Base Smart Wallet](/general/smart-wallets). HEVN issues details, orchestrates metadata, and shows status — but it is never a party in the money flow.
+Every funding rail in HEVN resolves to the same place: the user's own [Base Smart Wallet](/general/smart-wallets). HEVN requests the details from a partner bank, orchestrates metadata, and shows status — but it is never a party in the money flow.
 
 ## Deposits
 
-### Bank details are bound to your wallet
+### Virtual account details are bound to your wallet
 
-When HEVN issues bank details (virtual account numbers / IBANs) for a user, those details are linked **only to that user's smart wallet address**. An incoming fiat transfer is converted by the banking partner and settles as USDC directly on the user's wallet.
+When a partner bank opens virtual account details (account numbers / IBANs) for a user, those details are linked **only to that user's smart wallet address**. An incoming fiat transfer is converted by the banking partner and settles as USDC directly on the user's wallet.
 
 ```mermaid
 flowchart LR

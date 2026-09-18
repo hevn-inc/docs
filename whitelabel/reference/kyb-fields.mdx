@@ -3,9 +3,9 @@ title: "KYB fields"
 description: "Every field of the KYB document, its accepted values, the document slots, and how to read a missing[] path."
 ---
 
-Every field of the KYB document, with its accepted values. The document is the body of `PUT /v1/clients/{clientId}/kyb` and the `document` block of `GET /v1/clients/{clientId}/kyb`; both use the same shape. [Onboarding](/whitelabel/onboarding) is the flow that fills it.
+Every field of the KYB document, with its accepted values. The document is the body of `PUT /dapi/v1/client/kyb` and the `document` block of `GET /dapi/v1/client/kyb`; both use the same shape, and both take the client id in `X-Hevn-Account` rather than in a path. [Onboarding](/whitelabel/onboarding) is the flow that fills it.
 
-"Required" below means submission is refused without it — the field appears in `missing[]` until it is set.
+"Required" below means completion is refused without it — the field appears in `missing[]` until it is set. Everything under "Optional detail" is accepted, never demanded by the gate, and routinely asked for by a reviewer instead: sending what you already hold is how an RFI is avoided rather than answered.
 
 ## `company`
 
@@ -30,6 +30,58 @@ Every field of the KYB document, with its accepted values. The document is the b
 | `sourceOfFunds` | enum | yes | Where the money the client will move comes from. |
 | `purposeOfFunds` | enum | yes | What it will be used for. |
 | `flowOfFunds` | string, 1–4000 | yes | How money reaches the company and where it goes, in plain sentences. |
+
+### `company` — optional detail
+
+None of these appears in `missing[]`. All of them are read by a reviewer.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `entityTypeDescription` | string, 1–200 | The legal form in words, when `entityType` is `other`. |
+| `industry` | string, 1–200 | The industry in words, alongside the `businessIndustry` code. |
+| `businessTypeDetails` | string, 1–4000 | What `businessType` does not capture. |
+| `productsServices` | array of strings, 1–200 each | What the company sells, itemised. |
+| `linkedinUrl` | string, 1–2000 | The company's public LinkedIn page. |
+| `operatingCountries` | array of ISO 3166-1 alpha-2 | Where it trades, as distinct from where it is registered. |
+| `primaryTargetMarket` | enum | Who it sells to. |
+| `publicListed` | boolean | Whether the company is listed. |
+| `institutionalInvestors` | boolean | Whether institutional investors fund or own it. |
+| `isRegulated` | boolean | Whether it holds a licence or sits under a regulator. |
+| `estimatedAnnualRevenue` | decimal, ≥ 0 | Annual revenue in USD. |
+| `revenueCovers` | enum | How much of operating expense that revenue covers. |
+| `txPerMonth` | enum | Expected transaction count per month. |
+| `expectedCryptoMonthlyVolumeUsd` | decimal, ≥ 0 | The digital-asset share of `expectedMonthlyVolumeUsd`. |
+| `expectedMonthlyAchUsd` | decimal, ≥ 0 | The ACH share. |
+| `expectedMonthlyWireUsd` | decimal, ≥ 0 | The wire share. |
+| `depositMethods` | array of strings, 1–200 each | How and from where the account will be funded. |
+| `usesBlockchain` | boolean | Whether blockchain or digital assets are used in operations. |
+| `cryptoIndustrySubtype` | enum | The digital-asset business model, when there is one. |
+| `hasUsBank` | boolean | Whether the company already holds a US payment account. |
+| `deniedUsBank` | boolean | Whether a US institution has declined or closed one. |
+| `hasIntermediateEntityOwnership` | boolean | Whether another legal entity sits between the company and a beneficial owner. See [complex ownership](#complex-ownership). |
+| `hasPep` | boolean | Whether the company, an owner or a controller is a politically exposed person. |
+| `bizAdverse` | array of strings, 1–4000 each | Adverse information about the company, declared up front. |
+| `ownersAdverse` | array of strings, 1–4000 each | The same for its owners and controllers. |
+| `sanctionedCountryOperations` | boolean | Whether it operates in or serves sanctioned jurisdictions. |
+| `highRiskActivities` | array of enum | Higher-risk activities it performs. |
+| `handlesCustomerFunds` | boolean | Whether it receives, holds or transfers funds for its own customers. |
+| `actingAsIntermediary` | boolean | Whether it sits between the payer and the ultimate beneficiary. |
+| `moneyServicesDescription` | string, 1–4000 | The money-services activity, when there is any. |
+| `complianceScreening` | string, 1–4000 | How it screens its own customers and transactions. |
+| `sourceOfFundsDetails` | string, 1–4000 | The `sourceOfFunds` answer, explained. |
+| `purposeOfFundsDetails` | string, 1–4000 | The `purposeOfFunds` answer, explained. |
+| `contactInfo` | string, 1–4000 | Any further contact or operational detail. |
+| `identityDocuments` | array of `{type, number, issuingCountry}` | Identification issued **to the company**, where the jurisdiction issues any. Metadata only — see below. |
+
+### `identityDocuments`
+
+Both `company` and `people[]` take this array. It carries the metadata off an identity document; the file itself is still a `POST /dapi/v1/documents` upload filed into a `documents[]` slot, and neither replaces the other.
+
+| Field | Type |
+| --- | --- |
+| `type` | enum |
+| `number` | string, 1–200, exactly as printed |
+| `issuingCountry` | ISO 3166-1 alpha-2 |
 
 ### `company.address` and `people[].address`
 
@@ -69,6 +121,17 @@ At least one person is required: a document with an empty roster reports `people
 | `isSigner` | boolean | no | |
 | `documents` | array of `{slot, uploadId}` | yes | One `proof_of_address` per person. |
 
+These six are optional and, like the company's, are read rather than demanded:
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `title` | string, 1–200 | The office held, for example `Director`. |
+| `birthCountry` | ISO 3166-1 alpha-2 | Country of birth. |
+| `nationalities` | array of ISO 3166-1 alpha-2 | Every nationality held. |
+| `country` | ISO 3166-1 alpha-2 | Country of residence. Distinct from `taxIdCountry`, which is declared, and from `address.country`. |
+| `linkedinUrl` | string, 1–2000 | The person's public LinkedIn profile. |
+| `identityDocuments` | array of `{type, number, issuingCountry}` | Passport or ID metadata, as above. |
+
 ## Enums
 
 Send one of the listed members. An unlisted value is refused at the boundary with `422 invalid_enum_value`, carrying `details.field` and the accepted set in `details.allowed` — nothing is written.
@@ -95,7 +158,37 @@ Send one of the listed members. An unlisted value is refused at the boundary wit
 `officer` · `employer` · `accountant` · `agent`
 </Accordion>
 
+<Accordion title="cryptoIndustrySubtype">
+`protocol` · `exchange` · `investment` · `lender` · `market_maker` · `saas` · `miner`
+</Accordion>
+
+<Accordion title="primaryTargetMarket">
+`retail` · `commercial` · `government` · `other`
+</Accordion>
+
+<Accordion title="revenueCovers">
+`all_operating_expenses` · `most` · `some` · `minimal`
+</Accordion>
+
+<Accordion title="txPerMonth">
+`<10` · `10-50` · `50-200` · `200-1,000` · `1,000+`
+
+These members are not identifiers. Send them exactly as printed, punctuation included.
+</Accordion>
+
+<Accordion title="highRiskActivities">
+`MONEY_SERVICES` · `LENDING_BANKING` · `OTC_FX_CRYPTO_BROKERAGE` · `HOLD_CLIENT_FUNDS` · `INVESTMENT_SERVICES` · `SAFE_DEPOSIT_BOX` · `PRECIOUS_METALS_STONES_JEWELRY` · `NICOTINE_TOBACCO` · `MARIJUANA` · `PHARMACEUTICALS` · `THIRD_PARTY_PAYMENT_PROCESSING` · `ADULT_ENTERTAINMENT` · `WEAPONS_FIREARMS_EXPLOSIVES` · `GAMBLING`
+
+The one upper-case enum in the API.
+</Accordion>
+
+<Accordion title="identityDocuments[].type">
+`passport` · `id_card` · `drivers_license` · `driver_license` · `residence_permit` · `government_id` · `state_or_provincial_id` · `visa`
+</Accordion>
+
 </AccordionGroup>
+
+Two of these break the `snake_case` rule the rest of the API keeps: `highRiskActivities` is upper-case and `txPerMonth` carries digits and punctuation. Match them character for character.
 
 ## Document slots
 
@@ -140,11 +233,11 @@ Every entry is a path into the document you sent. Fix it there and write again.
 | `documents.certificate_of_incorporation` | A company slot has nothing in it. |
 | `graph.entities.<uuid>.phone` | The gap belongs to an entity the flat document does not own. |
 
-The index in `people[0]` is the person's position in the `people` array of `GET /v1/clients/{clientId}/kyb`, not the order you happened to send. Read the document back and index into that.
+The index in `people[0]` is the person's position in the `people` array of `GET /dapi/v1/client/kyb`, not the order you happened to send. Read the document back and index into that.
 
 ## Complex ownership
 
-The flat document models one company owned directly by people. A chain with holding companies in it is written through HEVN's entity-graph routes, which are outside this API and available on request. The two models coexist: the flat document only ever replaces the people it created, and never touches an entity added another way — a write that would drop one answers `409 kyb_roster_conflict` with `details.entityIds`. Gaps belonging to those entities are the `graph.entities.<uuid>.<field>` rows above.
+The flat document models one company owned directly by people; `hasIntermediateEntityOwnership` is where you declare that it does not. A chain with holding companies in it is written through HEVN's entity-graph routes, which are outside this API and available on request. The two models coexist: the flat document only ever replaces the people it created, and never touches an entity added another way — a write that would drop one answers `409 kyb_roster_conflict` with `details.entityIds`. Gaps belonging to those entities are the `graph.entities.<uuid>.<field>` rows above.
 
 <Card title="Next: Errors" icon="arrow-right" href="/whitelabel/reference/errors">
   The envelope, and every slug the API can answer with.

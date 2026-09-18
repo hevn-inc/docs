@@ -1,9 +1,9 @@
 ---
 title: "Errors"
-description: "One envelope and all 107 error slugs, grouped by resource, with what to do about each."
+description: "One envelope and all 109 error slugs, grouped by resource, with what to do about each."
 ---
 
-Every refusal from `/v1` has the same body. `code` is a stable lowercase slug — branch on it, and never on `message`.
+Every refusal from `/dapi/v1` has the same body. `code` is a stable lowercase slug — branch on it, and never on `message`.
 
 ```json
 {
@@ -17,7 +17,7 @@ Every refusal from `/v1` has the same body. `code` is a stable lowercase slug �
 
 | Key | Contract |
 | --- | --- |
-| `code` | One of the 107 slugs below. Stable across releases. Lowercase, `snake_case`, never a class name. |
+| `code` | One of the 109 slugs below. Stable across releases. Lowercase, `snake_case`, never a class name. |
 | `message` | One sentence, safe to log or show an operator. Rewritten whenever it can be made clearer — do not parse it. |
 | `details` | camelCase, and present only when there is something to carry: the id the key already owns, the fields that failed, the amount available. On a `5xx` it also carries `requestId`. |
 
@@ -74,15 +74,15 @@ A `422 validation_failed` names every field that failed, in wire spelling, with 
 | `idempotency_key_invalid` | 400 | The header is outside `^[A-Za-z0-9._:-]{1,128}$`. |
 | `idempotency_key_reused` | 409 | The same key already names different terms. `details` carries the id it owns (`payoutId`, `escrowId`). Replay the exact body, or use a new key. |
 | `unauthenticated` | 401 | Send `Authorization: Bearer <accessToken>`. |
-| `token_expired` | 401 | Re-mint with `POST /v1/auth/refresh` and retry once. |
-| `forbidden` | 403 | This session may not perform this operation. |
+| `token_expired` | 401 | Re-mint with `POST /dapi/v1/auth/refresh` and retry once. |
+| `forbidden` | 403 | This session may not perform this operation. On `/dapi/v1` it is also what a non-platform token, a paused developer key registration and an off-allowlist source IP answer — see [Developer keys](#developer-keys). |
 | `not_found` | 404 | No such resource. |
 | `method_not_allowed` | 405 | Wrong verb for this path. |
 | `conflict` | 409 | A state conflict with no narrower slug. Read `message`, re-read the resource. |
 | `gone` | 410 | The resource is no longer available. |
 | `payload_too_large` | 413 | Send a smaller upload. |
 | `rate_limited` | 429 | Sleep `Retry-After` seconds, then retry. |
-| `provider_unavailable` | 503 | A partner is down or the sandbox treasury cannot pay. Retry with backoff. |
+| `provider_unavailable` | 503 | A partner is down or the sandbox faucet account cannot pay. Retry with backoff. |
 | `database_unavailable` | 503 | Retry with backoff. |
 | `internal_error` | 500 | Log `details.requestId` and contact support. |
 
@@ -96,7 +96,7 @@ A `422 validation_failed` names every field that failed, in wire spelling, with 
 | `challenge_consumed` | 409 | A challenge is single-use. Start a new one. |
 | `challenge_expired` | 410 | Start a new challenge and sign it promptly. |
 | `signature_invalid` | 400 | The signature does not verify against the stored payload. Nothing was consumed — sign the decoded payload bytes and try again. |
-| `key_not_registered` | 403 | This public key is not registered for the account. Register it in the app. |
+| `key_not_registered` | 403 | This public key is not in the account's signer, or has no registration of its own. See [Developer key](/whitelabel/developer-key). |
 | `signer_not_attached` | 409 | The developer signer is not attached to the account's wallet. |
 | `wallet_not_linked` | 409 | The account has no wallet yet. For a client, wait for `status: "ready"`. |
 | `approval_consumed` | 409 | This approval already signed something. Prepare the operation again. |
@@ -106,12 +106,32 @@ A `422 validation_failed` names every field that failed, in wire spelling, with 
 | `login_unavailable` | 503 | Login is temporarily unavailable. Retry with backoff. |
 | `login_mode_unavailable` | 501 | This login mode is not enabled here. `details.use` names the one that is. |
 
+## Developer keys
+
+A platform session is established by one registered developer key, and every `/dapi/v1` request re-reads that
+registration: it must still be active, and the request must arrive from an address inside the key's allowlist. Both
+checks are repeated on `POST /dapi/v1/auth/refresh` and again immediately before HEVN co-signs, so pausing a key stops
+the sessions it already minted rather than waiting for them to expire.
+
+| Slug | Status | What to do |
+| --- | --- | --- |
+| `unauthenticated` | 401 | No bearer, or one that does not verify. `/dapi/v1` takes a **platform** access token and nothing else. |
+| `forbidden` | 403 | With `details.reason = "developerSessionRequired"`: the token is an ordinary API token, a `platform-refresh` token on a business route, or a platform token with no `developer_key_id`. Log in through `POST /dapi/v1/auth/challenge` and `POST /dapi/v1/auth/token`. |
+| `forbidden` | 403 | With no `details`: the registration behind the session is paused, or the call left an address outside its allowlist. Resume from an allowlisted host, or register a key that covers this one. |
+| `key_not_registered` | 403 | The public key you named in a signature has no registration on this account. |
+| `invalid_credentials` | 401 | At login only. A paused key, an off-allowlist IP, an unknown email and a bad signature are all one code, deliberately. |
+| `developer_key_not_found` | 404 | `POST /api/v1/developer/api-keys/{developerKeyId}/pause` was given a `dk_…` id that is not yours. |
+| `developer_key_already_exists` | 409 | That public key is already registered for this developer. Registrations are immutable and additive — pause the old one instead of re-registering. |
+
+The last two come from the management routes under `/api/v1/developer/api-keys`, which take an ordinary owner JWT and
+carry the ordinary API's own error shape. They are deliberately absent from `/dapi/v1`.
+
 ## Acting as a client
 
 | Slug | Status | What to do |
 | --- | --- | --- |
 | `account_header_invalid` | 400 | `X-Hevn-Account` is not a `cl_…` id. |
-| `account_scope_conflict` | 400 | The header was sent to a route that refuses it, or it disagrees with the client id in the path. `details.reason` says which. |
+| `account_scope_conflict` | 400 | The header was sent to a self-scoped route — `POST /clients`, `GET /clients` or any escrow route — or the token itself is delegated to one client. `details.reason` is `selfScopedRoute` in both cases. |
 | `account_not_found` | 404 | Unknown client, or a client that is not yours. The two are indistinguishable by design. |
 | `account_forbidden` | 403 | The client exists but cannot be acted for right now — typically a paused integrator profile. |
 | `account_read_only` | 403 | This credential may read the client but not write. `details.credential` names it. |
@@ -123,7 +143,7 @@ A `422 validation_failed` names every field that failed, in wire spelling, with 
 | --- | --- | --- |
 | `integrator_inactive` | 403 | Your integrator profile is not active. HEVN switches it on; nothing in the API does. |
 | `client_creation_not_enabled` | 403 | Your account cannot create clients yet. HEVN enables this. |
-| `email_in_use` | 409 | That email already belongs to an account. Look it up with `GET /v1/clients?email=`. |
+| `email_in_use` | 409 | That email already belongs to an account. Look it up with `GET /dapi/v1/clients?email=`. |
 | `name_in_use` | 409 | Company names are globally unique. Send a more specific legal name. |
 | `client_request_conflict` | 409 | An identical client request is already in flight. Poll instead of creating again. |
 | `client_not_found` | 404 | Unknown client id, or not one of yours. |
@@ -133,10 +153,10 @@ A `422 validation_failed` names every field that failed, in wire spelling, with 
 
 | Slug | Status | What to do |
 | --- | --- | --- |
-| `rail_not_found` | 404 | No such rail id. Copy one from `GET /v1/banks`. |
+| `rail_not_found` | 404 | No such rail id. Copy one from `GET /dapi/v1/banks`. |
 | `rail_not_available` | 403 | The rail is not offered to this client. |
-| `rail_requirements_unmet` | 422 | Something the rail needs is missing. `GET /v1/banks/{rail}/requirements` lists it. |
-| `phone_required` | 422 | The client has no phone number. `PATCH /v1/clients/{clientId}` with one, then open the rail. |
+| `rail_requirements_unmet` | 422 | Something the rail needs is missing. `GET /dapi/v1/banks/{rail}/requirements` lists it. |
+| `phone_required` | 422 | The client has no phone number. `PATCH /dapi/v1/client` with one, and the client's id in `X-Hevn-Account`, then open the rail. |
 | `payin_not_available` | 422 | This client cannot be paid in that currency over that method. `details.options` lists the pairs that work. |
 | `payin_expired` | 410 | The price no longer holds. Quote the payin again. |
 | `payin_not_found` | 404 | Unknown payin id, or one belonging to another client. |
@@ -148,13 +168,11 @@ Booking a payout — to a bank account or to a wallet — and the contacts it pa
 
 | Slug | Status | What to do |
 | --- | --- | --- |
-| `contact_details_invalid` | 422 | The recipient's requisites or address are incomplete for the method. `details.fields` names them. |
+| `contact_details_invalid` | 422 | The contact's requisites or address are incomplete for the method, at create or update time. `details.fields` names them. |
 | `contact_in_use` | 409 | A payout still references this contact. It cannot be deleted. |
-| `recipient_not_payable` | 409 | The recipient cannot be paid on this rail. `details.blockers` is the same array `capabilities` returns. |
-| `recipient_chain_unsupported` | 422 | The recipient is on a chain a client balance cannot pay. Only USDC on Base is paid from the balance; `details.chain` echoes what was asked. |
-| `recipient_token_unsupported` | 422 | The recipient expects a token a client balance cannot pay. `details.token` echoes it. |
-| `recipient_details_invalid` | 422 | The partner refused the recipient's details — most often a beneficiary name the bank does not recognise. Correct the contact and book again. |
-| `amount_below_minimum` | 422 | Below the route's minimum. `POST /v1/payouts/preview` reports it as `minAmount`. |
+| `contact_not_payable` | 409 | The contact cannot be paid on this rail. `details.blockers` is the same array `capabilities` returns — the codes are listed under [Contact blockers](#contact-blockers). |
+| `contact_payment_details_invalid` | 422 | The partner refused the contact's payment details — most often a beneficiary name the bank does not recognise. Correct the contact and book again. Not to be confused with `contact_details_invalid` above, which is our own refusal of an incomplete contact body. |
+| `amount_below_minimum` | 422 | Below the route's minimum. `POST /dapi/v1/payouts/preview` reports it as `minAmount`. |
 | `amount_above_maximum` | 422 | Above the route's maximum. |
 | `amount_precision_unsupported` | 422 | More decimals than the asset allows. Amounts are refused, never rounded. |
 | `payout_not_found` | 404 | Unknown payout id for this client. |
@@ -163,9 +181,44 @@ Booking a payout — to a bank account or to a wallet — and the contacts it pa
 | `bundler_rejected` | 502 | The chain rejected the operation. Confirm again with backoff. |
 | `bundler_unavailable` | 502 | Chain infrastructure is unreachable. Confirm again with backoff. |
 
+Four more slugs are in the published enum and never reach you. `contact_requires_quote` and
+`direct_transfer_unsupported` are both folded into `409 contact_not_payable` before the response is written.
+`contact_chain_unsupported` and `contact_token_unsupported` have no raise site at all: a contact off Base, or
+expecting another token, is [routed cross-chain](/whitelabel/payouts#a-routed-payout-is-priced) rather than
+refused, and an account without routing gets `409 payout_not_fundable`. Generated clients will carry all four;
+branch on `contact_not_payable`.
+
+## Contact blockers
+
+`GET /dapi/v1/contacts/{contactId}/capabilities` answers a `blockers[]` array rather than a refusal, and
+`409 contact_not_payable` carries the same array as `details.blockers`. Each entry has a `code`, a `message` safe to
+show an operator, and sometimes the `field` it is about. These codes are their own vocabulary — they are not error
+slugs, and they never appear as `error.code`.
+
+| Code | What it means |
+| --- | --- |
+| `contact_details_missing` | The contact has no payment account for this method yet. |
+| `contact_address_incomplete` | The method needs the beneficiary's address and part of it is missing. |
+| `contact_country_restricted` | The partner does not pay this beneficiary country. |
+| `contact_holder_type_unsupported` | The partner does not pay this holder type — a company where only people are paid, or the reverse. |
+| `account_type_unsupported` | The partner cannot pay an account of this shape at all. |
+| `routing_unresolved` | The identifiers do not resolve to a route the partner recognises. |
+| `receiving_account_unavailable` | The client has no active account to send from. Open a rail first. |
+| `payment_method_unavailable` | None of the client's accounts sends over this method. |
+| `currency_mismatch` | The account holds one currency and the transfer is in another. |
+| `transfer_feature_disabled` | This transfer kind is switched off on the sending account. |
+| `transfer_feature_on_request` | This transfer kind exists but must be opened for the account first. |
+| `channel_not_configured` | The channel that would carry it is not configured here. |
+| `sender_residency_ineligible` | The sending client's residency rules this route out. |
+| `sender_category_restricted` | The sending client's business category rules this route out. |
+| `endorsement_required` | The route needs an endorsement the sending client does not hold. |
+| `channel_unavailable` | The partner reports the channel as unavailable right now. |
+| `amount_below_minimum` | The amount you asked about is under the route's minimum. |
+| `amount_above_maximum` | The amount you asked about is over the route's maximum. |
+
 ## Funding a payment
 
-These arrive at `POST /v1/payouts/{payoutId}/confirm`; two of them — `quote_not_submitted` and `payout_not_fundable` — also answer the sandbox settlement routes, where they mean the same thing. The decision table for the four that branch is on [Payouts](/whitelabel/payouts#when-a-payout-is-refused).
+These arrive at `POST /dapi/v1/payouts/{payoutId}/confirm`; two of them — `quote_not_submitted` and `payout_not_fundable` — also answer the sandbox settlement routes, where they mean the same thing. The decision table for the four that branch is on [Payouts](/whitelabel/payouts#when-a-payout-is-refused).
 
 | Slug | Status | What to do |
 | --- | --- | --- |
@@ -181,7 +234,7 @@ These arrive at `POST /v1/payouts/{payoutId}/confirm`; two of them — `quote_no
 | `quote_not_fundable` | 409 | The booking is no longer fundable. Request a new one. |
 | `funding_mode_unsupported` | 409 | This route cannot be funded with a developer key. |
 | `funding_token_unsupported` | 409 | Only USDC funds a payout. |
-| `self_transfer` | 409 | The recipient is the client's own wallet. |
+| `self_transfer` | 409 | The contact is the client's own wallet. |
 | `smart_wallet_not_deployed` | 409 | The client's wallet is not on chain yet. Wait for `status: "ready"`. |
 | `wallet_owner_unverified` | 409 | The wallet's owner set does not yet include the signer. Contact support. |
 | `user_operation_rejected` | 502 | The bundler rejected the operation. Confirm again. |
@@ -191,10 +244,10 @@ These arrive at `POST /v1/payouts/{payoutId}/confirm`; two of them — `quote_no
 
 | Slug | Status | What to do |
 | --- | --- | --- |
-| `kyb_incomplete` | 422 | Submission was attempted with gaps. `GET /v1/clients/{clientId}/kyb` lists `missing[]`. |
+| `kyb_incomplete` | 422 | The submission was completed with gaps. `GET /dapi/v1/client/kyb` lists `missing[]`. |
 | `kyb_roster_conflict` | 409 | The people on file conflict with this write — usually a person removed while still owning shares. |
 | `kyb_subject_conflict` | 409 | The subject conflicts with the verification data already on file. |
-| `document_fields_missing` | 422 | A document carries none of the values a reviewer needs. `details.documents` names each `<slot>.<key>`; write them with `PUT /v1/documents/{documentId}/content`. |
+| `document_fields_missing` | 422 | A document carries none of the values a reviewer needs. `details.documents` names each `<slot>.<key>`; write them with `PUT /dapi/v1/documents/{documentId}/content`. |
 | `document_not_found` | 404 | Unknown `doc_…` id for this client. |
 | `document_type_unsupported` | 422 | That slot does not accept this document type. |
 | `invalid_enum_value` | 422 | The value is not one of the accepted ones. See [KYB fields](/whitelabel/reference/kyb-fields). |
@@ -215,7 +268,7 @@ These arrive at `POST /v1/payouts/{payoutId}/confirm`; two of them — `quote_no
 | `amount_out_of_range` | 422 | The amount is outside what the deal allows. An over-large `capture` or `authorize` currently arrives as a bare `400 invalid_request` instead, with no `details` and the generic message. |
 | `window_closed` | 409 | The action's window has passed. A closed window currently arrives as a bare `400 invalid_request` instead — handle both the same way: read the deal, pick from `availableActions`. |
 | `token_not_supported` | 422 | Escrow settles in `USDC` or `EURC`, by symbol. |
-| `receiver_not_a_client` | 422 | Both parties must be clients of yours. |
+| `receiver_not_a_client` | 422 | Both parties must be clients you provisioned with `POST /clients`. An account you only referred is never an escrow party. |
 | `conflict` | 409 | A state conflict with no narrower slug — on escrow it is what an unclassified deal error becomes. Read `message`, re-read the deal. An approval that closed is `410 approval_expired`, one already used is `409 approval_consumed`. |
 | `bundler_rejected`, `bundler_unavailable` | 502 | Chain infrastructure. Confirm again with backoff. |
 

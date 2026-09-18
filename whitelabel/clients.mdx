@@ -42,7 +42,7 @@ client, err := api.Post("/clients", hevn.Body{
 
 </CodeGroup>
 
-`201 Created`, `Location: /v1/clients/cl_7YQ2Kf3mN8`:
+`201 Created`, `Location: /dapi/v1/client`:
 
 ```json
 {
@@ -53,13 +53,15 @@ client, err := api.Post("/clients", hevn.Body{
   "phone": "+13125550142",
   "kybStatus": "notStarted",
   "createdAt": "2026-09-17T10:04:11Z",
-  "pollUrl": "/v1/clients/cl_7YQ2Kf3mN8"
+  "pollUrl": "/dapi/v1/client"
 }
 ```
 
 `baseSmartWallet` is absent because it does not exist yet. Responses omit fields with no value, so an absent field and a null field are the same thing — see [conventions](/whitelabel/conventions).
 
-Examples use the client from [HTTP client](/whitelabel/reference/client). Nothing on this page acts as a client, so every call here carries your own access token and no account header.
+`pollUrl` carries no id. It is literally `/dapi/v1/client`, the singular route that reads whichever account `X-Hevn-Account` names — so a poller sends the new `cl_…` in that header rather than building a path from it.
+
+Examples use the client from [HTTP client](/whitelabel/reference/client). This page straddles the two account scopes: `POST /dapi/v1/clients` and `GET /dapi/v1/clients` are the collection **you** own and **refuse** `X-Hevn-Account` with `400 account_scope_conflict`, while `GET /dapi/v1/client` and `PATCH /dapi/v1/client` act on one client and **require** it. [Sessions](/whitelabel/sessions#acting-as-a-client) has the whole table.
 
 ## The three fields
 
@@ -79,12 +81,13 @@ Examples use the client from [HTTP client](/whitelabel/reference/client). Nothin
 
 ```mermaid
 stateDiagram-v2
-    [*] --> provisioning: POST /v1/clients
+    [*] --> provisioning: POST /dapi/v1/clients
     provisioning --> ready: smart wallet deployed
     provisioning --> failed: provisioning refused
 
     note right of provisioning
-        Poll GET /v1/clients/{clientId} every 2 s.
+        Poll GET /dapi/v1/client every 2 s,
+        with the id in X-Hevn-Account.
         Expect ready in about 30 seconds.
     end note
     note right of ready
@@ -101,34 +104,38 @@ stateDiagram-v2
 
 ## Wait until it is ready
 
-Read the id you were given until its status changes. `pollUrl` on the create response is that path, so a poller never builds a URL.
+Read the client until its status changes. `pollUrl` on the create response is the path, and the id you were given goes in `X-Hevn-Account`.
 
 <PollSnippet />
 
 <CodeGroup>
 
 ```bash cURL
-curl "$HEVN_API/clients/cl_7YQ2Kf3mN8" \
-  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN"
+curl "$HEVN_API/client" \
+  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+  -H "X-Hevn-Account: cl_7YQ2Kf3mN8"
 ```
 
 ```python Python
+northwind = hevn.acting_as(client["id"])
 client = poll_until(
-    lambda: hevn.get(f"/clients/{client['id']}"),
+    lambda: northwind.get("/client"),
     lambda c: c["status"] != "provisioning",
 )
 ```
 
 ```javascript Node
+const northwind = hevn.actingAs(client.id);
 const ready = await pollUntil(
-  () => hevn.get(`/clients/${client.id}`),
+  () => northwind.get("/client"),
   (c) => c.status !== "provisioning",
 );
 ```
 
 ```go Go
+northwind := api.ActingAs(client.Str("id"))
 ready, err := hevn.PollUntil(func() (hevn.Payload, error) {
-	return api.Get("/clients/" + client.Str("id"))
+	return northwind.Get("/client")
 }, func(c hevn.Payload) bool { return c.Str("status") != "provisioning" }, 2*time.Minute)
 ```
 
@@ -149,11 +156,11 @@ A `ready` client carries the address that holds its money:
 }
 ```
 
-There is one id to store. `cl_7YQ2Kf3mN8` is how you read this client, how you write its KYB document, and what you put in `X-Hevn-Account` to act for it on every money route. `baseSmartWallet` is the address that holds its balance; keep it for your own reconciliation, but no call takes it as an argument.
+There is one id to store. `cl_7YQ2Kf3mN8` is what you put in `X-Hevn-Account`: to read this client, to write its KYB document, and to act for it on every money route. Nothing takes it in a path. `baseSmartWallet` is the address that holds its balance; keep it for your own reconciliation, but no call takes it as an argument.
 
 `Idempotency-Key` is accepted on the create and is not needed: an identical retry replays rather than creating a second company, and an open request for the same email is deduplicated whether you sent a key or not.
 
-`kybStatus` follows the client's verification from here on — `notStarted`, then `pending`, `approved`, `rfi` or `rejected`. [Onboarding](/whitelabel/onboarding) owns that vocabulary; this row is where you read it without a second call.
+`kybStatus` follows the client's verification from here on — `notStarted`, then `pending`, `approved`, `rfi` or `rejected` — and `kybApplicationId` names the latest submission behind it. [Onboarding](/whitelabel/onboarding) owns that vocabulary; this row is where you read it without a second call.
 
 ## If provisioning fails
 
@@ -199,7 +206,7 @@ found := page.List("items")
 
 </CodeGroup>
 
-`GET /v1/clients` answers `{ "items": [...], "nextCursor": "..." }`, newest first, and includes clients that are still provisioning. It also takes `status` (`provisioning`, `ready`, `failed`) and cursor pagination. Re-sending an identical create body while the first request is still open replays it and answers `200` with `Idempotency-Replayed: true` and the same id; a different `name` or `phone` for the same open email answers `409 client_request_conflict`.
+`GET /dapi/v1/clients` answers `{ "items": [...], "nextCursor": "..." }`, newest first, and includes clients that are still provisioning. It also takes `status` (`provisioning`, `ready`, `failed`) and cursor pagination. Re-sending an identical create body while the first request is still open replays it and answers `200` with `Idempotency-Replayed: true` and the same id; a different `name` or `phone` for the same open email answers `409 client_request_conflict`.
 
 ## Creating clients at scale
 
@@ -211,27 +218,28 @@ The second is concurrency. Client creation is a queued operation; `ready` arrive
 
 ## Update the phone and the address
 
-`PATCH /v1/clients/{clientId}` writes two things and nothing else — the phone number the rails check, and the postal address:
+`PATCH /dapi/v1/client` writes two things and nothing else — the phone number the rails check, and the postal address. It is a client-scoped route, so the id travels in `X-Hevn-Account`:
 
 <CodeGroup>
 
 ```bash cURL
-curl -X PATCH "$HEVN_API/clients/cl_7YQ2Kf3mN8" \
+curl -X PATCH "$HEVN_API/client" \
   -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+  -H "X-Hevn-Account: cl_7YQ2Kf3mN8" \
   -H "Content-Type: application/json" \
   -d '{"phone":"+13125550142"}'
 ```
 
 ```python Python
-client = hevn.patch(f"/clients/{client_id}", {"phone": "+13125550142"})
+patched = hevn.acting_as(client_id).patch("/client", {"phone": "+13125550142"})
 ```
 
 ```javascript Node
-const patched = await hevn.patch(`/clients/${clientId}`, { phone: "+13125550142" });
+const patched = await hevn.actingAs(clientId).patch("/client", { phone: "+13125550142" });
 ```
 
 ```go Go
-patched, err := api.Patch("/clients/"+clientID, hevn.Body{"phone": "+13125550142"})
+patched, err := api.ActingAs(clientID).Patch("/client", hevn.Body{"phone": "+13125550142"})
 ```
 
 </CodeGroup>
@@ -242,7 +250,7 @@ Everything else a company has to tell HEVN is verification data and belongs in i
 
 ## What your key can do with a client
 
-Your developer key is the only key that can spend from this client's wallet. The client has no signer of its own and no login. That is the whole point of the whitelabel model, and it is the one thing to be deliberate about before you create your first client in production — see [accounts and custody](/whitelabel/accounts-and-custody).
+Your developer key is the only key on your side that can authorize a spend from this client's wallet — HEVN co-signs the operation it built, and neither signature alone is a quorum. The client has no signer of its own and no login. That is the whole point of the whitelabel model, and it is the one thing to be deliberate about before you create your first client in production — see [accounts and control](/whitelabel/accounts-and-control).
 
 <Card title="Next: Onboard a client" icon="arrow-right" href="/whitelabel/onboarding">
   Fill the KYB document, upload its papers, submit, and answer an RFI.

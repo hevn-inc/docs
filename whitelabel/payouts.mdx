@@ -10,7 +10,7 @@ import PollSnippet from "/snippets/poll.mdx";
 import SandboxCapsSnippet from "/snippets/sandbox-caps.mdx";
 import SignPayloadSnippet from "/snippets/sign-payload.mdx";
 
-Two calls move money: `POST /v1/payouts` prices and books it, `POST /v1/payouts/{payoutId}/confirm` signs it. One resource pays a bank account and a wallet alike — the recipient decides which route runs, and you never pick. The side you typed is inviolable: HEVN pins the amount you sent and derives the other one.
+Two calls move money: `POST /dapi/v1/payouts` prices and books it, `POST /dapi/v1/payouts/{payoutId}/confirm` signs it. One resource pays a bank account and a wallet alike — the contact decides which route runs, and you never pick. The side you typed is inviolable: HEVN pins the amount you sent and derives the other one.
 
 <CodeGroup>
 ```python Python
@@ -62,17 +62,17 @@ Examples use the client from [HTTP client](/whitelabel/reference/client). `actin
 
 ```mermaid
 stateDiagram-v2
-    [*] --> awaitingSignature: POST /v1/payouts
+    [*] --> awaitingSignature: POST /dapi/v1/payouts
     awaitingSignature --> awaitingSignature: approval expired — re-open with the same key, at the same price
     awaitingSignature --> submitted: POST /confirm with your signature
     submitted --> settled
-    submitted --> failed: retry with POST /v1/payouts and the same Idempotency-Key
+    submitted --> failed: retry with POST /dapi/v1/payouts and the same Idempotency-Key
     settled --> refunded
 ```
 
-## Save a recipient
+## Save a contact
 
-A payout always pays a **contact** — a recipient you saved once and reuse. `POST /v1/contacts` takes the bank requisites in the same shape `GET /v1/banks` returns them, plus the beneficiary's own address.
+A payout always pays a **contact** — a payment destination you saved once and reuse. `POST /dapi/v1/contacts` takes the bank requisites in the same shape `GET /dapi/v1/banks` returns them, plus the beneficiary's own address.
 
 <CodeGroup>
 ```bash cURL
@@ -88,7 +88,7 @@ curl -s -X POST "$HEVN_API/contacts" \
 ```
 
 ```python Python
-recipient = northwind.post("/contacts", {
+contact = northwind.post("/contacts", {
     "name": "Ardenne Fabrication SARL",
     "bank": {
         "method": "sepa",
@@ -101,7 +101,7 @@ recipient = northwind.post("/contacts", {
 ```
 
 ```javascript Node
-const recipient = await northwind.post("/contacts", {
+const contact = await northwind.post("/contacts", {
   name: "Ardenne Fabrication SARL",
   bank: {
     method: "sepa",
@@ -114,7 +114,7 @@ const recipient = await northwind.post("/contacts", {
 ```
 
 ```go Go
-recipient, err := northwind.Post("/contacts", hevn.Body{
+contact, err := northwind.Post("/contacts", hevn.Body{
 	"name": "Ardenne Fabrication SARL",
 	"bank": hevn.Body{
 		"method":   "sepa",
@@ -127,7 +127,7 @@ recipient, err := northwind.Post("/contacts", hevn.Body{
 ```
 </CodeGroup>
 
-```json Response — 201, Location: /v1/contacts/ct_3K9…
+```json Response — 201, Location: /dapi/v1/contacts/ct_3K9…
 { "id": "ct_3K9…", "name": "Ardenne Fabrication SARL", "isExternal": true,
   "createdAt": "2026-09-17T10:04:11Z",
   "bank": { "method": "sepa", "currency": "EUR",
@@ -139,12 +139,12 @@ recipient, err := northwind.Post("/contacts", hevn.Body{
 
 Four decisions live here:
 
-- **A bank contact needs a complete recipient address.** Without `country`, `city`, `streetAddress` and `zip` the call answers `422 contact_details_invalid`, listing them in `details.fields`. Which identifiers `fields` must carry depends on the method — see [Rails](/whitelabel/reference/rails).
-- **The same requisites create one contact.** A second `POST` answers `200` with `Idempotency-Replayed: true` and the original `ct_…`, so a retried create never forks a recipient.
-- **Correct a recipient with `PATCH /v1/contacts/{contactId}`, never by re-creating it.** Name, address and holder are editable, the account identifiers are not; a misspelled beneficiary name is refused by the partner, not by the contact, so this is the repair path.
-- **`DELETE /v1/contacts/{contactId}` forgets the recipient** and returns the record it removed. Payouts already booked keep their own `recipient`, so a delete never rewrites history. `GET /v1/contacts` lists what you have, cursor-paged.
+- **A bank contact needs a complete beneficiary address.** Without `country`, `city`, `streetAddress` and `zip` the call answers `422 contact_details_invalid`, listing them in `details.fields`. Which identifiers `fields` must carry depends on the method — see [Rails](/whitelabel/reference/rails).
+- **The same requisites create one contact.** A second `POST` answers `200` with `Idempotency-Replayed: true` and the original `ct_…`, so a retried create never forks a contact.
+- **Correct a contact with `PATCH /dapi/v1/contacts/{contactId}`, never by re-creating it.** Name, address and holder are editable, the account identifiers are not; a misspelled beneficiary name is refused by the partner, not by the contact, so this is the repair path.
+- **`DELETE /dapi/v1/contacts/{contactId}` forgets the contact** and returns the record it removed. Payouts already booked keep their own `contact` snapshot, so a delete never rewrites history. `GET /dapi/v1/contacts` lists what you have, cursor-paged.
 
-Two optional reads price a payout before you book one. `GET /v1/contacts/{contactId}/capabilities?amount=500.00` reports one `options` row per payable account — `method`, `currency`, `minAmount`, `maxAmount`, `feeBps`, `fixedFee`, and whether `purpose`, a memo or documents are required. `POST /v1/payouts/preview` takes `{"rail", "amount"}` and prices a **rail** with no recipient and no side effects. Neither is a gate: `POST /v1/payouts` refuses the same cases on its own, and its numbers are the ones you are held to.
+Two optional reads price a payout before you book one. `GET /dapi/v1/contacts/{contactId}/capabilities?amount=500.00` reports one `options` row per payable account — `method`, `currency`, `minAmount`, `maxAmount`, `feeBps`, `fixedFee`, and whether `purpose`, a memo or documents are required; anything that would refuse a payout comes back in `blockers[]` ([Errors](/whitelabel/reference/errors) has the codes). `POST /dapi/v1/payouts/preview` takes `{"rail", "amount"}` and prices a **rail** with no contact and no side effects. Neither is a gate: `POST /dapi/v1/payouts` refuses the same cases on its own, and its numbers are the ones you are held to.
 
 ## Move the money
 
@@ -165,7 +165,7 @@ Two optional reads price a payout before you book one. `GET /v1/contacts/{contac
 
     ```python Python
     payout = northwind.post("/payouts", {
-        "contactId": recipient["id"],
+        "contactId": contact["id"],
         "amount": "500.00",
         "publicKey": key.public_key,
         "paymentReference": "INV-2026-114",
@@ -174,7 +174,7 @@ Two optional reads price a payout before you book one. `GET /v1/contacts/{contac
 
     ```javascript Node
     const payout = await northwind.post("/payouts", {
-      contactId: recipient.id,
+      contactId: contact.id,
       amount: "500.00",
       publicKey: key.publicKey,
       paymentReference: "INV-2026-114",
@@ -183,7 +183,7 @@ Two optional reads price a payout before you book one. `GET /v1/contacts/{contac
 
     ```go Go
     payout, err := northwind.Post("/payouts", hevn.Body{
-    	"contactId":        recipient.Str("id"),
+    	"contactId":        contact.Str("id"),
     	"amount":           "500.00",
     	"publicKey":        key.PublicKey,
     	"paymentReference": "INV-2026-114",
@@ -191,7 +191,7 @@ Two optional reads price a payout before you book one. `GET /v1/contacts/{contac
     ```
     </CodeGroup>
 
-    ```json Response — 201, Location: /v1/payouts/po_4c8a…
+    ```json Response — 201, Location: /dapi/v1/payouts/po_4c8a…
     {
       "id": "po_4c8a…",
       "kind": "fiat",
@@ -204,7 +204,7 @@ Two optional reads price a payout before you book one. `GET /v1/contacts/{contac
       "approval": { "id": "…", "payload": "eyJ…", "expiresAt": "2026-09-17T10:06:10Z" },
       "debit": { "address": "0x8f3b…", "amount": "500.00", "amountAtomic": "500000000",
                  "token": "USDC", "chainId": 8453 },
-      "recipient": { "contactId": "ct_3K9…", "name": "Ardenne Fabrication SARL" }
+      "contact": { "contactId": "ct_3K9…", "name": "Ardenne Fabrication SARL" }
     }
     ```
 
@@ -214,13 +214,13 @@ Two optional reads price a payout before you book one. `GET /v1/contacts/{contac
     | Which registered key will sign | `publicKey`. A real choice while you rotate keys, which is why it is on the opening call and not on confirm. |
     | What the beneficiary sees | `paymentReference`, up to 140 characters. |
     | What the destination rail demands | `purpose` when `capabilities` reports `purposeRequired`, and up to ten `documentIds` from [document upload](/whitelabel/onboarding) when it reports `documentsRequired`. |
-    | Which of several accounts to pay | `bankId` (`bnk_…`), the same id `capabilities` returns on each option, when a recipient has more than one. Omit it and HEVN picks the account `capabilities` would pick. |
+    | Which of several accounts to pay | `bankId` (`bnk_…`), the same id `capabilities` returns on each option, when a contact has more than one. Omit it and HEVN picks the account `capabilities` would pick. |
 
     Amounts are decimal strings in the major unit — `"500.00"`, never `500` and never atomic units. More precision than the asset allows is refused, never rounded ([Conventions](/whitelabel/conventions#money)).
   </Step>
 
   <Step title="Check the debit, then sign">
-    `debit` is not an echo of your request. It is decoded out of the [operation you are about to sign](/whitelabel/signing): `address` is the HEVN treasury address that will be paid, `amount` and `amountAtomic` are what will leave the client's wallet, in `token` on chain `chainId`. Compare it against your own record and raise if it drifted — this is the one cross-check a signer has.
+    `debit` is not an echo of your request. It is decoded out of the [operation you are about to sign](/whitelabel/signing): `address` is the funding address for this payout, `amount` and `amountAtomic` are what will leave the client's wallet, in `token` on chain `chainId`. Compare it against your own record and raise if it drifted — this is the one cross-check a signer has.
 
     <SignPayloadSnippet />
 
@@ -263,21 +263,21 @@ Two optional reads price a payout before you book one. `GET /v1/contacts/{contac
     | Status | Body | What it means |
     | --- | --- | --- |
     | `200` | `status: "settled"`, `transactionHash` | The debit landed on chain and the payout is with the partner. |
-    | `200` | `status: "failed"`, `transactionHash`, `failure.code` | The operation reverted on chain. Nothing moved. Book it again with `POST /v1/payouts` and the same `Idempotency-Key`. |
+    | `200` | `status: "failed"`, `transactionHash`, `failure.code` | The operation reverted on chain. Nothing moved. Book it again with `POST /dapi/v1/payouts` and the same `Idempotency-Key`. |
     | `202` | `status: "submitted"`, `pollUrl` | Sent, no receipt yet. Read `pollUrl` or confirm again — both are safe. |
 
     `publicKey` is optional in the confirm body and only skips a key scan: HEVN verifies your signature locally, against the payload it stored, before it consumes anything. A wrong signature never burns the approval.
   </Step>
 
   <Step title="Track it to completion">
-    `GET /v1/payouts/{payoutId}` answers for the whole lifecycle, bank and wallet alike, and it is the route a `pollUrl` names.
+    `GET /dapi/v1/payouts/{payoutId}` answers for the whole lifecycle, bank and wallet alike, and it is the route a `pollUrl` names. `contact` on the read is the snapshot fixed when the payout was booked, not a live read of the contact record.
 
     ```json Response — 200
     { "id": "po_4c8a…", "kind": "fiat", "status": "settled",
       "quote": { "fromAmount": "500.00", "fromCurrency": "USD",
                  "toAmount": "459.31", "toCurrency": "EUR", "rate": "0.9247" },
       "transactionHash": "0x4f1c…", "transactionId": "txn_9e4…",
-      "recipient": { "contactId": "ct_3K9…", "name": "Ardenne Fabrication SARL" },
+      "contact": { "contactId": "ct_3K9…", "name": "Ardenne Fabrication SARL" },
       "paymentReference": "INV-2026-114",
       "createdAt": "2026-09-17T10:04:11Z", "settledAt": "2026-09-17T10:04:39Z" }
     ```
@@ -290,7 +290,7 @@ Two optional reads price a payout before you book one. `GET /v1/contacts/{contac
     | `failed` | The operation reverted, or the partner refused or canceled the transfer. `failure.code` says which. |
     | `refunded` | The partner sent the money back. It returns to the client's wallet. |
 
-    `transactionId` appears once the payout is projected into the client's ledger; read it with `GET /v1/transactions/{transactionId}` ([Balances and transactions](/whitelabel/balances-and-transactions)). `attention: {"kind": "rfi", "url": …}` means the partner is holding the transfer pending an information request — the payout is not lost, and nothing you sign will move it until the request is answered.
+    `transactionId` appears once the payout is projected into the client's ledger; read it with `GET /dapi/v1/transactions/{transactionId}` ([Balances and transactions](/whitelabel/balances-and-transactions)). `attention: {"kind": "rfi", "url": …}` means the partner is holding the transfer pending an information request — the payout is not lost, and nothing you sign will move it until the request is answered.
 
     <PollSnippet />
   </Step>
@@ -298,7 +298,7 @@ Two optional reads price a payout before you book one. `GET /v1/contacts/{contac
 
 ## Pay a wallet instead of a bank
 
-There is one payout resource. `POST /v1/payouts` reads the recipient and picks the route: a bank contact is quoted and booked with a partner, a wallet contact is sent USDC on Base straight out of the client's wallet. Same body, same `approval.payload`, same confirm route, same `GET /v1/payouts/{payoutId}`.
+There is one payout resource. `POST /dapi/v1/payouts` reads the contact and picks the route: a bank contact is quoted and booked with a partner, a wallet contact on Base is sent USDC straight out of the client's wallet, and a wallet contact on any other chain is routed across chains. Same body, same `approval.payload`, same confirm route, same `GET /dapi/v1/payouts/{payoutId}`.
 
 <CodeGroup>
 ```python Python
@@ -347,32 +347,32 @@ curl -s -X POST "$HEVN_API/contacts" \
 ```
 
 ```python Python
-recipient = northwind.post("/contacts", {
+contact = northwind.post("/contacts", {
     "name": "Ardenne treasury",
     "crypto": {"chain": "base", "token": "USDC", "address": "0x7c1d…"},
 })
 ```
 
 ```javascript Node
-const recipient = await northwind.post("/contacts", {
+const contact = await northwind.post("/contacts", {
   name: "Ardenne treasury",
   crypto: { chain: "base", token: "USDC", address: "0x7c1d…" },
 });
 ```
 
 ```go Go
-recipient, err := northwind.Post("/contacts", hevn.Body{
+contact, err := northwind.Post("/contacts", hevn.Body{
 	"name":   "Ardenne treasury",
 	"crypto": hevn.Body{"chain": "base", "token": "USDC", "address": "0x7c1d…"},
 })
 ```
 </CodeGroup>
 
-A wallet contact needs no recipient address on file — the chain is the address. Only **USDC on Base** can be paid from a client balance: another chain answers `422 recipient_chain_unsupported` with `details.chain`, another token answers `422 recipient_token_unsupported` with `details.token`, and neither is ever routed or converted silently. A contact saved by `email` also works when that email belongs to a HEVN account: HEVN resolves it to that account's wallet.
+A wallet contact needs no postal address on file — the chain is the address. **USDC on Base is paid straight from the client's balance**: nothing is converted, no partner is involved, and the address you saved is the address the money lands on. A contact on any other [chain](/whitelabel/reference/rails#chain-codes), or expecting any other token, is **routed** instead — still one `POST /dapi/v1/payouts`, still `kind: "onchain"`, but priced as a cross-chain route ([below](#a-routed-payout-is-priced)). A contact saved by `email` also works when that email belongs to a HEVN account: HEVN resolves it to that account's wallet.
 
 ### What comes back
 
-```json Response — 201, Location: /v1/payouts/po_6d21…
+```json Response — 201, Location: /dapi/v1/payouts/po_6d21…
 {
   "id": "po_6d21…",
   "kind": "onchain",
@@ -383,25 +383,56 @@ A wallet contact needs no recipient address on file — the chain is the address
   "approval": { "id": "…", "payload": "eyJ…", "expiresAt": "2026-09-17T10:06:10Z" },
   "debit": { "address": "0x7c1d…", "amount": "1.50", "amountAtomic": "1500000",
              "token": "USDC", "chainId": 8453 },
-  "recipient": { "contactId": "ct_9a…", "name": "Ardenne treasury", "address": "0x7c1d…" }
+  "contact": { "contactId": "ct_9a…", "name": "Ardenne treasury",
+               "address": "0x7c1d…", "chainId": "base", "token": "USDC" }
 }
 ```
 
-Two differences from a bank payout matter.
+`contact` on an on-chain payout carries `address`, `chainId` and `token` alongside the `contactId` and the name. Two differences from a bank payout matter.
 
 **`quote` carries no `rate`, no `feeAmount` and no `expiresAt`.** Nothing is converted and no partner priced anything, so those fields are absent rather than filled with `1` and `0`. `fromAmount` and `toAmount` are the same number because they are the same money.
 
-**`debit.address` is the recipient's address**, not the HEVN treasury. There is no conversion and no intermediary, so the address decoded out of the operation is the address the USDC lands on. Compare it against the contact you meant to pay before you sign — same habit, same reason.
+**`debit.address` is the contact's address**, not a funding address. There is no conversion and no intermediary, so the address decoded out of the operation is the address the USDC lands on. Compare it against the contact you meant to pay before you sign — same habit, same reason.
+
+Both statements hold for a Base-and-USDC contact. A routed payout is the other shape.
+
+### A routed payout is priced
+
+When the contact is on another chain, or expects another token, the balance cannot pay it directly and HEVN books a **cross-chain route** instead. The response is the same resource with two visible differences:
+
+```json Response — 201, Location: /dapi/v1/payouts/po_6d21…
+{
+  "id": "po_6d21…",
+  "kind": "onchain",
+  "status": "awaitingSignature",
+  "quote": { "fromAmount": "1.50", "fromCurrency": "USDC",
+             "toAmount": "1.4923", "toCurrency": "USDC",
+             "feeAmount": "0.0077", "feeCurrency": "USD",
+             "expiresAt": "2026-09-17T10:06:11Z",
+             "fromChainId": "base", "toChainId": "arb" },
+  "approval": { "id": "…", "payload": "eyJ…", "expiresAt": "2026-09-17T10:06:10Z" },
+  "debit": { "address": "0x9b41…", "amount": "1.50", "amountAtomic": "1500000",
+             "token": "USDC", "chainId": 8453 },
+  "contact": { "contactId": "ct_9a…", "name": "Ardenne treasury",
+               "address": "0x7c1d…", "chainId": "arb", "token": "USDC" }
+}
+```
+
+**`quote` names both ends of the route.** `fromChainId` is the network the debit leaves, `toChainId` the network the contact receives on, and `feeAmount` is the route's cost in `USD`. `rate` stays absent — a route is not a currency conversion. The quote expires, so `expiresAt` is present here and the confirm has to land inside it.
+
+**`debit.address` is the route's one-time deposit address**, not the contact's. The same rule as a bank payout applies: check `amount`, `amountAtomic` and `token` against your own record before you sign, and check `contact.address` against the contact you meant to pay.
+
+Routing has to be available for the account. When it is not, booking answers `409 payout_not_fundable` and the fix is a contact the balance can pay directly.
 
 `amount` is a decimal string with at most six fractional digits, the precision USDC has on chain. More than that answers `422 validation_failed` with `details.fields[0].code = "amount_precision"` — never a rounded payout.
 
 Two refusals belong to this route alone: `409 self_transfer` when the address resolves to the client's own wallet, and `409 insufficient_funds` when the balance does not cover the amount (there is no fiat leg to absorb it).
 
-A confirmed wallet payout carries `transactionHash`, and the durable record is the client's ledger: the row shows up with `isIncome: false` and `type: "crypto"` — or `internal`, when the address belongs to another HEVN account. Read it through `GET /v1/transactions` ([Balances and transactions](/whitelabel/balances-and-transactions#walk-the-ledger)).
+A confirmed wallet payout carries `transactionHash`, and the durable record is the client's ledger: the row shows up with `isIncome: false` and `type: "crypto"` — or `internal`, when the address belongs to another HEVN account. Read it through `GET /dapi/v1/transactions` ([Balances and transactions](/whitelabel/balances-and-transactions#walk-the-ledger)).
 
 ## Retries and idempotency
 
-`POST /v1/payouts` books money at a partner, so a retry must not book twice. `Idempotency-Key` is how you say "this is the same payout".
+`POST /dapi/v1/payouts` books money at a partner, so a retry must not book twice. `Idempotency-Key` is how you say "this is the same payout".
 
 <IdempotencySnippet />
 
@@ -409,7 +440,7 @@ A confirmed wallet payout carries `transactionHash`, and the durable record is t
 - **Same key, different terms** → `409 idempotency_key_reused` with `details.payoutId`. Contact, account, pinned side and amount all have to match.
 - **No key at all** → HEVN derives one from the request and echoes it as `idempotencyKey`. Inside its window a retry replays instead of paying twice; outside it, two payouts happen. An explicit key holds far longer; [Limits](/whitelabel/reference/limits#idempotency) has both windows.
 
-Re-opening is bounded: after several expired approvals the next `POST /v1/payouts` answers `409 funding_attempts_exhausted`, and the payout has to be re-quoted under a new key.
+Re-opening is bounded: after several expired approvals the next `POST /dapi/v1/payouts` answers `409 funding_attempts_exhausted`, and the payout has to be re-quoted under a new key.
 
 <Warning>
   Never rotate the key on a retry, and never derive it from a clock or a random value. A fresh key on the retry of a payment you already sent is how the same invoice gets paid twice.
@@ -417,11 +448,13 @@ Re-opening is bounded: after several expired approvals the next `POST /v1/payout
 
 ## When a payout is refused
 
-Booking refusals arrive at `POST /v1/payouts` and are about the recipient, the amount or the route:
+Booking refusals arrive at `POST /dapi/v1/payouts` and are about the contact, the amount or the route:
 
 | `code` | Status | What to do |
 | --- | --- | --- |
 | `contact_not_found` | 404 | The `ct_…` is unknown, deleted, or belongs to another account. |
+| `contact_not_payable` | 409 | The contact cannot be paid on this rail. `details.blockers` is the same array `capabilities` returns. |
+| `contact_payment_details_invalid` | 422 | The partner refused the saved account identifiers. Repair the contact with `PATCH /dapi/v1/contacts/{contactId}`. |
 | `invalid_request` | 400 | The route refused these terms and `message` says which — below the route's minimum, a direction it cannot price, requisites the method does not satisfy. Fix the input and call again with the same key. |
 | `validation_failed` | 422 | The body itself is wrong: both `amount` and `amountTo`, neither of them, more precision than the asset allows, or a key the schema does not know. `details.fields` names each one. |
 | `payout_not_fundable` | 409 | Booked, but the route cannot be funded with a developer key. Re-quote with a new key on a rail that can. |
@@ -435,7 +468,7 @@ Funding refusals arrive at `confirm`, and each has exactly one correct response:
 | --- | --- | --- |
 | `already_funded` | 409 | **Treat as success.** The money moved; `details.transactionHash` is the proof. Never re-open. |
 | `funding_in_progress` | 409 | Wait, then confirm again. An attempt is still in flight. |
-| `funding_attempt_expired` | 409 | The approval expired. Re-open with `POST /v1/payouts` and the same key, then sign the new payload. |
+| `funding_attempt_expired` | 409 | The approval expired. Re-open with `POST /dapi/v1/payouts` and the same key, then sign the new payload. |
 | `insufficient_funds` | 409 | The client's USDC balance does not cover the debit. `details.available` and `details.required` are in atomic units. Fund the wallet and confirm again. |
 | `bundler_rejected`, `bundler_unavailable` | 502 | Chain infrastructure. Confirm again with backoff. |
 | anything else | — | Stop. Do not re-confirm and do not re-open; `funding_state_unknown` in particular means an earlier attempt may still land. Take it to support with the `X-Request-ID` of the response. |

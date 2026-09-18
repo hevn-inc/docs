@@ -1,5 +1,5 @@
 ---
-title: "Accounts and custody"
+title: "Accounts and control"
 description: "Who can move a client's money, what HEVN cannot do alone, and what happens if your developer key leaks."
 ---
 
@@ -26,19 +26,23 @@ other accounts. Each **client account** it creates is equally ordinary — a com
 subject, bank rails, contacts, a ledger — and a Base smart wallet of its own.
 
 The wallet is the money. `baseSmartWallet` on the client record is where deposits settle, what
-`GET /v1/clients/{clientId}/balance` reads, and what every payout debits. Client wallets are separate
+`GET /dapi/v1/client/balance` reads for the client in `X-Hevn-Account`, and what every payout
+debits. Client wallets are separate
 from each other and from yours: there is no pooled account and no omnibus balance anywhere in this
 product.
 
 ## Who can spend
 
 On chain the client's smart wallet has exactly one owner: an EOA created for that client, whose key
-never exists outside [Privy's key management](/general/privy-wallets). Two things must happen before
-that EOA signs anything:
+never exists outside [Privy's key management](/general/privy-wallets). Three things must happen
+before that EOA signs anything:
 
-1. **You sign.** Your developer key is registered as a signer for the wallet, and signs the exact
+1. **Your session is still allowed to ask.** Every request re-reads the developer-key registration
+   behind your token: it must still be active, and the request must come from an address inside that
+   registration's immutable allowlist. HEVN checks both again immediately before it co-signs.
+2. **You sign.** Your developer key is registered as a signer for the wallet, and signs the exact
    operation HEVN prepared.
-2. **HEVN co-signs.** The signer is a two-of-two quorum: your key and HEVN's own authorization key.
+3. **HEVN co-signs.** The signer is a two-of-two quorum: your key and HEVN's own authorization key.
    HEVN adds its half only to the operation it built itself, after verifying your signature over the
    same bytes locally.
 
@@ -48,9 +52,9 @@ The consequences are worth stating flatly:
 | --- | --- |
 | Can you move a client's money without HEVN? | No. HEVN builds the operation and holds the second signature. |
 | Can HEVN move a client's money without you? | No. HEVN cannot produce your signature, and one signature is not a quorum. |
-| Can the client move its own balance? | Not through this API: nothing in it lets a client spend, and a client never signs a payment you make. You are its treasury. |
+| Can the client move its own balance? | Not through this API: nothing in it lets a client spend, and a client never signs a payment you make. Every movement starts with your signature. |
 | Can HEVN freeze or seize a client balance? | No. HEVN can stop building new operations for a paused integrator; it cannot spend or claw back. |
-| Does HEVN decide who a client may pay? | The partner bank does, through the refusals a payout can return. HEVN never picks a recipient. |
+| Does HEVN decide who a client may pay? | The partner bank does, through the refusals a payout can return. HEVN never picks a beneficiary. |
 
 <Note>
   The [General](/general/what-is-hevn) tab describes a self-serve HEVN account, where the person who
@@ -62,7 +66,8 @@ The consequences are worth stating flatly:
 
 ## What this means for your product
 
-You are the custody surface your customer sees. Two obligations follow.
+Your customer sees your product, not HEVN — you are the party they hold responsible for every
+movement. Two obligations follow.
 
 **Every spend needs an authority in your own system.** HEVN authenticates your key, not your reason.
 The approval, the four-eyes check and the audit trail behind "pay this invoice" are yours to build.
@@ -71,21 +76,24 @@ Keep the payment id you used as `Idempotency-Key`, the `debit` you asserted, and
 
 **The client's money survives your incident, not your negligence.** Because your integrator account —
 not a single key — controls the wallet's owner quorum, losing a developer key is not losing funds:
-you register a new key in the app and keep signing. A *leaked* key is different. Until you rotate it,
-whoever holds it can ask HEVN to build a payment from any of your clients' wallets, and HEVN will
-co-sign it, because that is exactly what the key means.
+register a new key, deploy it, pause the old registration, and keep signing. A *leaked* key is
+different. Until you pause its registration, whoever holds it can ask HEVN to build a payment from
+any of your clients' wallets, and HEVN will co-sign it, because that is exactly what the key means.
+The one thing standing between the two is the registration's IP allowlist: the holder has to be on a
+network you listed, and pausing the registration stops the next request with it.
 
 <Warning>
   Treat the developer key as a spending credential for every client balance at once. Keep the private
-  half in a secret manager, never in a browser, never in a repository, and rehearse
+  half in a secret manager, never in a browser, never in a repository, keep its allowlist as narrow
+  as your deployment allows, and rehearse
   [rotation](/whitelabel/developer-key#rotate-a-key) before you need it.
 </Warning>
 
 ## Acting for a client, in one sentence
 
 Reads and writes on a client's data and money are the same API calls you would make for yourself,
-with `X-Hevn-Account: cl_…` added — one token, any client. What that header can and cannot reach is
-[Sessions](/whitelabel/sessions#acting-as-a-client).
+with `X-Hevn-Account: cl_…` added — one token, any client. Where that header is optional, where it is
+required and where it is refused is [Sessions](/whitelabel/sessions#acting-as-a-client).
 
 <Card title="Next: Developer key" icon="key-round" href="/whitelabel/developer-key">
   Generate it, register it, verify it, and rotate it without downtime.
