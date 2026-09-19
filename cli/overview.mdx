@@ -1,52 +1,39 @@
 ---
 title: "HEVN CLI"
-description: "Install, authenticate, and operate HEVN payments, invoices, contracts, cards, and app-scoped transfers from the command line."
+description: "Operate a HEVN account from a terminal or an agent: one command shape, one credential, and structured output for everything."
 ---
 
-HEVN CLI is a standalone command-line wrapper for the HEVN backend API and app-scoped transfer endpoints. It is built primarily for AI agents and automation that need scriptable access to HEVN account data and payment workflows, while still providing human-readable terminal output for operators, finance teams, and developers.
+The CLI drives a HEVN account from outside the app — balances, contacts, invoices, contracts, cards
+and transfers. It was built for AI agents and scripts first, so every command can emit a machine-readable
+envelope; the human tables are the convenience layer on top.
+
+One credential covers all of it. `hevn login` issues an app API key and saves it locally; nothing
+else needs configuring before the first useful command.
 
 <CardGroup cols={2}>
   <Card title="Quickstart" icon="rocket" href="/cli/quickstart">
-    Install the CLI, sign in, and confirm your account in a few commands.
-  </Card>
-  <Card title="Configuration" icon="settings-2" href="/cli/configuration">
-    Configure environments, API keys, output formats, and debugging.
-  </Card>
-  <Card title="Agent workflows" icon="bot" href="/cli/agent-workflows">
-    Load the agent skill, inspect the CLI manifest, and run workflows safely.
+    Install, sign in, and move money in about five commands.
   </Card>
   <Card title="Connect AI agents" icon="plug" href="/cli/connect-agents">
-    Expose the CLI to Claude Code, Codex, and Cursor over MCP with one command.
+    Expose every command to Claude Code, Codex and Cursor over MCP with one install.
   </Card>
-  <Card title="Money movement" icon="arrow-right-left" href="/cli/commands/money-movement">
-    Check balances, create deposit quotes, pay invoices, and transfer to contacts.
+  <Card title="Agent workflows" icon="bot" href="/cli/agent-workflows">
+    How an agent should read the CLI contract before it acts on money.
   </Card>
-  <Card title="Contracts" icon="file-pen-line" href="/cli/commands/contracts">
-    Upload existing contracts, generate HEVN templates, approve contracts, and manage payment methods.
+  <Card title="Configuration" icon="settings-2" href="/cli/configuration">
+    Environments, credentials, output formats and debugging.
   </Card>
 </CardGroup>
 
-## What you can do
-
-- Authenticate with `hevn login` and store a local app API key.
-- Inspect account, KYC, balance, card, bank, contact, invoice, and contract state.
-- Create contacts for email, crypto, and fiat payout destinations.
-- Create invoices manually, from uploaded invoice documents, or from contracts.
-- Generate HEVN contracts from templates or upload existing signed contracts.
-- Move USDC by invoice, email recipient, contact, or payout quote.
-- Emit human-readable tables or machine-readable JSON/YAML envelopes for automation.
-- Print an agent-readable command manifest with `hevn --schema`.
-- Connect MCP coding agents (Claude Code, Codex, Cursor) with `hevn mcp install`.
-
 ## Command shape
 
-Most commands follow this pattern:
+Almost every command reads the same way: a resource, then an action.
 
 ```bash
 hevn [global-options] <resource> <action> [options]
 ```
 
-Common global options:
+Global options go before the resource:
 
 ```bash
 hevn --env dev account get
@@ -56,29 +43,42 @@ hevn --dry-run transfer --invoice-id <invoice-id>
 hevn --non-interactive --yaml contacts list
 ```
 
-Most read and write commands also support command-local output flags:
+`--json` and `--yaml` also work per command, which is what a script or an agent should reach for.
+In structured mode a success is wrapped as `ok`, `data`, `meta` and `warnings`, and a failure as
+`ok`, `errorCode`, `errorType`, `error` and `exitCode` — so a caller branches on `errorCode` and
+never on a printed message.
 
-```bash
---json
---yaml
-```
+Two commands describe the CLI to a machine rather than doing anything: `hevn --schema` prints the
+full command manifest, and `hevn agent-skill` prints the packaged operating guide. An agent should
+read both before it plans a workflow.
 
-Use these flags for scripts, agent tools, CI jobs, and data extraction. In JSON/YAML mode, successful command output is wrapped as `ok`, `data`, `meta`, and `warnings`; error output is wrapped as `ok`, `errorCode`, `errorType`, `error`, and `exitCode`.
+## Authentication
 
-## Authentication model
+An **app** is a named integration workspace inside a HEVN account. Each app has its own API keys
+and, optionally, its own transfer allowance.
 
-An **app** is a named integration workspace inside your HEVN account: each app has its own API keys and, optionally, its own transfer allowance. `hevn login` opens HEVN in a browser, creates or selects an app, issues an app API key, and saves it in your local HEVN CLI config. Automation can save a key directly:
+`hevn login` opens HEVN in a browser, creates or selects an app, issues an app API key and saves it
+to the local config. Automation can skip the browser and save a key it already holds:
 
 ```bash
 hevn login --api-key hvn_...
 ```
 
-One `hvn_...` API key is used for every authenticated endpoint, including transfers. Each API key is a full EVM keypair whose spending ability is bounded by an onchain spend permission granted by the account owner — see [how API keys work](/general/authentication#api-keys-cli-rest-api-agents). The key is always sent in the `X-Api-Key` header.
+That one `hvn_…` key authenticates every command, transfers included, and travels in the
+`X-Api-Key` header.
+
+The key is more than a bearer token. It is a full EVM keypair, and what it may spend is governed on
+chain by a spend permission the account owner granted to its address — so a leaked key is capped by
+the remaining allowance for the current period and is revoked on chain, not by a flag in a database.
+See [how API keys work](/general/authentication#api-keys-cli-rest-api-agents).
 
 <Note>
-  Transfer commands no longer require an app id. The backend resolves the owning app from the API key.
+  App API keys are the CLI and agent credential. They are **not** the credential for the
+  [whitelabel REST API](/api-reference/overview), which authenticates with a developer key and JWT
+  sessions and rejects `X-Api-Key`. Transfer commands take no app id: the backend resolves the
+  owning app from the key.
 </Note>
 
-<Note>
-  App API keys are the CLI and agent credential. They are not the credential for the [whitelabel REST API](/api-reference/overview), which authenticates with a developer key and JWT sessions and rejects `X-Api-Key`.
-</Note>
+<Card title="Next: Quickstart" icon="rocket" href="/cli/quickstart">
+  Install the CLI, sign in, and run your first transfer.
+</Card>

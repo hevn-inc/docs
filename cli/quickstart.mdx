@@ -1,18 +1,12 @@
 ---
 title: "Quickstart"
-description: "Install HEVN CLI, authenticate, and run your first account and balance commands."
+description: "Install the CLI, sign in, confirm the account you are on, and send your first transfer."
 ---
 
-## Prerequisites
-
-Before you begin, you need:
-
-- An active HEVN account.
-- `pipx` (Python 3.11+) or Homebrew for an isolated end-user install.
+Five commands from an empty terminal to money that moved. You need an active HEVN account and either
+`pipx` (Python 3.11+) or Homebrew.
 
 ## Install
-
-### pipx (recommended)
 
 `pipx` installs the CLI from PyPI into its own isolated environment:
 
@@ -21,79 +15,54 @@ pipx install hevn-cli
 hevn --help
 ```
 
-Upgrade to the latest published release:
-
-```bash
-pipx upgrade hevn-cli
-```
-
-### Homebrew
-
-On macOS and Linux you can install from the HEVN tap:
+On macOS and Linux, Homebrew works too. The tap is the formula source, so the first command both taps
+and installs:
 
 ```bash
 brew install hevn-inc/tap/hevn-cli
 hevn --help
 ```
 
-The tap is the formula source, so the first command both taps and installs. Upgrade with:
+Upgrade with `pipx upgrade hevn-cli` or `brew upgrade hevn-cli`.
 
-```bash
-brew upgrade hevn-cli
-```
-
-## Authenticate
-
-Run the browser login flow:
+## Sign in
 
 ```bash
 hevn login
 ```
 
-The CLI opens HEVN, waits for a local callback, saves your app API key, and prints the config path. If you are on a remote machine or do not want the browser to open automatically, use:
+The CLI opens HEVN in a browser, waits for a local callback, saves your app API key and prints the
+config path. On a remote machine, `hevn login --no-open` prints the URL instead of opening it, and
+`hevn login --api-key hvn_...` saves a key you already hold without any browser at all.
 
-```bash
-hevn login --no-open
-```
+That one key authenticates everything from here on, transfers included.
 
-For automation or remote environments, save an API key directly without opening a browser:
+## Confirm which account you are on
 
-```bash
-hevn login --api-key hvn_...
-```
-
-The same `hvn_...` key is used for all authenticated CLI calls, including transfers.
-
-## Confirm your account
-
-Check the active account:
-
-```bash
-hevn account get
-```
-
-Introspect the active API key, owning app, scopes, balance, and spend limit:
+Do this before the first write. `whoami` introspects the key itself — the owning app, its scopes,
+the balance it can see and the spend limit it is bounded by:
 
 ```bash
 hevn whoami
 hevn whoami --yaml
 ```
 
-List accounts in machine-readable form:
+`account get` and `balance` answer for the account rather than the key:
+
+```bash
+hevn account get
+hevn balance
+```
+
+Every read takes `--json` or `--yaml`, which is what a script should use:
 
 ```bash
 hevn account list --yaml
 ```
 
-Check balances across the account's wallets:
+## Send something
 
-```bash
-hevn balance
-```
-
-## First useful workflow
-
-Create an email contact and transfer USDC:
+Save a destination, then pay it:
 
 ```bash
 hevn contacts new --type email --name "Vendor" --email vendor@example.com
@@ -101,20 +70,29 @@ hevn contacts list --yaml
 hevn transfer contact --contact-id <contact-id> --amount 25 --memo "Thanks"
 ```
 
-Pay an invoice by id:
+Paying an invoice needs only its id:
 
 ```bash
 hevn transfer --invoice-id <invoice-id> --memo "Invoice payment"
 ```
 
-## Log out
+Preview any mutating command before it sends by putting `--dry-run` before the resource:
 
-Clear saved local credentials:
+```bash
+hevn --dry-run transfer --invoice-id <invoice-id> --memo "Invoice payment"
+```
+
+## Sign out
 
 ```bash
 hevn logout
 ```
 
 <Warning>
-  `hevn logout` removes saved HEVN CLI credential fields from the local config file. It does not delete your HEVN account or revoke unrelated credentials.
+  `hevn logout` clears the saved CLI credential fields from the local config file. It does not delete
+  your HEVN account and does not revoke the key on the server — revoke that in the app.
 </Warning>
+
+<Card title="Next: Agent workflows" icon="bot" href="/cli/agent-workflows">
+  How an agent reads the CLI contract, and the rules it follows before it moves money.
+</Card>

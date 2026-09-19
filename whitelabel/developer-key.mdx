@@ -143,8 +143,8 @@ source address HEVN cannot determine — the same answer a paused key gets, on a
 <Warning>
   `ipAllowlist` and `scope` are **immutable**. There is no `PATCH`: moving to a new egress range
   means registering a new key and pausing the old one. Register with the addresses your deployment
-  will actually call from — a new NAT gateway is the confusing way to learn that a perfectly good key
-  and a perfectly good signature can still answer `403`.
+  will actually call from. A perfectly good key and a perfectly good signature still answer `403`
+  from an address you did not list, and a new NAT gateway is an expensive way to find that out.
 </Warning>
 
 Your edge must strip caller-supplied `X-Forwarded-For`, `X-Real-IP` and `CF-Connecting-IP` before

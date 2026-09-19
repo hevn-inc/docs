@@ -1,0 +1,143 @@
+---
+title: "Coverage"
+description: "The currencies and payment methods money can arrive in and leave by, the chains a payout can reach, and why the authoritative answer is always per client."
+---
+
+Coverage has two sides and they are not symmetric. A client can **receive** fiat only over a rail it
+has opened, in one of a short list of currencies. It can **pay** a beneficiary in many more — every
+payout method below is a destination you can save as a contact, whether or not the same market can
+send money the other way.
+
+<Warning>
+  This page is the shape of the catalogue, not a promise for your account. Rail availability is
+  decided per integrator, per client and per partner, and the only authoritative answers are
+  `GET /dapi/v1/banks` for a given client and
+  `GET /dapi/v1/contacts/{contactId}/capabilities` for a given contact. Read them; do not derive
+  from this page.
+</Warning>
+
+## Money in
+
+These are the methods a client can hold a virtual account in, and the currency each one receives. A
+payer wires that currency; the client's wallet is credited in the rail's settlement token.
+
+| Method | Currency | Market |
+| --- | --- | --- |
+| `ach` | USD | United States |
+| `fedwire` | USD | United States |
+| `swift` | USD | International |
+| `sepa` | EUR | Euro area |
+| `ukfps` | GBP | United Kingdom |
+| `uaefts` | AED | United Arab Emirates |
+| `pix` | BRL | Brazil |
+| `spei` | MXN | Mexico |
+| `npp` | AUD | Australia |
+| `nip` | NGN | Nigeria |
+| `breb` | COP | Colombia |
+| `pse` | COP | Colombia |
+| `transfers_3_0` | ARS | Argentina |
+
+Money can also arrive on chain with no rail at all: anything sent to the client's `baseSmartWallet`
+on Base is its balance the moment it confirms, and a transfer from another chain can be quoted first
+with `POST /dapi/v1/payins` carrying `originChainId`. Neither path needs a verified client — only a
+`ready` one.
+
+## Money out
+
+Every method here is a destination a contact can hold. Grouped by market, with the identifiers each
+one routes on in [Rails and payment methods](/whitelabel/reference/rails#what-each-method-needs).
+
+### Americas
+
+| Currency | Market | Methods |
+| --- | --- | --- |
+| USD | United States | `ach`, `fedwire`, `fednow`, `rtp` |
+| CAD | Canada | `cad_eft` |
+| MXN | Mexico | `spei` |
+| BRL | Brazil | `pix`, `brl_local` |
+| ARS | Argentina | `transfers_3_0` |
+| COP | Colombia | `breb`, `pse`, `cop_local` |
+| CLP | Chile | `clp_local` |
+| BOB | Bolivia | `bob_local` |
+| CRC | Costa Rica | `crc_local` |
+| GTQ | Guatemala | `gtq_local`, `gtq_ewallet` |
+| HNL | Honduras | `hnl_local` |
+| DOP | Dominican Republic | `dop_local`, `dop_ewallet` |
+| JMD | Jamaica | `jmd_local` |
+
+### Europe, Middle East and Africa
+
+| Currency | Market | Methods |
+| --- | --- | --- |
+| EUR | Euro area | `sepa` |
+| GBP | United Kingdom | `ukfps` |
+| PLN | Poland | `pln_local` |
+| DKK | Denmark | `dkk_local` |
+| NOK | Norway | `nok_local` |
+| TRY | Türkiye | `try_fast` |
+| ILS | Israel | `ils_local` |
+| AED | United Arab Emirates | `uaefts` |
+| SAR | Saudi Arabia | `sar_local` |
+| EGP | Egypt | `egp_local` |
+| NGN | Nigeria | `nip` |
+| XOF | West African CFA franc zone | `xof_local` |
+| SLE | Sierra Leone | `sle_local` |
+| TZS | Tanzania | `tzs_local` |
+| UGX | Uganda | `ugx_local` |
+| ZMW | Zambia | `zmw_local` |
+
+### Asia-Pacific
+
+| Currency | Market | Methods |
+| --- | --- | --- |
+| AUD | Australia | `npp` |
+| JPY | Japan | `jpy_local` |
+| KRW | South Korea | `krw_local` |
+| CNY | China | `cny_alipay`, `cny_wechatpay` |
+| HKD | Hong Kong | `hkd_fps` |
+| INR | India | `inr_local`, `inr_upi` |
+| IDR | Indonesia | `idr_local`, `idr_ewallet` |
+| MYR | Malaysia | `myr_local` |
+| PHP | Philippines | `php_local`, `php_ewallet` |
+| PKR | Pakistan | `pkr_raast`, `pkr_ewallet` |
+| THB | Thailand | `thb_local` |
+| VND | Vietnam | `vnd_local` |
+| BDT | Bangladesh | `bdt_local`, `bdt_ewallet` |
+
+`swift` is the exception to the grouping above: it is an international wire, not a domestic
+system, and it carries USD to a beneficiary bank in most of the world.
+
+A method suffixed `_ewallet` routes to a mobile wallet on a phone number rather than to a bank
+account. A method suffixed `_local` is that market's domestic clearing system. Neither changes how
+you call the API: both are a contact, then a payout.
+
+## On chain
+
+A client balance settles on **Base**, in USDC or EURC. A wallet contact on Base holding either token
+is paid straight out of the balance, with nothing converted and no partner involved. A contact on any
+other chain, or expecting any other token, is paid through a cross-chain route — the same
+`POST /dapi/v1/payouts`, quoted with `fromChainId` and `toChainId`.
+
+`GET /dapi/v1/chains` answers the live list: every chain, its EVM `chainId`, and each token's
+`decimals` and contract `address`. Read it at startup rather than hardcoding the codes in
+[Chain codes](/whitelabel/reference/rails#chain-codes).
+
+## What actually decides availability
+
+Four things narrow the catalogue above, and each one has a refusal that names it.
+
+| What | Effect | You see |
+| --- | --- | --- |
+| Your integrator agreement | Which rails HEVN enables for you at all | `403 rail_not_available` on `POST /dapi/v1/banks` |
+| The client's residency and legal form | Which of those rails this client may hold | The rail is absent from `GET /dapi/v1/banks` for that client |
+| The client's verification state | Whether a rail can open, and whether it can go `active` | `422 rail_requirements_unmet` with `details.blockers` |
+| The partner behind the rail | Whether it is accepting business right now | `503 provider_unavailable`, or the rail reports `channel_unavailable` |
+
+The cheapest way to find out what a client can really do is to create one, verify it and read
+`GET /dapi/v1/banks` — in the sandbox exactly as in production. Naming the currencies and markets
+you sell into is part of the conversation that switches your integrator account on; see
+[Going live](/whitelabel/going-live#what-hevn-must-enable).
+
+<Card title="Next: Fees" icon="arrow-right" href="/whitelabel/reference/fees">
+  Where a fee is declared, where it is quoted, and which side of a payment absorbs it.
+</Card>

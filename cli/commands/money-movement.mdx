@@ -3,6 +3,11 @@ title: "Money movement"
 description: "Check balances, create deposit quotes, inspect transactions, and send app-scoped transfers."
 ---
 
+Four things live on this page and they run in order: what the account holds, how money gets in,
+what has happened so far, and how money gets out. Every transfer command accepts
+`--idempotency-key`, and a transfer is the one place where repeating a command without one costs
+real money.
+
 ## Balance
 
 Show USD balances across the account's wallets:
@@ -122,3 +127,7 @@ The owner approves or declines requests in the app (REST: `/transfer_requests`).
 <Note>
   `hevn transfer email` and `hevn transfer contact` generate an idempotency key automatically when one is not supplied; `hevn transfer --invoice-id` does not. Pass `--idempotency-key` when replay protection must be controlled by your own system (and always for invoice transfers you may retry).
 </Note>
+
+<Card title="Next: Invoices" icon="file-text" href="/cli/commands/invoices">
+  Create, upload, batch and pay invoices.
+</Card>

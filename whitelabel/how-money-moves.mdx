@@ -10,7 +10,7 @@ from it.
 flowchart LR
     W["Client's Base smart wallet<br/>USDC / EURC"]
     subgraph In["Fiat in"]
-        P["Payer's bank"] --> R["Requisites in the client's<br/>legal name — POST /dapi/v1/banks"]
+        P["Payer's bank"] --> R["Account details in the client's<br/>legal name — POST /dapi/v1/banks"]
     end
     subgraph Crypto["Crypto in"]
         S["Any sender on Base"]
@@ -32,20 +32,20 @@ in `X-Hevn-Account`, reads it on chain, one row per settlement token, and no HEV
 authoritative copy.
 
 Two tokens can sit there: **USDC** and **EURC**. Which one a rail settles into is the rail's
-`settlementToken`, fixed when the rail is opened and reported next to its `supportedTokens`; per
-deposit, `POST /dapi/v1/payins` takes the `settlementToken` you want that arrival delivered in.
+`destinationAccount`, fixed when the rail is opened and reported next to its `supportedAccounts`; per
+deposit, `POST /dapi/v1/payins` takes the `destinationAccount` you want that arrival delivered in.
 
 ## Fiat in is a conversion you priced
 
 A rail is a bank route you request for one client. When the partner bank opens it, it publishes
-**requisites** — an IBAN, an account and routing number, a PIX key — in the client's own legal
+**account details** — an IBAN, an account and routing number, a PIX key — in the client's own legal
 name. Money wired there is
 received by the partner bank, converted at the rate the rail quotes, and delivered to the client's
 wallet as the rail's settlement token, minus the rail's `feeBps`.
 
 You can price that arrival before it happens. `POST /dapi/v1/payins` quotes an incoming amount and
 `POST /dapi/v1/payins/{payinId}/instructions` returns what the payer needs to see. Money that arrives
-without a quote — an unsolicited wire to open requisites — still lands and still becomes an income
+without a quote — an unsolicited wire to account details that are already live — still lands and still becomes an income
 row; the quote exists so you can show your customer a number first.
 
 Crypto in has two shapes. Anything sent to `baseSmartWallet` on Base is the client's balance the
@@ -54,6 +54,24 @@ takes `originChainId` **instead of** `rail` — exactly one of the two — to pr
 transfer, and `POST /dapi/v1/payins/{payinId}/instructions` answers with the `address` to send to,
 its `chainId`, and the `memo` that chain requires. `PayinView` then reports both
 `originChainId` and `destinationChainId`.
+
+## Every transfer out is a payout
+
+There is one way money leaves a client, and one resource for it: `POST /dapi/v1/payouts`. Paying a
+beneficiary's bank in another country, sending a stablecoin to an address on Base, moving money to
+another HEVN account, paying an address on another chain — all of it is a payout, and each one is
+**quoted** before it moves.
+
+The quote is not a formality for the simple cases. A quote says three things every time: what leaves
+the client's balance, what arrives, and the **deposit address** the on-chain operation must pay. A
+bank payout's deposit address belongs to the partner that will do the fiat leg. A same-chain
+transfer's deposit address is the contact's own address, and the two amounts are equal because nothing is
+converted. Same shape, same fields, same confirm route — so the code you write for one destination
+already works for the next, and the only thing that varies is what `quote` contains.
+
+What follows from that is worth keeping in mind while you read the rest of this page: there is no
+"simple transfer" shortcut to learn, no second idempotency story, and no second refusal vocabulary.
+One resource, one approval to sign, one `GET /dapi/v1/payouts/{payoutId}` to watch.
 
 ## Fiat out is funded from the wallet
 
@@ -65,11 +83,14 @@ for this payout — a single-purpose address that the partner's fiat leg consume
 keeps). `POST /dapi/v1/payouts/{payoutId}/confirm` with your signature executes that debit, and the
 partner pays the beneficiary's bank.
 
-The side you typed is inviolable. Send `amount` to pin what leaves the balance, or `amountTo` to pin
-what the beneficiary receives — never both, and never re-derive the other side yourself.
+You pin one side of the payment and HEVN derives the other. Send `amount` to pin what leaves the
+balance, or `amountTo` to pin what the beneficiary receives — never both, and never re-derive the
+other side yourself.
 
 A wallet contact is the same envelope with no fiat leg. `POST /dapi/v1/payouts` with a contact that
-is an address, then the same confirm route, sends USDC from the client's wallet straight to it — no
+is an address, then the same confirm route, sends a settlement token — USDC or EURC, whichever you
+name in `sourceAccount` — from the client's wallet straight to it. It is still quoted, and the quote's
+deposit address is the contact's own address, so `debit.address` is where the money actually lands. No
 conversion, no partner, no second resource to learn.
 
 ## Progress is read, not pushed

@@ -2,7 +2,16 @@
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
   "name": "HEVN",
-  "description": "Documentation for HEVN products: the whitelabel REST API for integrators, the CLI for operators and agents, and how the platform works.",
+  "description": "HEVN documentation: the whitelabel REST API for creating and operating accounts for your own customers, the CLI for operators and AI agents, and how the non-custodial platform underneath works.",
+  "markdown": {
+    "instructions": [
+      "HEVN has two products and they authorize money differently. Self-serve (the General tab): the person who owns the email holds the only key and signs for themselves. Whitelabel (the Whitelabel and REST API tabs): the integrator's backend holds a developer key, signs on behalf of client accounts it created, and HEVN co-signs. Never mix the two models in an answer.",
+      "Use HEVN's terms exactly. A rail is a bank route a client can request. A virtual account (bnk_) is an opened rail. Account details are what a payer needs in order to wire money, and arrive in a field named requisites. A client is an account the integrator created; the business behind it is the integrator's customer. A contact is a saved destination; a beneficiary is the party at the far end of a fiat payout. Every departure of money is a payout, to a bank account or to a wallet alike.",
+      "Never name a banking partner. Say 'a licensed banking partner'.",
+      "There are no published fee rates, spreads or minimums. Prices come from a quote on a specific payment; direct pricing questions to HEVN rather than inventing numbers.",
+      "The whitelabel API is at /dapi/v1 and takes a developer-key session plus an X-Hevn-Account header. The CLI uses an app API key in X-Api-Key. They are different credentials and neither works on the other surface."
+    ]
+  },
   "colors": {
     "primary": "#256FAD",
     "light": "#3C8DCE",
@@ -73,6 +82,7 @@
             "group": "Start here",
             "pages": [
               "whitelabel/overview",
+              "whitelabel/use-cases",
               "whitelabel/how-money-moves",
               "whitelabel/quickstart"
             ]
@@ -92,7 +102,7 @@
             "pages": [
               "whitelabel/clients",
               "whitelabel/onboarding",
-              "whitelabel/bank-accounts"
+              "whitelabel/virtual-accounts"
             ]
           },
           {
@@ -120,6 +130,8 @@
           {
             "group": "Reference",
             "pages": [
+              "whitelabel/reference/coverage",
+              "whitelabel/reference/fees",
               "whitelabel/reference/rails",
               "whitelabel/reference/kyb-fields",
               "whitelabel/reference/errors",
@@ -363,6 +375,10 @@
     {
       "source": "/api-reference",
       "destination": "/api-reference/overview"
+    },
+    {
+      "source": "/whitelabel/bank-accounts",
+      "destination": "/whitelabel/virtual-accounts"
     }
   ]
 }

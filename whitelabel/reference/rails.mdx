@@ -109,17 +109,17 @@ These are the methods a client can hold a rail in, and the currency each one set
 An id usually reads `{method}_{named|pooled}-{bank}` — the ids written this way on these pages, `sepa_named-bank_a` and `ach_named-bank_b`, stand in for the real ones — though a few carry no bank segment at all (`wire_named`). Two parts matter:
 
 - **`named`** — the client's own legal name is on the account. Payers see the client; nothing else is needed for the money to be attributed.
-- **`pooled`** — one partner account serves many clients, and each deposit is attributed by the `paymentReference` on the requisites. The payer must quote it.
+- **`pooled`** — one partner account serves many clients, and each deposit is attributed by the `paymentReference` on the account details. The payer must quote it.
 
-The bank segment is the partner behind the rail and is not something to branch on. Treat the whole id as opaque: compare it for equality, store it, copy it into `POST /dapi/v1/banks`, and never parse it or show it to your end users. Ids are per environment — one you hardcoded in the sandbox does not exist in production.
+The bank segment is the partner behind the rail and is not something to branch on. Treat the whole id as opaque: compare it for equality, store it, copy it into `POST /dapi/v1/banks`, and never parse it or show it to your customers. Ids are per environment — one you hardcoded in the sandbox does not exist in production.
 
-## Settlement tokens
+## Accounts a rail settles into
 
-`supportedTokens` on a rail record is what that rail can deliver into the client's wallet.
+`supportedAccounts` on a rail record is which of the client's accounts that rail can deliver into.
 
-A rail's token is fixed when the rail is opened, so choosing the token means choosing the rail id: rails that can deliver either token ship as a pair of ids, one per token, with the EURC variant's id ending in `_eurc`. `settlementToken` on the record echoes what the open rail delivers.
+A rail's token is fixed when the rail is opened, so choosing the token means choosing the rail id: rails that can deliver either token ship as a pair of ids, one per token, with the EURC variant's id ending in `_eurc`. `destinationAccount` on the record echoes what the open rail delivers.
 
-Per deposit the choice is on the money-in call: `POST /dapi/v1/payins` takes a `settlementToken`, and a token no rail of the client's settles into answers `422 payin_not_available` with `details.options[]` listing the pairs that do.
+Per deposit the choice is on the money-in call: `POST /dapi/v1/payins` takes a `destinationAccount`, and a token no rail of the client's settles into answers `422 payin_not_available` with `details.options[]` listing the pairs that do.
 
 `feeBps` on the rail record is HEVN's deposit fee in basis points for that rail. It is a whole number: `25` is 0.25%.
 
@@ -127,9 +127,21 @@ Per deposit the choice is on the money-in call: `POST /dapi/v1/payins` takes a `
 
 On-chain destinations use a chain code, not a rail: a wallet [contact](/whitelabel/payouts#save-an-address-as-a-contact) carries one in `crypto.chain`, and a quoted on-chain [payin](/whitelabel/payins#quote-an-on-chain-transfer) carries one in `originChainId`.
 
+`GET /dapi/v1/chains` answers the live list rather than this page: every chain, its EVM `chainId`, and each token's `decimals` and contract `address`. `settlement: true` marks the chain balances live on, and a token's `account` names the account it holds when a client can hold a balance in it. Read it once at startup instead of hardcoding what follows.
+
 `eth` · `bsc` · `avax` · `op` · `arb` · `pol` · `sol` · `base` · `gnosis` · `tron` · `xrp` · `zec` · `doge` · `ltc` · `btc` · `cardano` · `bera` · `sui` · `near` · `near_intents` · `xlayer` · `plasma` · `ton` · `stellar` · `monad` · `starknet` · `aptos` · `adi` · `bch`
 
-A client balance settles as **USDC on Base**, so a contact on Base is paid directly out of it. A contact on any other chain in this list is paid through a [cross-chain route](/whitelabel/payouts#a-routed-payout-is-priced) — the same `POST /dapi/v1/payouts`, quoted with `fromChainId` and `toChainId`, refused with `409 payout_not_fundable` when routing is unavailable for the account.
+A client balance settles on **Base**, in USDC or EURC, so a contact on Base holding either token is paid straight out of it. A contact on any other chain in this list, or expecting any other token, is paid through a [cross-chain route](/whitelabel/payouts#a-routed-payout-is-priced) — the same `POST /dapi/v1/payouts`, quoted with `fromChainId` and `toChainId`, refused with `409 payout_not_fundable` when routing is unavailable for the account.
+
+## Market rates
+
+`GET /dapi/v1/rates?from=EUR&to=USDC` converts one currency or token into another at the current market rate, before any transfer exists:
+
+```json
+{ "fromCurrency": "EUR", "toCurrency": "USDC", "rate": "1.14776038", "indicative": true }
+```
+
+Both sides accept a fiat code or a token symbol, so a fiat pair, a token pair and a mixed pair answer the same way. It is a display rate and says so: the rate a transfer settles at comes from that transfer's own quote, and a rail's deposit rate comes from `GET /dapi/v1/banks/{rail}/rate`. A currency HEVN does not price answers `404 not_found`.
 
 <Card title="Next: KYB fields" icon="arrow-right" href="/whitelabel/reference/kyb-fields">
   Every field of the KYB document, its accepted values, and the document slots.

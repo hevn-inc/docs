@@ -1,0 +1,143 @@
+---
+title: "Fees"
+description: "Where a fee is declared, where it is quoted, which side of a payment absorbs it, and why the quote is the only number you are held to."
+---
+
+There is no price list in this API and there is no page you can read a rate off. Every price is
+attached to a specific movement of money, for a specific client, at the moment you ask for it. This
+page is where those numbers live and how to read them.
+
+<Note>
+  The rates behind them are commercial and set per integrator. Ask HEVN for yours — the API will
+  then quote them back to you on every payment.
+</Note>
+
+## Two kinds of number
+
+Every price in this API is one of two things, and they are never interchangeable.
+
+| | **Declared** | **Quoted** |
+| --- | --- | --- |
+| What it is | A rate published on a rail or a capability, before any payment exists | The terms of one specific payment |
+| Where it comes from | `GET /dapi/v1/banks`, `GET /dapi/v1/banks/{rail}/rate`, `GET /dapi/v1/contacts/{contactId}/capabilities`, `POST /dapi/v1/payouts/preview`, `GET /dapi/v1/rates` | The `quote` on a `POST /dapi/v1/payins` or `POST /dapi/v1/payouts` response |
+| What it is for | Showing your customer a number before they commit to an amount | Charging them |
+| Does it bind | **No.** It is indicative and can move | **Yes.** It is what settles, until `expiresAt` |
+
+Show declared numbers in your UI. Reconcile against quoted ones. Never store a declared rate and
+bill from it later.
+
+## The fields that carry a fee
+
+### On a rail
+
+A rail record from `GET /dapi/v1/banks` carries `feeBps` — HEVN's deposit fee for that rail in basis
+points, a whole number, taken out of the converted amount. `100` is one per cent, so `25` is 0.25%.
+It carries `minimumDeposit` too: the smallest amount the partner will accept over that rail, in the
+rail's own currency. Anything under it is returned by the bank, not refused by us.
+
+`GET /dapi/v1/banks/{rail}/rate` is the indicative price of a deposit over one rail:
+
+```json
+{ "currency": "EUR", "rate": "…", "fixedFee": "…", "fixedFeeCurrency": "EUR" }
+```
+
+On a rail the client has not opened, only `currency` comes back.
+
+### On a contact
+
+`GET /dapi/v1/contacts/{contactId}/capabilities?amount=500.00` is the closest thing to a price list
+this API has, because it is scoped to one real destination. It answers one `options` row per payable
+account, each carrying `method`, `currency`, `minAmount`, `maxAmount`, `feeBps`, `fixedFee`, whether
+a `purpose`, a memo or documents are required — and `blockers[]`, which is everything that would
+refuse a payout to that contact right now.
+
+`POST /dapi/v1/payouts/preview` takes `{"rail", "amount"}` and prices a rail with no contact and no
+side effects.
+
+Neither is a gate. `POST /dapi/v1/payouts` re-checks the same conditions on its own, and its numbers
+are the ones you are held to.
+
+### On a payin
+
+The `quote` on `POST /dapi/v1/payins` states both ends and the cost between them:
+
+```json
+{ "amount": "2000.00", "currency": "EUR",
+  "amountTo": "…", "destinationAccount": "USDC",
+  "feeAmount": "10.50", "feeCurrency": "EUR", "rate": "1.0000" }
+```
+
+### On a payout
+
+A payout's `quote` has three shapes, and which one you get is decided by the contact — not by a flag
+you set.
+
+**A bank payout** converts, so it carries everything:
+
+```json
+{ "fromAmount": "500.00", "fromCurrency": "USD",
+  "toAmount": "459.31", "toCurrency": "EUR",
+  "rate": "0.9247", "feeAmount": "1.00", "feeCurrency": "USD",
+  "expiresAt": "2026-09-17T10:06:11Z" }
+```
+
+**A settlement token paid on Base** converts nothing, so `rate`, `feeAmount` and `expiresAt` are
+**absent** rather than filled with `1` and `0`, and the two amounts are the same money:
+
+```json
+{ "fromAmount": "1.50", "fromCurrency": "USDC",
+  "toAmount": "1.50", "toCurrency": "USDC" }
+```
+
+**A routed payout** to another chain is priced as a route, not a conversion: `feeAmount` is the
+route's cost, `rate` stays absent, and the quote expires.
+
+```json
+{ "fromAmount": "1.50", "fromCurrency": "USDC",
+  "toAmount": "1.4923", "toCurrency": "USDC",
+  "feeAmount": "0.0077", "feeCurrency": "USD",
+  "expiresAt": "2026-09-17T10:06:11Z",
+  "fromChainId": "base", "toChainId": "arb" }
+```
+
+<Warning>
+  Branch on the presence of a field, not on its value. A missing `rate` means nothing was converted;
+  a `rate` of `"1.0000"` means something was converted at par. They are different facts.
+</Warning>
+
+## Which side absorbs the fee
+
+You decide, by choosing which side of the payment to pin. Send exactly one:
+
+| You send | You are fixing | The other side | Use it when |
+| --- | --- | --- | --- |
+| `amount` | What leaves the client's balance | Derived — the beneficiary receives less | The payer's budget is fixed |
+| `amountTo` | What the beneficiary receives | Derived — HEVN grosses the debit up | The beneficiary's net is fixed |
+
+Sending both is refused. Deriving the other side yourself and sending it as the pinned side is worse:
+it will be right until a rate moves between your calculation and the booking, and then it will be
+quietly wrong. See [Conventions](/whitelabel/conventions#money).
+
+## What is not a fee
+
+- **Gas.** A client's Base smart wallet transacts through an ERC-4337 paymaster, so there is no
+  network fee line on any quote and no ETH for anyone to hold.
+- **`GET /dapi/v1/rates`.** It converts one currency or token into another at the current market
+  rate and says so with `indicative: true`. It is a display rate; no payment ever settles at it.
+- **The escrow `feeBps`.** On `capture` and `charge` that field is **your own** take rate, deducted
+  from the captured amount before the seller is paid, up to the ceiling fixed when the deal was
+  created. It is revenue for you, not a cost from HEVN. See
+  [Escrow actions](/whitelabel/escrow-actions#the-matrix).
+
+## Reading the cost back after the fact
+
+The quote is what you were charged; the ledger is what happened. A transaction row carries its
+amounts as two sides — `from` is what left the source, `to` is what arrived — so the difference
+between them is the whole cost of that movement, whatever it was made of.
+`GET /dapi/v1/transactions/summary` totals the same filters, and
+`GET /dapi/v1/transactions/export` renders a statement your customer's accountant can read. See
+[Balances and transactions](/whitelabel/balances-and-transactions).
+
+<Card title="Next: Rails and payment methods" icon="arrow-right" href="/whitelabel/reference/rails">
+  What each method needs, which currencies the deposit rails carry, and how a rail id is put together.
+</Card>

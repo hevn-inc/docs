@@ -17,7 +17,7 @@ flowchart LR
     G2 -.->|"sandbox: the review is emulated"| G4
 ```
 
-Gate 1 is [creating the client](/whitelabel/clients). Gate 4 is [opening a rail](/whitelabel/bank-accounts). This page is gates 2 and 3: one document, one readiness list, one submission.
+Gate 1 is [creating the client](/whitelabel/clients). Gate 4 is [opening a rail](/whitelabel/virtual-accounts). This page is gates 2 and 3: one document, one readiness list, one submission.
 
 No route here names the client in its path. `PUT /dapi/v1/client/kyb`, `GET /dapi/v1/client/kyb` and `POST /dapi/v1/client/kyb/complete` all **require** `X-Hevn-Account`, and document upload accepts the same header. Your own access token is the only credential any of this needs. Examples use the client from [HTTP client](/whitelabel/reference/client).
 
@@ -400,6 +400,6 @@ Set the account phone at creation and this never comes up.
 
 The flat document covers a company owned directly by people — one subject, its papers, and the humans above it. A structure with holding companies in the chain is written through the entity-graph routes instead; the two models coexist, because the document only owns the people it created. When a gap belongs to an entity the document does not own, `missing[]` reports it as `graph.entities.<id>.<field>` rather than a `people[…]` path. Contact HEVN before you build against the graph routes.
 
-<Card title="Next: Virtual accounts" icon="arrow-right" href="/whitelabel/bank-accounts">
-  Check a rail's requirements, open it, and read the requisites the client's payers wire to.
+<Card title="Next: Virtual accounts" icon="arrow-right" href="/whitelabel/virtual-accounts">
+  Check a rail's requirements, open it, and read the account details the client's payers wire to.
 </Card>

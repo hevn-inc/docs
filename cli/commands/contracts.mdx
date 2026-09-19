@@ -3,6 +3,9 @@ title: "Contracts"
 description: "Upload existing contracts, generate HEVN templates, preview, approve, update, pause, and manage payment methods."
 ---
 
+A contract is the agreement an invoice can be generated from. Upload one you already signed, or
+generate one from a HEVN template; either way the counterparty approves it before it can bill.
+
 ## List and inspect contracts
 
 ```bash
@@ -143,3 +146,7 @@ hevn contracts delete --id <contract-id> --yes
 <Warning>
   Before creating a contract from a file, determine which party is the current HEVN user. Use `--contractor-email` when the current user is the client, and `--client-email` when the current user is the contractor.
 </Warning>
+
+<Card title="Next: Cards and banks" icon="credit-card" href="/cli/commands/cards-banks">
+  Card status and KYC links, bank rails and detail validation.
+</Card>

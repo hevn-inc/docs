@@ -3,6 +3,9 @@ title: "Invoices"
 description: "List, create, upload, decline, batch, and pay HEVN invoices."
 ---
 
+An invoice is a request for payment — one you issued, or one issued to you. The CLI can create them
+by hand, read them out of an uploaded document, derive them from a contract, and pay them.
+
 ## List invoices and bills
 
 List all invoices:
@@ -127,3 +130,7 @@ Separately, `hevn invoice pay` **marks** an invoice as paid (optionally with a c
 ```bash
 hevn invoice pay <invoice-id> --reference <tx-reference>
 ```
+
+<Card title="Next: Contracts" icon="file-pen-line" href="/cli/commands/contracts">
+  Upload or generate a contract, then bill against it.
+</Card>

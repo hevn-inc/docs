@@ -7,13 +7,13 @@ import ActingAsSnippet from "/snippets/acting-as.mdx";
 import PollSnippet from "/snippets/poll.mdx";
 import SandboxCapsSnippet from "/snippets/sandbox-caps.mdx";
 
-Money arrives four ways: a quoted deposit you priced, a quoted on-chain transfer you priced, an unsolicited wire to open requisites, or crypto sent straight to the wallet. All four end as one income row on the client's ledger.
+Money arrives four ways: a quoted deposit you priced, a quoted on-chain transfer you priced, an unsolicited wire to account details that are already live, or crypto sent straight to the wallet. All four end as one income row on the client's ledger.
 
 | Shape | What you call | What the payer needs |
 | --- | --- | --- |
 | **Quoted deposit** | `POST /dapi/v1/payins` with `rail`, then `POST /dapi/v1/payins/{payinId}/instructions` | The instructions that quote returns, payment reference included |
 | **Quoted on-chain transfer** | `POST /dapi/v1/payins` with `originChainId`, then the same instructions call | The `address`, `chainId` and `memo` the instructions return |
-| **Unsolicited wire** | Nothing — the requisites stay live | The `requisites` on the client's active rail from `GET /dapi/v1/banks` |
+| **Unsolicited wire** | Nothing — the account details stay live | The `requisites` on the client's active rail from `GET /dapi/v1/banks` |
 | **Crypto** | Nothing | The client's `baseSmartWallet` address |
 
 Quote a payin when you need the rate and the fee pinned before the payer pays, and when you want their transfer attributed to one order. Take an unquoted path when the client publishes its own details and reconciles afterwards.
@@ -32,7 +32,7 @@ flowchart LR
 
 ## Quote a deposit
 
-The client needs an **active rail** in the currency the payer sends — see [Virtual accounts](/whitelabel/bank-accounts).
+The client needs an **active rail** in the currency the payer sends — see [Virtual accounts](/whitelabel/virtual-accounts).
 
 <Steps>
   <Step title="Price the deposit">
@@ -42,7 +42,7 @@ The client needs an **active rail** in the currency the payer sends — see [Vir
       -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
       -H "X-Hevn-Account: $HEVN_CLIENT_ID" \
       -H "Content-Type: application/json" \
-      -d '{"amount":"2000.00","currency":"EUR","rail":"sepa","settlementToken":"EURC"}'
+      -d '{"amount":"2000.00","currency":"EUR","rail":"sepa","destinationAccount":"EURC"}'
     ```
 
     ```python Python
@@ -50,7 +50,7 @@ The client needs an **active rail** in the currency the payer sends — see [Vir
         "amount": "2000.00",
         "currency": "EUR",
         "rail": "sepa",
-        "settlementToken": "EURC",
+        "destinationAccount": "EURC",
     })
     ```
 
@@ -59,7 +59,7 @@ The client needs an **active rail** in the currency the payer sends — see [Vir
       amount: "2000.00",
       currency: "EUR",
       rail: "sepa",
-      settlementToken: "EURC",
+      destinationAccount: "EURC",
     });
     ```
 
@@ -68,7 +68,7 @@ The client needs an **active rail** in the currency the payer sends — see [Vir
     	"amount":          "2000.00",
     	"currency":        "EUR",
     	"rail":            "sepa",
-    	"settlementToken": "EURC",
+    	"destinationAccount": "EURC",
     })
     ```
     </CodeGroup>
@@ -76,7 +76,7 @@ The client needs an **active rail** in the currency the payer sends — see [Vir
     ```json Response — 201, Location: /dapi/v1/payins/pi_2b7…
     { "id": "pi_2b7…", "status": "pending", "rail": "sepa",
       "quote": { "amount": "2000.00", "currency": "EUR",
-                 "settlementAmount": "1989.50", "settlementToken": "EURC",
+                 "settlementAmount": "1989.50", "destinationAccount": "EURC",
                  "feeAmount": "10.50", "feeCurrency": "EUR", "rate": "1.0000" },
       "expiresAt": "2026-09-17T10:06:11Z", "createdAt": "2026-09-17T10:04:11Z" }
     ```
@@ -86,7 +86,7 @@ The client needs an **active rail** in the currency the payer sends — see [Vir
     - **`amount` or `amountTo`, exactly one.** `amount` is what the payer sends in `currency`; `amountTo` is what should land on the wallet, and HEVN grosses the payer's side up to reach it.
     - **`rail` or `originChainId`, exactly one.** `rail` prices money arriving over a payment method; `originChainId` prices money arriving on a chain. Sending both, or neither, is refused.
     - **`rail` here is a payment *method*** — `sepa`, `ach`, `swift`, `fedwire`, `pix`, … — not the rail id you opened with `POST /dapi/v1/banks`. The two are different vocabularies; [Rails](/whitelabel/reference/rails) lists both.
-    - **`settlementToken`** is the stablecoin the payin is delivered in, `USDC` (the default) or `EURC`. It has to be a token one of the client's matching rails settles into; when it is not, the call refuses with the pairs that work (see below).
+    - **`destinationAccount`** is the stablecoin the payin is delivered in, `USDC` (the default) or `EURC`. It has to be a token one of the client's matching rails settles into; when it is not, the call refuses with the pairs that work (see below).
 
     The price holds until `expiresAt`. Read it; do not cache a quote.
   </Step>
@@ -151,7 +151,7 @@ The client needs an **active rail** in the currency the payer sends — see [Vir
 `originChainId` in place of `rail` prices money arriving on a chain instead of through a bank. The body is otherwise the same call:
 
 ```json
-{ "amount": "2000.00", "currency": "USDC", "originChainId": "arb", "settlementToken": "USDC" }
+{ "amount": "2000.00", "currency": "USDC", "originChainId": "arb", "destinationAccount": "USDC" }
 ```
 
 `PayinView` then carries `originChainId` — the network the payer funds from — and `destinationChainId`, the network the payin settles on. Open it with the same `POST /dapi/v1/payins/{payinId}/instructions`, and the instructions answer `kind: "onchain"` with the three fields a sender needs:
@@ -185,17 +185,17 @@ Some rails require the payer's own account so the receiving bank can check the s
 
 ## When a pair cannot be paid
 
-A currency and method the client cannot be paid in answers `422 payin_not_available`, and `details.options` carries every pair that **can** — each with `rail`, `currency`, `available`, `minAmount`, `maxAmount`, `feeBps`, `fixedFee`, `payerRequired` and `settlementTokens`. Read the options rather than pre-flighting: the refusal is the capability catalogue.
+A currency and method the client cannot be paid in answers `422 payin_not_available`, and `details.options` carries every pair that **can** — each with `rail`, `currency`, `available`, `minAmount`, `maxAmount`, `feeBps`, `fixedFee`, `payerRequired` and `destinationAccounts`. Read the options rather than pre-flighting: the refusal is the capability catalogue.
 
 `410 payin_expired` and `404 payin_not_found` are the other two you will meet; both carry `details.payinId`. [Errors](/whitelabel/reference/errors#rails-and-payins) has the rest.
 
-## Unsolicited wires to the client's requisites
+## Unsolicited wires to the client's account details
 
-An active rail's requisites stay live between payments. Anyone can wire to them with no quote and no API call from you.
+An active rail's account details stay live between payments. Anyone can wire to them with no quote and no API call from you.
 
 1. Read `requisites` for the active rail from `GET /dapi/v1/banks`.
 2. Give the payer the fields it carries, plus `paymentReference` when one is set.
-3. The deposit lands as an income row on `GET /dapi/v1/transactions`, carrying `remitter` where the partner reports the sender, `paymentReference`, and the receiving requisites.
+3. The deposit lands as an income row on `GET /dapi/v1/transactions`, carrying `remitter` where the partner reports the sender, `paymentReference`, and the receiving account details.
 
 <Note>
   Some partners report no sender at all. When `remitter` is absent on a settled deposit, the sender cannot be recovered from the API — treat it as unknown rather than retrying.

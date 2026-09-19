@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "HEVN Platform API",
-    "description": "One API for integrators. Create client accounts, submit them for verification, open virtual\naccount rails, receive and send money, operate on-chain escrow deals, and read balances and\ntransactions.\n\nThe base URL already carries the version — every path below is relative to it. Bodies, responses\nand query parameters are camelCase, null fields are omitted, and every amount is a decimal string\nin the asset's major unit (`\"500.00\"`), never a JSON number.\n\nLog in with your developer key: `POST /auth/challenge` returns a payload to sign,\n`POST /auth/token` exchanges the signature for an access token. Send it as\n`Authorization: Bearer <accessToken>`. The session it mints is platform-only — it reaches\n`/dapi/v1` and nothing else, and the ordinary `/api/v1` surface refuses it. Registering the key\nitself, with the source IPs it may be used from, happens on `/api/v1/developer/api-keys` with an\nordinary owner session and is deliberately absent from this document.\n\nOne token is enough for your whole book: name the client you are acting for with\n`X-Hevn-Account: cl_…`. The singular `/client*` operations require that header; `/clients` and\n`/escrow*` are about you rather than a client and refuse it.\n\nIds are opaque and prefixed by what they name (`cl_` client, `ct_` contact, `bnk_` rail,\n`po_` payout, `pi_` payin, `txn_` transaction, `doc_` document, `kyb_` application,\n`esc_` escrow deal). Never parse one.\n\nEvery write accepts `Idempotency-Key: <^[A-Za-z0-9._:-]{1,128}$>` and requires none. A retry with\nthe same key replays the first answer and carries `Idempotency-Replayed: true`; the same key with a\ndifferent request is refused with `idempotency_key_reused`. Lists page with `limit` (default 50,\nmax 100) and the opaque `nextCursor` of the previous page.\n\nEvery refusal is the same envelope: `{\"error\": {\"code\": string, \"message\": string,\n\"details\"?: object}}`. Branch on `error.code`; every slug is listed in the guide's\n[Errors reference](https://docs.hevn.finance/whitelabel/reference/errors). `unauthenticated` (401),\n`forbidden` (403), `rate_limited` (429), `validation_failed` (422) and `internal_error` (500) can\nanswer any operation and are not repeated per operation.\n\nThis document is served by the API itself at `/dapi/v1/openapi.json`, and browsable at\n`/dapi/v1/docs`.",
+    "description": "HEVN's account, verification and money-movement API. Verification follows a submission workflow: save applicant info and documents, inspect outstanding requirements, then explicitly complete the submission to send an immutable snapshot for review. Completing a submission is separate from editing it.",
     "version": "1.0.0"
   },
   "paths": {
@@ -508,7 +508,7 @@
           "accounts"
         ],
         "summary": "Retrieve one account",
-        "description": "Retrieve the client selected by `X-Hevn-Account`. Unknown, malformed and foreign account ids share the same not-found response.",
+        "description": "Retrieve the client selected by `X-Hevn-Account`, from the moment `POST /clients` returns its id — a client still provisioning answers here too. Unknown, malformed and foreign account ids share the same not-found response.",
         "operationId": "read_client_client_get",
         "security": [
           {
@@ -3667,6 +3667,82 @@
         }
       }
     },
+    "/transactions/sync": {
+      "post": {
+        "tags": [
+          "transactions"
+        ],
+        "summary": "Refresh the client's ledger from its sources",
+        "description": "Refresh the client's ledger from the banks and chains its money moved over, then answer how many entries changed. Reads never do this on their own: `GET /dapi/v1/transactions` answers from the ledger as it stands, so call this when a transfer made elsewhere has to be visible before you read. It reaches out to every source, so it is rate-limited and not a per-request call.",
+        "operationId": "sync_transactions_transactions_sync_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Hevn-Account",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself.",
+              "examples": [
+                "cl_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+              ],
+              "title": "X-Hevn-Account"
+            },
+            "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
+          },
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LedgerSyncView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/transactions": {
       "get": {
         "tags": [
@@ -4524,12 +4600,154 @@
         }
       }
     },
+    "/chains": {
+      "get": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "List supported chains and tokens",
+        "description": "Every chain and token this API names, with the contract address and decimals of each token. `settlement` marks the chain accounts hold their balance on and the tokens a payout can be funded with.",
+        "operationId": "list_chains_chains_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChainListView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rates": {
+      "get": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Retrieve a market reference rate",
+        "description": "Convert one currency or token into another at the current market rate, before any transfer exists. Use it to show a price; the rate a transfer settles at comes from its own quote.",
+        "operationId": "read_rate_rates_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 5,
+              "description": "ISO 4217 currency code or a token symbol.",
+              "examples": [
+                "EUR"
+              ],
+              "title": "From"
+            },
+            "description": "ISO 4217 currency code or a token symbol."
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 5,
+              "description": "ISO 4217 currency code or a token symbol.",
+              "examples": [
+                "USDC"
+              ],
+              "title": "To"
+            },
+            "description": "ISO 4217 currency code or a token symbol."
+          },
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RateView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/sandbox/treasury": {
       "get": {
         "tags": [
           "sandbox"
         ],
-        "summary": "Read the sandbox faucet account that funds emulated credits",
+        "summary": "Read the sandbox treasury that funds emulated credits",
         "operationId": "read_treasury_sandbox_treasury_get",
         "security": [
           {
@@ -4975,6 +5193,41 @@
   },
   "components": {
     "schemas": {
+      "AccountBalanceView": {
+        "properties": {
+          "account": {
+            "$ref": "#/components/schemas/BalanceAccount",
+            "description": "Account this balance belongs to, named by the asset it holds."
+          },
+          "balance": {
+            "type": "string",
+            "title": "Balance",
+            "description": "Available balance on this account.",
+            "example": "500.00"
+          },
+          "usdValue": {
+            "type": "string",
+            "title": "Usdvalue",
+            "description": "Indicative USD value of this balance.",
+            "example": "500.00"
+          }
+        },
+        "type": "object",
+        "required": [
+          "account",
+          "balance",
+          "usdValue"
+        ],
+        "title": "AccountBalanceView"
+      },
+      "BalanceAccount": {
+        "type": "string",
+        "enum": [
+          "USDC",
+          "EURC"
+        ],
+        "title": "BalanceAccount"
+      },
       "BankAccountInput": {
         "properties": {
           "accountType": {
@@ -5486,6 +5739,70 @@
         "title": "ChainCode",
         "description": "Supported blockchain network code."
       },
+      "ChainListView": {
+        "properties": {
+          "chains": {
+            "items": {
+              "$ref": "#/components/schemas/ChainView"
+            },
+            "type": "array",
+            "title": "Chains",
+            "description": "Every chain this API names, settlement chain included."
+          }
+        },
+        "type": "object",
+        "required": [
+          "chains"
+        ],
+        "title": "ChainListView"
+      },
+      "ChainView": {
+        "properties": {
+          "chain": {
+            "type": "string",
+            "title": "Chain",
+            "description": "Chain code used by contacts, payouts and transactions."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Human-readable chain name."
+          },
+          "chainId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chainid",
+            "description": "EVM chain id; absent for non-EVM chains."
+          },
+          "settlement": {
+            "type": "boolean",
+            "title": "Settlement",
+            "description": "Whether clients hold their balances on this chain."
+          },
+          "tokens": {
+            "items": {
+              "$ref": "#/components/schemas/TokenView"
+            },
+            "type": "array",
+            "title": "Tokens",
+            "description": "Tokens this API names on the chain."
+          }
+        },
+        "type": "object",
+        "required": [
+          "chain",
+          "name",
+          "settlement",
+          "tokens"
+        ],
+        "title": "ChainView"
+      },
       "ChallengeRequest": {
         "properties": {
           "email": {
@@ -5688,13 +6005,13 @@
             "title": "Basesmartwallet",
             "description": "Base smart-wallet address controlled by the account."
           },
-          "tokens": {
+          "accounts": {
             "items": {
-              "$ref": "#/components/schemas/TokenBalanceView"
+              "$ref": "#/components/schemas/AccountBalanceView"
             },
             "type": "array",
-            "title": "Tokens",
-            "description": "Balances grouped by supported digital asset."
+            "title": "Accounts",
+            "description": "One entry per account the client holds a balance on."
           },
           "totalUsd": {
             "type": "string",
@@ -6385,6 +6702,36 @@
         "type": "object",
         "title": "ContactHolderUpdate"
       },
+      "ContactLinkedUserView": {
+        "properties": {
+          "avatar": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avatar",
+            "description": "Avatar of the linked HEVN account."
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Display name of the linked HEVN account."
+          }
+        },
+        "type": "object",
+        "title": "ContactLinkedUserView"
+      },
       "ContactPaymentAccount": {
         "properties": {
           "method": {
@@ -6527,10 +6874,10 @@
             "title": "Paymentreference",
             "description": "Reference or memo required by the contact."
           },
-          "settlementToken": {
+          "destinationAccount": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/DepositToken"
+                "$ref": "#/components/schemas/BalanceAccount"
               },
               {
                 "type": "null"
@@ -6638,6 +6985,30 @@
               }
             ],
             "description": "On-chain destination details."
+          },
+          "userId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Userid",
+            "description": "Account behind an existing HEVN contact."
+          },
+          "user": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ContactLinkedUserView"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Profile of the linked HEVN account."
           }
         },
         "type": "object",
@@ -6709,6 +7080,17 @@
               }
             ],
             "description": "Updated intermediary institution; send null to remove it."
+          },
+          "bankAddress": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BankAddress"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Updated postal address of the destination institution, replacing the stored one in full."
           }
         },
         "additionalProperties": false,
@@ -6971,15 +7353,6 @@
         ],
         "title": "CountryCode",
         "description": "ISO 3166-1 alpha-2 country codes."
-      },
-      "DepositToken": {
-        "type": "string",
-        "enum": [
-          "USDC",
-          "EURC"
-        ],
-        "title": "DepositToken",
-        "description": "Stablecoin a virtual account delivers on-chain for a fiat deposit."
       },
       "DocumentContentRequest": {
         "properties": {
@@ -8017,6 +8390,27 @@
         "title": "IntermediaryBank"
       },
       "JsonValue": {},
+      "LedgerSyncView": {
+        "properties": {
+          "syncedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Syncedat",
+            "description": "When this refresh finished."
+          },
+          "written": {
+            "type": "integer",
+            "title": "Written",
+            "description": "Transactions the refresh created or updated in the client's ledger."
+          }
+        },
+        "type": "object",
+        "required": [
+          "syncedAt",
+          "written"
+        ],
+        "title": "LedgerSyncView"
+      },
       "Page_ClientResponse_": {
         "properties": {
           "items": {
@@ -8206,8 +8600,8 @@
             ],
             "description": "Network from which an on-chain incoming transfer is funded."
           },
-          "settlementToken": {
-            "$ref": "#/components/schemas/DepositToken",
+          "destinationAccount": {
+            "$ref": "#/components/schemas/BalanceAccount",
             "description": "Digital asset delivered to the account after settlement.",
             "default": "USDC"
           }
@@ -8413,9 +8807,9 @@
             "description": "Amount delivered in the settlement asset.",
             "example": "500.00"
           },
-          "settlementToken": {
+          "destinationAccount": {
             "type": "string",
-            "title": "Settlementtoken",
+            "title": "Destinationaccount",
             "description": "Digital asset used to settle the incoming transfer."
           },
           "feeAmount": {
@@ -8462,7 +8856,7 @@
           "amount",
           "currency",
           "settlementAmount",
-          "settlementToken"
+          "destinationAccount"
         ],
         "title": "PayinQuoteView"
       },
@@ -8814,6 +9208,11 @@
             ],
             "title": "Bankid",
             "description": "Optional receiving-account identifier used to select a specific funding route."
+          },
+          "sourceAccount": {
+            "$ref": "#/components/schemas/BalanceAccount",
+            "description": "Settlement token this payout is funded with. The contact and the rail decide whether it can be used.",
+            "default": "USDC"
           }
         },
         "additionalProperties": false,
@@ -9494,16 +9893,12 @@
           "quote_not_fundable",
           "funding_mode_unsupported",
           "funding_token_unsupported",
-          "contact_requires_quote",
-          "direct_transfer_unsupported",
-          "self_transfer",
           "insufficient_funds",
           "smart_wallet_not_deployed",
           "wallet_owner_unverified",
           "already_funded",
+          "payment_slot_consumed",
           "funding_in_progress",
-          "funding_attempts_exhausted",
-          "funding_state_unknown",
           "funding_attempt_expired",
           "contact_changed",
           "user_operation_rejected",
@@ -12577,18 +12972,18 @@
             "title": "Feebps",
             "description": "Variable fee in basis points; 100 basis points equals 1 percent."
           },
-          "supportedTokens": {
+          "supportedAccounts": {
             "items": {
-              "$ref": "#/components/schemas/DepositToken"
+              "$ref": "#/components/schemas/BalanceAccount"
             },
             "type": "array",
-            "title": "Supportedtokens",
+            "title": "Supportedaccounts",
             "description": "Settlement tokens accepted by this payment method."
           },
-          "settlementToken": {
+          "destinationAccount": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/DepositToken"
+                "$ref": "#/components/schemas/BalanceAccount"
               },
               {
                 "type": "null"
@@ -12644,9 +13039,42 @@
           "method",
           "opened",
           "feeBps",
-          "supportedTokens"
+          "supportedAccounts"
         ],
         "title": "RailView"
+      },
+      "RateView": {
+        "properties": {
+          "fromCurrency": {
+            "type": "string",
+            "title": "Fromcurrency",
+            "description": "Currency or token the rate converts from."
+          },
+          "toCurrency": {
+            "type": "string",
+            "title": "Tocurrency",
+            "description": "Currency or token the rate converts to."
+          },
+          "rate": {
+            "type": "string",
+            "title": "Rate",
+            "description": "How many units of toCurrency one unit of fromCurrency buys.",
+            "example": "500.00"
+          },
+          "indicative": {
+            "type": "boolean",
+            "title": "Indicative",
+            "description": "Always true: this is a market reference rate. A payout or incoming transfer is priced by its own quote.",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "fromCurrency",
+          "toCurrency",
+          "rate"
+        ],
+        "title": "RateView"
       },
       "RefreshRequest": {
         "properties": {
@@ -13097,7 +13525,7 @@
             "description": "Current public lifecycle status of the emulated credit."
           },
           "token": {
-            "$ref": "#/components/schemas/DepositToken",
+            "$ref": "#/components/schemas/BalanceAccount",
             "description": "Digital asset credited after settlement."
           },
           "amount": {
@@ -13271,7 +13699,7 @@
           "token": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/DepositToken"
+                "$ref": "#/components/schemas/BalanceAccount"
               },
               {
                 "type": "null"
@@ -13432,7 +13860,7 @@
       "SandboxTokenBalanceResponse": {
         "properties": {
           "token": {
-            "$ref": "#/components/schemas/DepositToken",
+            "$ref": "#/components/schemas/BalanceAccount",
             "description": "Supported sandbox digital asset."
           },
           "tokenAddress": {
@@ -13460,12 +13888,12 @@
           "chainId": {
             "type": "integer",
             "title": "Chainid",
-            "description": "Numeric network identifier used by the sandbox faucet account."
+            "description": "Numeric network identifier used by the sandbox treasury."
           },
           "address": {
             "type": "string",
             "title": "Address",
-            "description": "Sandbox faucet account address."
+            "description": "Sandbox treasury address."
           },
           "gasBalance": {
             "type": "string",
@@ -13528,33 +13956,6 @@
         ],
         "title": "SessionResponse"
       },
-      "TokenBalanceView": {
-        "properties": {
-          "token": {
-            "$ref": "#/components/schemas/DepositToken",
-            "description": "Supported digital asset symbol."
-          },
-          "balance": {
-            "type": "string",
-            "title": "Balance",
-            "description": "Available quantity of this digital asset.",
-            "example": "500.00"
-          },
-          "usdValue": {
-            "type": "string",
-            "title": "Usdvalue",
-            "description": "Indicative USD value of this balance.",
-            "example": "500.00"
-          }
-        },
-        "type": "object",
-        "required": [
-          "token",
-          "balance",
-          "usdValue"
-        ],
-        "title": "TokenBalanceView"
-      },
       "TokenResponse": {
         "properties": {
           "accessToken": {
@@ -13590,6 +13991,55 @@
           "userId"
         ],
         "title": "TokenResponse"
+      },
+      "TokenView": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol",
+            "description": "Token symbol, as contacts and payouts name it."
+          },
+          "decimals": {
+            "type": "integer",
+            "title": "Decimals",
+            "description": "On-chain decimals of the token's smallest unit."
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address",
+            "description": "ERC-20 contract address; absent for a chain's gas coin."
+          },
+          "native": {
+            "type": "boolean",
+            "title": "Native",
+            "description": "Whether this is the chain's gas coin."
+          },
+          "account": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BalanceAccount"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The account this token holds, when a client can hold a balance in it."
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "decimals",
+          "native"
+        ],
+        "title": "TokenView"
       },
       "TransactionDetailView": {
         "properties": {
@@ -14116,9 +14566,7 @@
     "securitySchemes": {
       "HTTPBearer": {
         "type": "http",
-        "scheme": "bearer",
-        "bearerFormat": "JWT",
-        "description": "Platform access token from `POST /auth/token`, carrying the `platform` audience and the `developer_key_id` of the registration that minted it. It acts as your own account; name a client you created with `X-Hevn-Account: cl_…`. Every request re-checks that the registration is still active and that the caller's source IP is inside its allowlist. A token is valid only against the server that issued it, so sandbox tokens are refused in production and production tokens in the sandbox."
+        "scheme": "bearer"
       }
     }
   },
@@ -14162,21 +14610,6 @@
     {
       "name": "sandbox",
       "description": "Emulate funding and lifecycle events in the sandbox environment."
-    }
-  ],
-  "servers": [
-    {
-      "url": "https://api.hevn.finance/dapi/v1",
-      "description": "Production. Tokens issued here work only here."
-    },
-    {
-      "url": "https://sandbox-api.hevn.finance/dapi/v1",
-      "description": "Sandbox (Base Sepolia test funds). Tokens issued here work only here."
-    }
-  ],
-  "security": [
-    {
-      "HTTPBearer": []
     }
   ]
 }

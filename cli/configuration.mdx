@@ -3,6 +3,10 @@ title: "Configuration"
 description: "Configure HEVN environments, API credentials, output formats, and debug behavior."
 ---
 
+Everything the CLI needs lives in one local config file and a handful of environment variables.
+Nothing here is required to get started — `hevn login` writes what it needs — but each setting is
+the answer to one question a script eventually asks.
+
 ## Config file
 
 By default, HEVN CLI stores local configuration at:
@@ -136,3 +140,7 @@ export HEVN_DEBUG=1
 <Warning>
   Debug output can include sensitive headers and request payloads. Avoid sharing raw debug logs without redaction.
 </Warning>
+
+<Card title="Next: Account and profile" icon="arrow-right" href="/cli/commands/account">
+  Inspect the active account, update profile fields, and check KYC status.
+</Card>

@@ -53,7 +53,7 @@ The key is scoped to `(your account, the operation)`. The same string on two ope
 | `POST /dapi/v1/escrow` | the deal, its resolved windows and its `approve` action. The **raw** key is echoed as `action.idempotencyKey`. |
 | `POST /dapi/v1/escrow/{escrowId}/actions` | the action. The raw key is the address in the confirm URL. |
 | `POST /dapi/v1/sandbox/deposits`, `/payins/{payinId}/complete`, `/payouts/{payoutId}/status` | the emulated credit or status move. |
-| `POST /dapi/v1/contacts`, `PATCH`, `DELETE /dapi/v1/contacts/{contactId}` | nothing: a contact is deduplicated by its own requisites. |
+| `POST /dapi/v1/contacts`, `PATCH`, `DELETE /dapi/v1/contacts/{contactId}` | nothing: a contact is deduplicated by its own account details. |
 | `POST /dapi/v1/clients`, `POST /dapi/v1/banks`, `PUT /dapi/v1/client/kyb`, `POST /dapi/v1/client/kyb/complete`, `POST /dapi/v1/payins`, `POST /dapi/v1/payins/{payinId}/instructions` | nothing: each is identified by its own natural key — the email, the rail, the client, the payin. Sending a key is harmless. |
 
 Send no key and the server derives one from the request itself, echoes it as `idempotencyKey`, and you can pin that value from then on. A derived key replays for **2 hours**; an explicit key replays for **7 days**. That is why two genuinely distinct payouts of the same amount, minutes apart, both need explicit keys.

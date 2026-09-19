@@ -168,7 +168,7 @@ Booking a payout — to a bank account or to a wallet — and the contacts it pa
 
 | Slug | Status | What to do |
 | --- | --- | --- |
-| `contact_details_invalid` | 422 | The contact's requisites or address are incomplete for the method, at create or update time. `details.fields` names them. |
+| `contact_details_invalid` | 422 | The contact's account details or address are incomplete for the method, at create or update time. `details.fields` names them. |
 | `contact_in_use` | 409 | A payout still references this contact. It cannot be deleted. |
 | `contact_not_payable` | 409 | The contact cannot be paid on this rail. `details.blockers` is the same array `capabilities` returns — the codes are listed under [Contact blockers](#contact-blockers). |
 | `contact_payment_details_invalid` | 422 | The partner refused the contact's payment details — most often a beneficiary name the bank does not recognise. Correct the contact and book again. Not to be confused with `contact_details_invalid` above, which is our own refusal of an incomplete contact body. |
@@ -224,17 +224,15 @@ These arrive at `POST /dapi/v1/payouts/{payoutId}/confirm`; two of them — `quo
 | --- | --- | --- |
 | `already_funded` | 409 | **Success.** The money moved; `details.transactionHash` proves it. Never re-open. |
 | `funding_in_progress` | 409 | An attempt is still in flight. Wait, then confirm again. |
-| `funding_attempt_expired` | 409 | The approval expired. Re-open with the same `Idempotency-Key` and sign the new payload. |
-| `funding_attempts_exhausted` | 409 | Too many re-opens. Quote a new payout with a new key. |
-| `funding_state_unknown` | 409 | An earlier attempt may still land. **Do not retry.** Read the payout, then take it to support. |
+| `funding_attempt_expired` | 409 | The approval expired unsigned. Re-open with the same `Idempotency-Key` and sign the new payload. |
+| `payment_slot_consumed` | 409 | This payout's on-chain slot is spent — an operation for it landed, including one that reverted. Nothing you sign for it can move money. Book a new payout with a new key. |
 | `insufficient_funds` | 409 | The client's balance does not cover the debit. `details.available` and `details.required` are atomic units. |
 | `contact_changed` | 409 | The contact was edited after the payout was booked. Book again. |
 | `contact_not_found` | 404 | The contact was deleted. |
 | `quote_not_submitted` | 409 | The payout was never booked with the partner. Book it again. |
 | `quote_not_fundable` | 409 | The booking is no longer fundable. Request a new one. |
 | `funding_mode_unsupported` | 409 | This route cannot be funded with a developer key. |
-| `funding_token_unsupported` | 409 | Only USDC funds a payout. |
-| `self_transfer` | 409 | The contact is the client's own wallet. |
+| `funding_token_unsupported` | 409 | The payout's `sourceAccount` is not one a developer key can fund on this route. |
 | `smart_wallet_not_deployed` | 409 | The client's wallet is not on chain yet. Wait for `status: "ready"`. |
 | `wallet_owner_unverified` | 409 | The wallet's owner set does not yet include the signer. Contact support. |
 | `user_operation_rejected` | 502 | The bundler rejected the operation. Confirm again. |

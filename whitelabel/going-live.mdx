@@ -49,7 +49,7 @@ Confirm all four the same way you would in the sandbox: create one client, read 
 | Rail ids | Rail ids are opaque strings you copy from `GET /dapi/v1/banks`. Never hardcode one you saw in the sandbox; read them per client, per environment. |
 | Idempotency keys | Keys are scoped to your account and the environment. A key that replayed a sandbox payout means nothing in production. |
 
-Keep both sets of credentials loadable at once and choose by `HEVN_API`: a deploy that points a production key at the sandbox host fails at login with `401 invalid_credentials`, which is a confusing way to learn you swapped a variable.
+Keep both sets of credentials loadable at once and choose by `HEVN_API`: a deploy that points a production key at the sandbox host fails at login with `401 invalid_credentials`, and nothing in that refusal says you swapped a variable.
 
 The allowlist is the second variable that fails this way. A registration is pinned to the source IPs you gave it and cannot be edited, so a production deploy behind a different NAT answers `403` on every call although the key, the signature and the token are all correct. Enumerate the egress addresses of every host that will call HEVN — including the ones an autoscaler adds — before you register the production key.
 
@@ -61,7 +61,7 @@ In the sandbox every row exists by the time the call returns. In production most
 | --- | --- | --- |
 | Client provisioning | seconds | seconds — poll `GET /dapi/v1/client` with `X-Hevn-Account` until `ready` |
 | KYB decision | approved on completion | a review. Poll `GET /dapi/v1/client/kyb` with `X-Hevn-Account`; expect `rfi` at least as often as `approved` |
-| Rail activation | `active` with requisites immediately | `preparing` until the partner publishes the account details. Poll `GET /dapi/v1/banks` |
+| Rail activation | `active` with account details immediately | `preparing` until the partner publishes the account details. Poll `GET /dapi/v1/banks` |
 | Payin settlement | you call `/dapi/v1/sandbox/payins/{payinId}/complete` | the payer's bank moves on its own clock; the income row appears when it lands |
 | Payout settlement | you call `/dapi/v1/sandbox/payouts/{payoutId}/status` | the partner drives it. `settled` means accepted and debited, not delivered |
 | Ledger rows | written before the call returns | written when the money moves. Reconcile from `GET /dapi/v1/transactions`, not from the response you got an hour ago |
@@ -101,7 +101,7 @@ Refusals your sandbox runs never produced, because the emulator never argues:
     One HTTP helper that sleeps for `Retry-After`, re-mints once on `401`, and logs `X-Request-ID` on anything `5xx`. Support asks for that id first.
   </Step>
   <Step title="Re-read your refusal handling">
-    Especially the four funding codes: `already_funded` is success, `funding_in_progress` means wait, `funding_attempt_expired` means re-open with the same key, and `funding_state_unknown` means stop and ask. See [Errors](/whitelabel/reference/errors#funding-a-payment).
+    Especially the four funding codes: `already_funded` is success, `funding_in_progress` means wait, `funding_attempt_expired` means re-open with the same key, and `payment_slot_consumed` means this payout can never move money — book a new one. See [Errors](/whitelabel/reference/errors#funding-a-payment).
   </Step>
   <Step title="Rehearse losing the key">
     Register a second key before you need it, book a payout naming the new `publicKey`, and confirm it. Rotation is a field on `POST /dapi/v1/payouts`, not a migration — but only if the second key is already registered **and** its allowlist covers the hosts that will use it. Pause the old registration once the new one has carried a payment.
@@ -115,6 +115,6 @@ Refusals your sandbox runs never produced, because the emulator never argues:
   Run one real payment end to end before you point customers at it: one client, one rail, one small payout to an account you control, reconciled from `GET /dapi/v1/transactions`. Every difference on this page shows up in that one run.
 </Warning>
 
-<Card title="Next: Rails" icon="building-columns" href="/whitelabel/reference/rails">
-  Rail ids, payment methods, the identifiers each method needs, currencies and settlement tokens.
+<Card title="Next: Coverage" icon="globe" href="/whitelabel/reference/coverage">
+  The currencies money can arrive in, the markets it can leave for, and what decides availability.
 </Card>

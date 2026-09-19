@@ -4,7 +4,7 @@ description: "Open partner-bank payment details for your own customers and move 
 ---
 
 With the whitelabel API you open partner-bank payment details for your own customers and move their
-money from your backend — no HEVN UI, no HEVN operator, no end-user signature.
+money from your backend — no HEVN UI, no HEVN operator, no signature from your customer.
 
 ```mermaid
 flowchart TB
@@ -14,7 +14,7 @@ flowchart TB
     I -->|"you create and act for these"| Wallet
     subgraph Wallet["Client account — one per customer"]
         W["Base smart wallet<br/>the balance lives here"]
-        B["Bank rails<br/>requisites in the client's legal name"]
+        B["Bank rails<br/>account details in the client's legal name"]
         T["Contacts<br/>saved payout destinations"]
         B -->|"deposits settle into"| W
         W -->|"payouts leave for"| T
@@ -23,18 +23,19 @@ flowchart TB
 
 ## What you can build
 
-- **A marketplace with on-chain escrow.** Lock a buyer's funds in a contract while a seller
-  delivers, then capture them minus your fee.
-- **A payroll or payables platform.** Collect from an employer, pay contractors to their own bank
-  accounts in their own currencies.
-- **An embedded payments account.** Give each of your customers payment details in their own company
-  name, a balance, a statement and outgoing payments, under your brand.
+A marketplace that holds a buyer's funds in escrow until a seller delivers. A payables platform that
+collects from an employer and pays contractors in their own currencies. An embedded account that
+gives each of your customers payment details in their own company name, a balance and a statement,
+under your brand.
+
+All three are assembled from the same five calls, in different orders —
+[What you can build](/whitelabel/use-cases) takes each one end to end.
 
 ## How it works
 
 You hold one HEVN account — your **integrator account** — and it creates and controls other HEVN
 accounts, one per customer. Those are your **clients**. Each client is a real account: it has a legal
-identity you submit for review once, **rails** that produce requisites in its own name, a balance,
+identity you submit for review once, **rails** that produce account details in its own name, a balance,
 and a ledger.
 
 Every client balance is a stablecoin balance on that client's own Base smart wallet. Fiat arriving
@@ -72,6 +73,9 @@ permission to create clients. Both are a conversation, in the sandbox as in prod
 ## Where to start
 
 <CardGroup cols={3}>
+  <Card title="What you can build" icon="blocks" href="/whitelabel/use-cases">
+    Three products assembled out of the five moves every integration is made of.
+  </Card>
   <Card title="Quickstart" icon="rocket" href="/whitelabel/quickstart">
     Nine steps in the sandbox: a client company that holds testnet USDC and has sent some of it out, signed by your key.
   </Card>

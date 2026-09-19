@@ -3,7 +3,7 @@ title: "Agent workflows"
 description: "Primary operating guide for AI agents and scripts that use HEVN CLI safely."
 ---
 
-HEVN CLI is designed primarily for AI agents and automation, with human terminal output as a convenience layer. Agents should prefer explicit flags, structured output, non-interactive execution, and confirmation-free commands only when the user's intent is clear.
+This is the operating guide an agent follows before it acts on a HEVN account. Four rules cover most of it: read the CLI contract before you plan, ask for structured output, read a resource before you write it, and never invent a value you were not given.
 
 <Note>
   Using an MCP coding agent like Claude Code, Codex, or Cursor? Run [`hevn mcp install`](/cli/connect-agents) to expose every command as an MCP tool — the guidance below is delivered to the agent automatically.
@@ -111,3 +111,7 @@ hevn contracts delete --id <contract-id> --yes
 ## Debug safely
 
 `--debug` can include curl commands and authentication details. Use it for local troubleshooting, but redact before storing or sharing logs.
+
+<Card title="Next: Connect AI agents" icon="plug" href="/cli/connect-agents">
+  Register the CLI as an MCP server so an agent gets all of this automatically.
+</Card>

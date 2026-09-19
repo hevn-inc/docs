@@ -7,6 +7,18 @@ HEVN is a financial platform for global payments built on USDC. It gives individ
 
 Every HEVN account is a [Base Smart Wallet](https://docs.base.org/base-account/overview/what-is-base-account) on the Base network, owned exclusively by a key that only the user controls. HEVN the platform stores metadata (contacts, invoices, virtual account details) and orchestrates workflows, but it **cannot move, freeze, or access user funds**.
 
+## Two ways to use HEVN, two people holding the key
+
+Everything on this tab describes the **self-serve** product: the person who owns the email owns the
+wallet, and nothing moves without a signature from their own key. HEVN cannot sign for them.
+
+The [whitelabel](/whitelabel/overview) product moves that role. Your backend holds a developer key,
+your customer's company is the account holder and legal owner of the funds, and every payment is
+signed by you and co-signed by HEVN. Your customer never signs and never logs in.
+
+Read this tab for how the platform is built and what it cannot do with the money. Read the
+[Whitelabel](/whitelabel/overview) tab if you are the one holding the key.
+
 <CardGroup cols={2}>
   <Card title="Architecture" icon="layers" href="/general/architecture">
     How email, Privy, and Base smart wallets fit together.

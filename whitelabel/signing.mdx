@@ -163,8 +163,9 @@ response. Three rules follow:
 - **Re-opening is free and idempotent.** Call the opening route again with the same
   `Idempotency-Key`: an expired-and-unused approval is replaced with a fresh one on the *same* booked
   payment, at the same price. It does not re-quote and does not pay twice.
-- **Five attempts per payment.** After that a payment answers `funding_attempts_exhausted` and needs
-  a new one.
+- **Re-open as often as you need.** There is no attempt budget, because there is nothing to budget:
+  every re-opened approval prepares an operation in the same on-chain slot, and a slot can only be
+  spent once. See [Why a retry cannot pay twice](/whitelabel/conventions#why-a-retry-cannot-pay-twice).
 
 ## Retrying a confirm
 
@@ -179,13 +180,15 @@ Confirm is designed to be repeated, and it never pays twice. This table is the w
 | `502` `bundler_rejected` / `bundler_unavailable` | Chain infrastructure | Confirm again, with backoff |
 | `409` `funding_in_progress` | An attempt is live | Wait, then confirm again |
 | `409` `already_funded` | **The money moved** | Success. Read `details.transactionHash` |
-| `409` `funding_attempt_expired` | The approval expired | Re-open with the same `Idempotency-Key` |
-| `409` `funding_state_unknown` | An earlier attempt may still land | Stop. Contact support with the payment id |
+| `409` `funding_attempt_expired` | The approval expired unsigned | Re-open with the same `Idempotency-Key` |
+| `409` `payment_slot_consumed` | An operation for this payment already landed | Stop re-opening. Read the payout; book a new one only if it says `failed` |
 | `400` `signature_invalid` | Wrong bytes or wrong encoding | Fix the signing and confirm again |
 
 <Warning>
-  After a `202`, a `502` or a timeout, do not re-open the payment: an earlier attempt may still land.
-  Re-open only on an explicit `failed`, `funding_attempt_expired`, or a `409` that says so.
+  After a `202`, a `502` or a timeout, confirm again rather than re-opening — a signed operation may
+  still be in flight, and confirming is what resolves it. Re-open only on an explicit `failed` or
+  `funding_attempt_expired`. Re-opening after a signed operation is not dangerous — the chain refuses
+  the second one — it just answers `payment_slot_consumed` instead of telling you what happened.
 </Warning>
 
 The same policy as code, in one place:

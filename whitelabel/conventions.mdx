@@ -3,7 +3,7 @@ title: "Conventions"
 description: "The seven rules that hold for every operation: money, ids, casing, idempotency, pagination, status codes and errors."
 ---
 
-Seven rules hold for all 45 operations. Read them once and no endpoint will surprise you.
+Seven rules hold for every operation in this API. Read them once and no endpoint will surprise you.
 
 | Rule | In one line |
 | --- | --- |
@@ -105,6 +105,39 @@ A key is scoped to your account and the operation, so two integrators can never 
 key on `POST /payouts` and `POST /contacts` is not a replay. Reusing one with a different body is
 `409 idempotency_key_reused`, and `details` names the resource the key already belongs to. A
 malformed one is `400 idempotency_key_invalid`.
+
+## Why a retry cannot pay twice
+
+Deduplication happens twice, and the two layers answer different questions.
+
+**Your key deduplicates the request.** `Idempotency-Key` decides whether two HTTP calls are the same
+intent. It is what makes a lost response safe to retry: the second `POST /dapi/v1/payouts` answers
+`200` with `Idempotency-Replayed: true` and the payout the first one booked, rather than booking a
+second one. This layer is ours, it lives in our database, and it is the one you control.
+
+**The chain deduplicates the money.** Every payout owns exactly one slot in its client's smart
+wallet — an ERC-4337 nonce derived from the payout itself, not a counter — and a slot can be spent
+once. Two signatures for one payout are not two payments: the first operation to land takes the slot,
+and the second is rejected by the network itself. You can re-open an expired approval as often as you
+like, sign it twice, or race two processes that both retry; there is one slot, so there is one
+payment.
+
+That is why the refusals read the way they do:
+
+| You see | What actually happened |
+| --- | --- |
+| `Idempotency-Replayed: true` | The request was a duplicate. Nothing new was booked. |
+| `409 already_funded` | The slot was spent by an operation that settled. `details.transactionHash` is the proof. |
+| `409 payment_slot_consumed` | The slot was spent by an operation that landed and reverted. Nothing you sign for this payout can move money; book a new one. |
+| `409 funding_in_progress` | An operation is signed and in flight. Confirm again — that is what resolves it. |
+
+The practical rule stays small: keep the key identical across every retry of one payment, confirm
+until you get a `200`, and never invent a new key to "get past" a refusal. A new key is a new
+payment, a new slot and a second debit — the one thing neither layer can undo.
+
+The same mechanism covers escrow actions and money the client's own app sends: an operation prepared
+by your integration and one prepared in the app for the same payment compete for the same slot
+instead of both landing.
 
 ## Pagination
 
