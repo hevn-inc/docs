@@ -11,15 +11,14 @@ them out of its own wallet, signed by your key. Nine steps, all of them in the s
 - **Create a sandbox account in a browser.** Sign up at
   [`https://sandbox.gethevn.com`](https://sandbox.gethevn.com) with your work email. Sandbox and
   production are separate accounts; nothing you do here touches real money.
-- **Generate a developer key and add it to your account's signer, in the same browser.** Generate a
-  P-256 keypair on your machine and paste the **public** key into the app's developer-key screen.
-  That screen changes what can authorize money from your account, so it is authorized by your own
-  browser session rather than by the key.
-- **Register the key for API access.** `POST /api/v1/developer/api-keys`, with an owner session from
-  that same browser, carries the public key and — in `ipAllowlist` — the egress address of the
-  machine that will run this quickstart. Nothing logs in until that registration exists, and every
-  later call is re-checked against the allowlist: a request from an address you did not list is a
-  `403` however correct the key and the signature are. Walk-through:
+- **Create a developer key, in the same browser.** Open **Settings → Partner program → Developer keys** and create one.
+  You set two things that can never be changed afterwards: the **IP allowlist**, which for this
+  quickstart is the egress address of the machine you will run it from, and the **scopes**, which for
+  this quickstart are `payout:sign` and `recipient:write`. Every later call is re-checked against the
+  allowlist — a request from an address you did not list is a `403` however correct the key and the
+  signature are — and a route whose scope the key lacks is a `403` with `details.requiredScope`.
+- **Save the private key into your environment.** The browser shows it once. Write it to
+  `$HEVN_KEY_PEM` with mode `0600`; HEVN never holds it and cannot show it again. Walk-through:
   [Developer key](/whitelabel/developer-key).
 - **Set the environment and install two dependencies.** Everything after that is code.
 
@@ -304,7 +303,7 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
   </Step>
 
   <Step title="Prepare the payout">
-    `publicKey` says which of your registered keys will sign this payment.
+    `publicKey` says which of your keys will sign this payment.
 
     <CodeGroup>
 

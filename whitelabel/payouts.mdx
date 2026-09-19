@@ -211,11 +211,11 @@ Two optional reads price a payout before you book one. `GET /dapi/v1/contacts/{c
     | Decision | Field |
     | --- | --- |
     | Which side of the conversion you pin | `amount` is what leaves the client's balance, `amountTo` is what the beneficiary receives. Send exactly one. HEVN never adjusts the side you sent — it derives the other one through the partner's own fee formula. |
-    | Which registered key will sign | `publicKey`. A real choice while you rotate keys, which is why it is on the opening call and not on confirm. |
+    | Which of your keys will sign | `publicKey`. A real choice while you rotate keys, which is why it is on the opening call and not on confirm. |
     | What the beneficiary sees | `paymentReference`, up to 140 characters. |
     | What the destination rail demands | `purpose` when `capabilities` reports `purposeRequired`, and up to ten `documentIds` from [document upload](/whitelabel/onboarding) when it reports `documentsRequired`. |
     | Which of several accounts to pay | `bankId` (`bnk_…`), the same id `capabilities` returns on each option, when a contact has more than one. Omit it and HEVN picks the account `capabilities` would pick. |
-    | Which token pays for it | `sourceAccount`, `USDC` (the default) or `EURC` — the settlement token debited from the client's balance. A wallet contact must be able to receive it: asking to pay a USDC address in EURC is refused with `400`, and so is a token the rail cannot be funded with. |
+    | Which account pays for it | `sourceAccount`, `USDC` (the default) or `EURC` — the client account debited. A wallet contact must be able to receive it: asking to pay a USDC address in EURC is refused with `400`, and so is a token the rail cannot be funded with. |
 
     Amounts are decimal strings in the major unit — `"500.00"`, never `500` and never atomic units. More precision than the asset allows is refused, never rounded ([Conventions](/whitelabel/conventions#money)).
   </Step>
@@ -268,6 +268,8 @@ Two optional reads price a payout before you book one. `GET /dapi/v1/contacts/{c
     | `202` | `status: "submitted"`, `pollUrl` | Sent, no receipt yet. Read `pollUrl` or confirm again — both are safe. |
 
     `publicKey` is optional in the confirm body and only skips a key scan: HEVN verifies your signature locally, against the payload it stored, before it consumes anything. A wrong signature never burns the approval.
+
+    Confirm needs the `payout:sign` scope. A key without it answers `403 forbidden` with `details.requiredScope`, before the signature is read and before anything is consumed — see [Developer key](/whitelabel/developer-key#scopes).
   </Step>
 
   <Step title="Track it to completion">
@@ -369,7 +371,7 @@ contact, err := northwind.Post("/contacts", hevn.Body{
 ```
 </CodeGroup>
 
-A wallet contact needs no postal address on file — the chain is the address. **A settlement token on Base — USDC or EURC — is paid straight from the client's balance**: nothing is converted, no partner is involved, and the address you saved is the address the money lands on. The quote is still there, priced at par: the deposit address it names *is* the contact's own address. A contact on any other [chain](/whitelabel/reference/rails#chain-codes), or expecting any other token, is **routed** instead — still one `POST /dapi/v1/payouts`, still `kind: "onchain"`, but priced as a cross-chain route ([below](#a-routed-payout-is-priced)). A contact saved by `email` also works when that email belongs to a HEVN account: HEVN resolves it to that account's wallet.
+A wallet contact needs no postal address on file — the chain is the address. **An account on Base — USDC or EURC — pays straight from the client's balance**: nothing is converted, no partner is involved, and the address you saved is the address the money lands on. The quote is still there, priced at par: the deposit address it names *is* the contact's own address. A contact on any other [chain](/whitelabel/reference/rails#chain-codes), or expecting any other token, is **routed** instead — still one `POST /dapi/v1/payouts`, still `kind: "onchain"`, but priced as a cross-chain route ([below](#a-routed-payout-is-priced)). A contact saved by `email` also works when that email belongs to a HEVN account: HEVN resolves it to that account's wallet.
 
 ### What comes back
 

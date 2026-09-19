@@ -82,7 +82,9 @@ reader is an engineer. Every other tab is brought to it, not the reverse.
 - Sentence case for every heading. Never Title Case.
 - End a guide page with a single `<Card title="Next: …">` pointing at the next
   page in the reading order.
-- Prefer a table to a bullet list whenever the bullets share a shape.
+- Prefer a table to a bullet list whenever the bullets share a shape — but keep
+  bullets when each one is a different thing rather than a different value of
+  the same thing.
 - One `<CodeGroup>` per operation, tabs in the order cURL, Python, Node, Go.
 
 ### Sentences
@@ -97,7 +99,10 @@ reader is an engineer. Every other tab is brought to it, not the reverse.
 ### Things not to write
 
 - **Feature lists without a task.** No "What you can do", no "Key features".
-  Say what the reader is trying to achieve, then how.
+  Say what the reader is trying to achieve, then how. This bans enumerating API
+  capabilities — it does **not** ban bullets. A short list of distinct things the
+  reader could build or decide between, each with a bolded lead-in, is the right
+  shape for a first screen, and turning one into a paragraph makes it worse.
 - **"Best practices" sections.** Put the practice next to the thing it applies to.
 - **Emoji in headings or bullets.**
 - **Marketing superlatives.** "seamless", "powerful", "simply", "just", "easily".

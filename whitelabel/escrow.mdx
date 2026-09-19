@@ -94,7 +94,7 @@ HEVN sponsors the gas for every action and charges nothing on top.
 - Your account may operate escrow. HEVN enables that, in the sandbox as in production; nothing in the API grants it. Without it every escrow call is refused — see [Going live](/whitelabel/going-live#what-hevn-must-enable).
 - The buyer's wallet holds the token when you authorize, not when you create. Creating a deal moves nothing.
 - Call escrow with your own access token and **no** `X-Hevn-Account` — the header answers `400 account_scope_conflict` on every escrow route.
-- Your developer key registration is active and the call leaves an allowlisted source IP. Both are re-checked on every request, and again immediately before HEVN co-signs an action — see [Developer key](/whitelabel/developer-key).
+- Your developer key still exists, holds the `escrow:sign` scope, and the call leaves an allowlisted source IP. All three are re-checked on every request, and again immediately before HEVN co-signs an action — see [Developer key](/whitelabel/developer-key#scopes).
 
 <IdempotencySnippet />
 

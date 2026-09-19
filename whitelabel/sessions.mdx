@@ -26,7 +26,7 @@ Two calls, two signatures, no browser.
 
 **`POST /dapi/v1/auth/challenge`** proves you hold the key. Sign the proof string
 `hevn-developer-key-login:{email}:{nonce}:{requestExpiry}` with your developer key and send it with
-the public key you registered. `nonce` is any integer you have not used before; `requestExpiry` is a
+the public key of the key you created. `nonce` is any integer you have not used before; `requestExpiry` is a
 millisecond timestamp at most five minutes in the future.
 
 ```json
@@ -72,13 +72,13 @@ import LoginSnippet from "/snippets/login.mdx";
 | `accessToken` | **1 hour** (`expiresIn: 3600`) | `platform` | Every call: `Authorization: Bearer <accessToken>` |
 | `refreshToken` | **60 days** | `platform-refresh` | One route only: `POST /dapi/v1/auth/refresh`, to mint a new access token |
 
-Both carry a `developer_key_id` claim naming the key registration that established the session, and
+Both carry a `developer_key_id` claim naming the developer key that established the session, and
 the two audiences do not cross. `/dapi/v1` refuses anything that is not a platform access token
 carrying that claim: no bearer at all is `401 unauthenticated`, and an ordinary app token, a refresh
-token on a business route or a token with no registration behind it is `403 forbidden` with
+token on a business route or a token with no key behind it is `403 forbidden` with
 `details.reason = "developerSessionRequired"`. The ordinary `/api/v1` refuses a platform token
-symmetrically, which is why the routes that register a developer key are not on this API — see
-[Developer key](/whitelabel/developer-key#register-it-once-per-environment).
+symmetrically, which is why a developer key is created in the app rather than over either API — see
+[Developer key](/whitelabel/developer-key#create-it-in-the-app).
 
 Re-mint with the refresh token as the bearer and an empty body:
 
@@ -188,13 +188,18 @@ development:
 ## What a session is bound to
 
 - **An environment.** Sandbox tokens are refused in production and the reverse.
-- **The key registration behind it, on every single request.** The `developer_key_id` in the token is
-  re-read before the request is served: the registration must still be active, and the call must come
-  from an address inside its immutable allowlist. Pausing a registration therefore **does** cut the
-  tokens already minted from it — the next call is a `403`, and so is the refresh that would have
-  replaced it. See [Developer key](/whitelabel/developer-key#rotate-a-key).
+- **The key behind it, on every single request.** The `developer_key_id` in the token is re-read
+  before the request is served: the key must still exist, and the call must come from an address
+  inside its immutable allowlist. Deleting a key therefore **does** cut the tokens already minted
+  from it — the next call is a `403`, and so is the refresh that would have replaced it. See
+  [Developer key](/whitelabel/developer-key#rotate-a-key).
 - **A set of source addresses.** A deploy from a new egress IP fails every call with `403` even
   though the key, the signature and the token are all correct.
+- **The key's scopes.** A session may call the confirm routes and the contact writes its key was
+  given, and no others: a route the key lacks the scope for is `403 forbidden` with
+  `details.requiredScope` and `details.scope`. Scopes are fixed when the key is created and they
+  limit *which* routes, not *how much* money those routes may move. The four values and the routes
+  each one opens are on [Developer key](/whitelabel/developer-key#scopes).
 - **A budget.** Reads and writes are limited per credential, and login has its own per-IP and
   per-email windows — over them is `429` with `Retry-After`. The numbers are in
   [Limits](/whitelabel/reference/limits#rate-limits). Logging in on a loop is the fastest way to lock

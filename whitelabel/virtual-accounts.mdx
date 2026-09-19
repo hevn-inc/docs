@@ -267,7 +267,7 @@ Read both back, never cache them:
 { "rail": "sepa_named-bank_a", "supportedAccounts": ["EURC"], "destinationAccount": "EURC" }
 ```
 
-The choice that is yours per payment is on the money-in side. `POST /dapi/v1/payins` takes `destinationAccount` and quotes the deposit in it; when no rail of the client's settles into the token you asked for, the refusal carries `details.options[]` with the pairs that do ([Payins](/whitelabel/payins)). Nothing on this page converts an existing balance — a settlement token only ever describes money that has not arrived yet.
+The choice that is yours per payment is on the money-in side. `POST /dapi/v1/payins` takes `destinationAccount` and quotes the deposit in it; when no rail of the client's settles into the token you asked for, the refusal carries `details.options[]` with the pairs that do ([Payins](/whitelabel/payins)). Nothing on this page converts an existing balance — `destinationAccount` only ever names where money that has not arrived yet will land.
 
 
 <Card title="Next: Payins" icon="arrow-right" href="/whitelabel/payins">

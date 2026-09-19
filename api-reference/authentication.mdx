@@ -24,21 +24,34 @@ Python, Node and Go.
 
 | Credential | Where it lives | Lifetime | What it authorizes |
 | --- | --- | --- | --- |
-| **Developer key** — a P-256 keypair you generate | Your servers. HEVN stores only the public half | Until you pause its registration | Logging in without a browser, and signing money movement |
-| **Its registration** — a `dk_…` row with an IP allowlist and a scope | HEVN's database | Until you pause it | Which key may log in, and from which source addresses |
+| **Developer key** — a P-256 keypair, `dk_…` | Your servers. HEVN stores only the public half | Until you delete it | Logging in without a browser, and signing money movement |
+| **Its allowlist and scopes** — fixed when the key is created | HEVN's database | The life of the key | Which source addresses may use it, and which routes a session from it may call |
 | **Refresh token** (`platform-refresh`) | Your secret store | 60 days | Only `POST /auth/refresh` |
 | **Access token** (`platform`, carrying `developer_key_id`) | In memory | 60 minutes (`expiresIn: 3600`) | Every other operation |
 
-Registration is two steps, both once per environment. The public half joins your account's signer, which changes what
-may sign for your wallets and needs your own browser session. Then the same key is registered with
-`POST /api/v1/developer/api-keys` — an ordinary owner JWT, a body of `{publicKey, ipAllowlist, scope}` — and that call
-returns the `dk_…` id. Only the second step makes login work. `ipAllowlist` and `scope` are immutable, so rotation is
-register-then-pause rather than edit. Everything after that is code — see
-[Developer key](/whitelabel/developer-key).
+A key is created in the HEVN app, once per environment, not over the API — the browser generates the private half and
+shows it once, and the public half joins your account's signer in the same action. Creation fixes the **IP allowlist**
+and the **scopes**, neither of which can be edited afterwards, so rotation is create-then-delete rather than edit.
+Everything after that is code — see [Developer key](/whitelabel/developer-key).
 
-Every `/dapi/v1` request re-reads the registration: it must still be active, and the call must come from an address the
-allowlist covers. A paused key stops the sessions it already minted on their next request, and the same check runs
-again on `POST /auth/refresh` and immediately before HEVN co-signs.
+Every `/dapi/v1` request re-reads the key: it must still exist, the call must come from an address the allowlist
+covers, and the route must be one the key's scopes open. Deleting a key stops the sessions it already minted on their
+next request, and the same checks run again on `POST /auth/refresh` and immediately before HEVN co-signs.
+
+## Scopes
+
+Four scopes exist. A key holds the ones it was created with, and a route it lacks the scope for is `403 forbidden`
+with `details.requiredScope` and `details.scope`.
+
+| Scope | Operations it opens |
+| --- | --- |
+| `payout:sign` | `POST /payouts/{payoutId}/confirm` |
+| `escrow:sign` | `POST /escrow/{escrowId}/actions/{idempotencyKey}/confirm` |
+| `recipient:write` | `POST /contacts`, `PATCH /contacts/{contactId}`, `DELETE /contacts/{contactId}` |
+| `swap:sign` | Nothing today. No operation in this reference reads it |
+
+Every other operation is open to any platform session. A scope decides which routes the session may call; it puts no
+ceiling on the amounts those routes move.
 
 ## Log in
 
@@ -62,8 +75,8 @@ Two calls, neither of which needs a token.
   </Step>
 </Steps>
 
-A challenge is single-use and expires within minutes. Every credential problem — unknown email, unregistered key,
-detached signer, bad signature, a paused registration, a source IP the allowlist does not cover — answers the same
+A challenge is single-use and expires within minutes. Every credential problem — unknown email, a key that is not on
+the account, a detached signer, a bad signature, a source IP the allowlist does not cover — answers the same
 `401 invalid_credentials`, so probing learns nothing; only an expiry outside the window differs, as
 `400 request_expired`.
 
@@ -113,8 +126,8 @@ Sending the header where it is refused is an error, not a silent no-op, and so i
 
 <Warning>
   Tokens are bound to the server that issued them. A sandbox token is refused by production and the
-  reverse, so log in separately against each host, and keep one developer key — and one registration, with that
-  environment's egress IPs — per environment.
+  reverse, so log in separately against each host, and keep one developer key — created in that environment's app, with
+  that environment's egress IPs — per environment.
 </Warning>
 
 ## Signing money movement
@@ -139,8 +152,8 @@ the developer key, because that key — not HEVN alone — can authorize a spend
   </Step>
 </Steps>
 
-Approvals are short: 120 seconds for a payout, 60 seconds for an escrow action. HEVN re-checks the key's registration
-and your source IP immediately before it co-signs, so a key paused between prepare and confirm fails the confirm with a
+Approvals are short: 120 seconds for a payout, 60 seconds for an escrow action. HEVN re-checks the key, its scopes and
+your source IP immediately before it co-signs, so a key deleted between prepare and confirm fails the confirm with a
 `403`. The byte-level rules, the pitfalls and the retry table are in [Signing](/whitelabel/signing).
 
 <Warning>

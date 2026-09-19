@@ -19,8 +19,8 @@ Authenticated windows are keyed per **credential** — the access token's creden
 | Sandbox money | 60 per hour | account | `POST /dapi/v1/sandbox/deposits`, `/payins/{payinId}/complete`, `/payouts/{payoutId}/status` |
 
 The three login windows cover `POST /auth/challenge` and `POST /auth/token` only. `POST /auth/refresh` carries no
-login limiter — it is an ordinary write, and it re-checks the developer key registration behind the session before it
-mints anything.
+login limiter — it is an ordinary write, and it re-checks the developer key behind the session before it mints
+anything.
 
 Exceeding one answers `429 rate_limited` with `Retry-After` in seconds. Sleep for it and retry — the helper in [HTTP client](/whitelabel/reference/client) does this for you.
 
@@ -73,15 +73,14 @@ A response that replayed a create answers `200` with `Idempotency-Replayed: true
 | `publicKey` on a payout | 512 characters |
 | `signature` | 2,048 characters |
 | Escrow duration | `^\d{1,4}[smhd]$` — up to 9999 seconds, minutes, hours or days |
-| `publicKey` on a developer key registration | 4,096 characters |
-| `ipAllowlist` on a developer key registration | 1 to 64 addresses or CIDR networks |
+| `publicKey` on a developer key | 4,096 characters |
+| The IP allowlist on a developer key | 1 to 64 addresses or CIDR networks |
 
 There is no `offset` anywhere. Walk a list by passing `nextCursor` back as `cursor` until it is absent.
 
-The two developer-key caps are the only ones you cannot raise by calling again: `ipAllowlist` and `scope` are frozen
-when the registration is created, so a network the allowlist does not cover needs a second registration, not an edit.
-The `publicKey` cap there is the DER-encoded public half, which is a different field from the 512-character
-`publicKey` a payout carries.
+The two developer-key caps are the only ones you cannot raise by calling again: the allowlist and the scopes are frozen
+when the key is created, so a network the allowlist does not cover needs a second key, not an edit. The `publicKey` cap
+there is the DER-encoded public half, which is a different field from the 512-character `publicKey` a payout carries.
 
 ## Sandbox
 

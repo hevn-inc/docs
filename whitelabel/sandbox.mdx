@@ -73,7 +73,7 @@ treasury, err := api.Get("/sandbox/treasury")
 
 `POST /dapi/v1/sandbox/deposits` has two arms, and `bankId` picks between them.
 
-- **With `bankId`** it is an unsolicited bank transfer into that rail's account details: `amount` is in the rail's currency, the emulator converts at the fixed rate and delivers the settlement token to the client's wallet. `remitter` and `paymentReference` are the payer's name and message.
+- **With `bankId`** it is an unsolicited bank transfer into that rail's account details: `amount` is in the rail's currency, the emulator converts at the fixed rate and credits the client's account. `remitter` and `paymentReference` are the payer's name and message.
 - **Without `bankId`** it is a token transfer straight to the client's wallet. `token` is `USDC` (default) or `EURC`, and it is the fastest way to fund a client before a payout test.
 
 <CodeGroup>
@@ -113,7 +113,7 @@ credit, err := northwind.Post("/sandbox/deposits", hevn.Body{"amount": "6.00", "
   "credited": "6.000000", "txHash": "0x08fa…", "transactionId": "txn_9e4…" }
 ```
 
-A bank deposit answers the same shape with the fiat side filled in — `amount` and `currency` in the rail's currency, `credited` in the settlement token, plus `fee`, `feeCurrency` and `rate`. When the credit settles a payin you quoted, `payinId` names it.
+A bank deposit answers the same shape with the fiat side filled in — `amount` and `currency` in the rail's currency, `credited` in the account it landed in, plus `fee`, `feeCurrency` and `rate`. When the credit settles a payin you quoted, `payinId` names it.
 
 The key is optional here, as everywhere. Send one and a retry replays it (`200` with `Idempotency-Replayed: true`); send none and HEVN derives one from the request and echoes it as `idempotencyKey`. Two identical un-keyed deposits always replay, whatever the gap between them, so pass an explicit key when you want a second identical credit.
 

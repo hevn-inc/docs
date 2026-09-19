@@ -37,11 +37,12 @@ On chain the client's smart wallet has exactly one owner: an EOA created for tha
 never exists outside [Privy's key management](/general/privy-wallets). Three things must happen
 before that EOA signs anything:
 
-1. **Your session is still allowed to ask.** Every request re-reads the developer-key registration
-   behind your token: it must still be active, and the request must come from an address inside that
-   registration's immutable allowlist. HEVN checks both again immediately before it co-signs.
-2. **You sign.** Your developer key is registered as a signer for the wallet, and signs the exact
-   operation HEVN prepared.
+1. **Your session is still allowed to ask.** Every request re-reads the developer key behind your
+   token: it must still exist, the request must come from an address inside that key's immutable
+   allowlist, and the route must be one the key's scopes open. HEVN checks all three again
+   immediately before it co-signs.
+2. **You sign.** Your developer key is a signer for the wallet, and signs the exact operation HEVN
+   prepared.
 3. **HEVN co-signs.** The signer is a two-of-two quorum: your key and HEVN's own authorization key.
    HEVN adds its half only to the operation it built itself, after verifying your signature over the
    same bytes locally.
@@ -76,11 +77,12 @@ Keep the payment id you used as `Idempotency-Key`, the `debit` you asserted, and
 
 **The client's money survives your incident, not your negligence.** Because your integrator account —
 not a single key — controls the wallet's owner quorum, losing a developer key is not losing funds:
-register a new key, deploy it, pause the old registration, and keep signing. A *leaked* key is
-different. Until you pause its registration, whoever holds it can ask HEVN to build a payment from
-any of your clients' wallets, and HEVN will co-sign it, because that is exactly what the key means.
-The one thing standing between the two is the registration's IP allowlist: the holder has to be on a
-network you listed, and pausing the registration stops the next request with it.
+create a new key, deploy it, delete the old one, and keep signing. A *leaked* key is different. Until
+you delete it, whoever holds it can ask HEVN to build a payment from any of your clients' wallets it
+has the scope for, and HEVN will co-sign it, because that is exactly what the key means. Two things
+stand between the two: the key's IP allowlist, so the holder has to be on a network you listed, and
+its scopes, which decide the routes it opens — but not the amounts they move. Deleting the key stops
+the next request with it.
 
 <Warning>
   Treat the developer key as a spending credential for every client balance at once. Keep the private
@@ -96,5 +98,5 @@ with `X-Hevn-Account: cl_…` added — one token, any client. Where that header
 required and where it is refused is [Sessions](/whitelabel/sessions#acting-as-a-client).
 
 <Card title="Next: Developer key" icon="key-round" href="/whitelabel/developer-key">
-  Generate it, register it, verify it, and rotate it without downtime.
+  Create it, scope it, load it, and rotate it without downtime.
 </Card>

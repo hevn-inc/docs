@@ -43,7 +43,7 @@ Confirm all four the same way you would in the sandbox: create one client, read 
 
 | Re-create in production | Why |
 | --- | --- |
-| The developer keypair and its registration | Keys are registered per environment. Generate a fresh P-256 key for production, add its public half to that account's signer, then register it with `POST /api/v1/developer/api-keys` carrying the **production** egress IPs in `ipAllowlist`. The sandbox key, and the sandbox allowlist, are both unknown in production. |
+| The developer key | Keys belong to one environment. Create a fresh one in the production app, with the **production** egress IPs in its allowlist and the scopes that deployment needs. The sandbox key, and the sandbox allowlist, are both unknown in production. |
 | Every client | A `cl_…` from the sandbox does not exist in production, and neither does anything hanging off it: KYB, rails, contacts, escrow deals. |
 | Tokens | Access and refresh tokens are environment-scoped. |
 | Rail ids | Rail ids are opaque strings you copy from `GET /dapi/v1/banks`. Never hardcode one you saw in the sandbox; read them per client, per environment. |
@@ -51,7 +51,9 @@ Confirm all four the same way you would in the sandbox: create one client, read 
 
 Keep both sets of credentials loadable at once and choose by `HEVN_API`: a deploy that points a production key at the sandbox host fails at login with `401 invalid_credentials`, and nothing in that refusal says you swapped a variable.
 
-The allowlist is the second variable that fails this way. A registration is pinned to the source IPs you gave it and cannot be edited, so a production deploy behind a different NAT answers `403` on every call although the key, the signature and the token are all correct. Enumerate the egress addresses of every host that will call HEVN — including the ones an autoscaler adds — before you register the production key.
+The allowlist is the second variable that fails this way. A key is pinned to the source IPs you gave it and cannot be edited, so a production deploy behind a different NAT answers `403` on every call although the key, the signature and the token are all correct. Enumerate the egress addresses of every host that will call HEVN — including the ones an autoscaler adds — before you create the production key.
+
+The scopes are the third. They are fixed at creation too, and a route the key does not cover answers `403 forbidden` with `details.requiredScope`. A production key that confirms payouts and maintains the contact book needs `payout:sign` and `recipient:write`; one that also runs escrow needs `escrow:sign`. See [Developer key](/whitelabel/developer-key#scopes).
 
 ## What stops being instant
 
@@ -88,8 +90,8 @@ Refusals your sandbox runs never produced, because the emulator never argues:
   <Step title="Get the flags">
     Integrator profile, client creation, escrow if you need it, and the rails for your markets. Verify by listing rails for a real client, not by being told.
   </Step>
-  <Step title="Register a production developer key">
-    A new P-256 keypair, generated on the machine that will hold it, mode `0600`. Add the public half to the production account's signer, then register it with `POST /api/v1/developer/api-keys` and the production egress IPs. Never copy the sandbox key, and never assume the sandbox allowlist carries over.
+  <Step title="Create a production developer key">
+    In the production app, with the production egress IPs in its allowlist and the scopes that deployment needs. Save the private half the browser shows you to a file with mode `0600` on the machine that will hold it. Never copy the sandbox key, and never assume the sandbox allowlist or scopes carry over.
   </Step>
   <Step title="Delete every /dapi/v1/sandbox call">
     There are four, and all four answer `404` in production. Whatever they drove — a deposit, a payin settling, a payout moving — now happens because a bank did it.
@@ -104,7 +106,7 @@ Refusals your sandbox runs never produced, because the emulator never argues:
     Especially the four funding codes: `already_funded` is success, `funding_in_progress` means wait, `funding_attempt_expired` means re-open with the same key, and `payment_slot_consumed` means this payout can never move money — book a new one. See [Errors](/whitelabel/reference/errors#funding-a-payment).
   </Step>
   <Step title="Rehearse losing the key">
-    Register a second key before you need it, book a payout naming the new `publicKey`, and confirm it. Rotation is a field on `POST /dapi/v1/payouts`, not a migration — but only if the second key is already registered **and** its allowlist covers the hosts that will use it. Pause the old registration once the new one has carried a payment.
+    Create a second key before you need it, book a payout naming the new `publicKey`, and confirm it. Rotation is a field on `POST /dapi/v1/payouts`, not a migration — but only if the second key already exists **and** its allowlist and scopes cover the hosts and routes that will use it. Delete the old key once the new one has carried a payment.
   </Step>
   <Step title="Fund what production makes you fund">
     Escrow refunds leave your own wallet, and a payout debits the client's. The sandbox faucet account covered both; now your balances do.

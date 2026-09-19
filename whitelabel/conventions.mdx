@@ -43,10 +43,10 @@ Every id is prefixed, opaque and safe to store as text:
 | `po_` | payout, over a bank rail or on chain | `doc_` | document |
 | `pi_` | payin | `kyb_` | KYB application |
 | `txn_` | transaction | `esc_` | escrow deal |
-| `ct_` | contact | `dk_` | developer key registration |
+| `ct_` | contact | `dk_` | developer key |
 
-A `dk_…` is the one id you never send to this API: it names a developer key registration and belongs
-to the management routes on the ordinary API ([Developer key](/whitelabel/developer-key)).
+A `dk_…` is the one id you never send to this API: it names a developer key, which is created and
+deleted in the HEVN app ([Developer key](/whitelabel/developer-key)).
 
 Do not parse them, derive them or assume a length. An id of the wrong kind in a body or query field
 is `400 invalid_id` with the expected prefix in `details`; in a path it is that resource's own `404`,

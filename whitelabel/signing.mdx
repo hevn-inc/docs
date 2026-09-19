@@ -59,7 +59,7 @@ refuses that header. Every confirm body is the same two fields:
 { "signature": "MEUCIQD…", "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE…" }
 ```
 
-`publicKey` is optional; it only saves HEVN a scan over your registered keys. A key that is not one
+`publicKey` is optional; it only saves HEVN a scan over your account's keys. A key that is not one
 of them is `403 key_not_registered` — see [Developer key](/whitelabel/developer-key#when-a-key-is-refused).
 
 Every other call in these guides carries a cURL tab. The confirms do not: a signature is produced by
@@ -141,9 +141,9 @@ At confirm, your signature is verified **locally** against the stored bytes befo
 consumed. A wrong signature is a refusal that costs you nothing: the approval survives, and you can
 fix the signing and confirm again.
 
-The credential is re-checked at both ends. Every request on this API re-reads the developer-key
-registration behind your session and the address the request came from, and the confirm re-checks
-them once more immediately before HEVN co-signs — so a registration paused between the prepare and
+The credential is re-checked at both ends. Every request on this API re-reads the developer key behind
+your session, the address the request came from and the scopes the key holds, and the confirm
+re-checks them once more immediately before HEVN co-signs — so a key deleted between the prepare and
 the confirm, or a confirm sent from an address outside its allowlist, is a `403` and nothing is
 signed. See [Developer key](/whitelabel/developer-key#the-ip-allowlist).
 

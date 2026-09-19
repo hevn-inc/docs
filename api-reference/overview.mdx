@@ -49,7 +49,7 @@ Authorization: Bearer <accessToken>
 
 The access token is a short-lived JWT your backend mints for itself by signing a challenge with your registered
 developer key. It is the **only** credential this API accepts. Its audience is `platform` and it carries a
-`developer_key_id` claim naming the registration that established the session; a request under `/dapi/v1` carrying
+`developer_key_id` claim naming the developer key that established the session; a request under `/dapi/v1` carrying
 anything else — no bearer, an ordinary API token, or the `platform-refresh` token — is refused before it reaches a
 route, with `401 unauthenticated` or `403 forbidden` and `details.reason: "developerSessionRequired"`. Ordinary
 `/api/v1` routes refuse a platform token just as firmly, in the other direction.
@@ -58,9 +58,10 @@ The schema shows an optional `x-api-key` parameter on every operation. That is a
 a credential: an API key belongs to the [CLI](/cli/overview) and can never authenticate here, because the boundary
 refuses the request before the key is read.
 
-HEVN re-reads the developer key registration on every request: it must still be active, and the request must arrive
-from an address inside the immutable allowlist registered with it. A paused key or a new egress IP is a `403` on every
-operation, whatever the token says — see [Developer key](/whitelabel/developer-key).
+HEVN re-reads the developer key on every request: it must still exist, the request must arrive from an address inside
+the immutable allowlist set when the key was created, and the operation must be one the key's scopes open. A deleted
+key, a new egress IP or a missing scope is a `403` on every operation, whatever the token says — see
+[Developer key](/whitelabel/developer-key).
 
 To act for one of your clients, send that client's id in a second header instead of minting a second
 token:

@@ -28,7 +28,7 @@ flowchart LR
 
 `POST /dapi/v1/clients` deploys a Base smart wallet for the client and returns its address as
 `baseSmartWallet`. That address is the balance: `GET /dapi/v1/client/balance`, with the client's id
-in `X-Hevn-Account`, reads it on chain, one row per settlement token, and no HEVN database holds an
+in `X-Hevn-Account`, reads it on chain, one row per account the client holds, and no HEVN database holds an
 authoritative copy.
 
 Two tokens can sit there: **USDC** and **EURC**. Which one a rail settles into is the rail's
@@ -41,7 +41,7 @@ A rail is a bank route you request for one client. When the partner bank opens i
 **account details** — an IBAN, an account and routing number, a PIX key — in the client's own legal
 name. Money wired there is
 received by the partner bank, converted at the rate the rail quotes, and delivered to the client's
-wallet as the rail's settlement token, minus the rail's `feeBps`.
+wallet into the account the rail settles into, minus the rail's `feeBps`.
 
 You can price that arrival before it happens. `POST /dapi/v1/payins` quotes an incoming amount and
 `POST /dapi/v1/payins/{payinId}/instructions` returns what the payer needs to see. Money that arrives
@@ -88,7 +88,7 @@ balance, or `amountTo` to pin what the beneficiary receives — never both, and 
 other side yourself.
 
 A wallet contact is the same envelope with no fiat leg. `POST /dapi/v1/payouts` with a contact that
-is an address, then the same confirm route, sends a settlement token — USDC or EURC, whichever you
+is an address, then the same confirm route, pays from an account — USDC or EURC, whichever you
 name in `sourceAccount` — from the client's wallet straight to it. It is still quoted, and the quote's
 deposit address is the contact's own address, so `debit.address` is where the money actually lands. No
 conversion, no partner, no second resource to learn.

@@ -75,7 +75,7 @@ A `422 validation_failed` names every field that failed, in wire spelling, with 
 | `idempotency_key_reused` | 409 | The same key already names different terms. `details` carries the id it owns (`payoutId`, `escrowId`). Replay the exact body, or use a new key. |
 | `unauthenticated` | 401 | Send `Authorization: Bearer <accessToken>`. |
 | `token_expired` | 401 | Re-mint with `POST /dapi/v1/auth/refresh` and retry once. |
-| `forbidden` | 403 | This session may not perform this operation. On `/dapi/v1` it is also what a non-platform token, a paused developer key registration and an off-allowlist source IP answer — see [Developer keys](#developer-keys). |
+| `forbidden` | 403 | This session may not perform this operation. On `/dapi/v1` it is also what a non-platform token, a deleted developer key, an off-allowlist source IP and a missing scope answer — see [Developer keys](#developer-keys). |
 | `not_found` | 404 | No such resource. |
 | `method_not_allowed` | 405 | Wrong verb for this path. |
 | `conflict` | 409 | A state conflict with no narrower slug. Read `message`, re-read the resource. |
@@ -96,7 +96,7 @@ A `422 validation_failed` names every field that failed, in wire spelling, with 
 | `challenge_consumed` | 409 | A challenge is single-use. Start a new one. |
 | `challenge_expired` | 410 | Start a new challenge and sign it promptly. |
 | `signature_invalid` | 400 | The signature does not verify against the stored payload. Nothing was consumed — sign the decoded payload bytes and try again. |
-| `key_not_registered` | 403 | This public key is not in the account's signer, or has no registration of its own. See [Developer key](/whitelabel/developer-key). |
+| `key_not_registered` | 403 | This public key is not one of the account's developer keys. See [Developer key](/whitelabel/developer-key). |
 | `signer_not_attached` | 409 | The developer signer is not attached to the account's wallet. |
 | `wallet_not_linked` | 409 | The account has no wallet yet. For a client, wait for `status: "ready"`. |
 | `approval_consumed` | 409 | This approval already signed something. Prepare the operation again. |
@@ -108,23 +108,25 @@ A `422 validation_failed` names every field that failed, in wire spelling, with 
 
 ## Developer keys
 
-A platform session is established by one registered developer key, and every `/dapi/v1` request re-reads that
-registration: it must still be active, and the request must arrive from an address inside the key's allowlist. Both
-checks are repeated on `POST /dapi/v1/auth/refresh` and again immediately before HEVN co-signs, so pausing a key stops
-the sessions it already minted rather than waiting for them to expire.
+A platform session is established by one developer key, and every `/dapi/v1` request re-reads it: the key must still
+exist, the request must arrive from an address inside the key's allowlist, and the route must be one the key's scopes
+cover. All three checks are repeated on `POST /dapi/v1/auth/refresh` and again immediately before HEVN co-signs, so
+deleting a key stops the sessions it already minted rather than waiting for them to expire.
 
 | Slug | Status | What to do |
 | --- | --- | --- |
 | `unauthenticated` | 401 | No bearer, or one that does not verify. `/dapi/v1` takes a **platform** access token and nothing else. |
 | `forbidden` | 403 | With `details.reason = "developerSessionRequired"`: the token is an ordinary API token, a `platform-refresh` token on a business route, or a platform token with no `developer_key_id`. Log in through `POST /dapi/v1/auth/challenge` and `POST /dapi/v1/auth/token`. |
-| `forbidden` | 403 | With no `details`: the registration behind the session is paused, or the call left an address outside its allowlist. Resume from an allowlisted host, or register a key that covers this one. |
-| `key_not_registered` | 403 | The public key you named in a signature has no registration on this account. |
-| `invalid_credentials` | 401 | At login only. A paused key, an off-allowlist IP, an unknown email and a bad signature are all one code, deliberately. |
-| `developer_key_not_found` | 404 | `POST /api/v1/developer/api-keys/{developerKeyId}/pause` was given a `dk_…` id that is not yours. |
-| `developer_key_already_exists` | 409 | That public key is already registered for this developer. Registrations are immutable and additive — pause the old one instead of re-registering. |
+| `forbidden` | 403 | With `details.requiredScope`: the key does not hold the scope this route needs, and `details.scope` lists the ones it does. Scopes are fixed when a key is created, so this needs a key that has it — the four values are on [Developer key](/whitelabel/developer-key#scopes). |
+| `forbidden` | 403 | With no `details`: the key behind the session was deleted, or the call left an address outside its allowlist. Resume from an allowlisted host, or create a key that covers this one. |
+| `key_not_registered` | 403 | The public key you named in a signature is not one of this account's keys. |
+| `invalid_credentials` | 401 | At login only. A deleted key, an off-allowlist IP, an unknown email and a bad signature are all one code, deliberately. |
+| `developer_key_not_found` | 404 | A `dk_…` id that is not yours was given to the key-management routes. |
+| `developer_key_already_exists` | 409 | That public key already belongs to a key on this account. Keys are immutable and additive — create a second one and delete the first. |
 
-The last two come from the management routes under `/api/v1/developer/api-keys`, which take an ordinary owner JWT and
-carry the ordinary API's own error shape. They are deliberately absent from `/dapi/v1`.
+The last two come from the key-management routes under `/api/v1`, which take an ordinary owner session and carry the
+ordinary API's own error shape. Your integration never calls them: keys are created and deleted in the HEVN app. They
+are deliberately absent from `/dapi/v1`.
 
 ## Acting as a client
 
