@@ -21,7 +21,8 @@ The sandbox is the same API against one emulated partner on Base Sepolia. Same p
 | FX | A fixed table: USD 1, EUR 1.08, GBP 1.27, AED 0.2723, and so on, with USDC pegged to USD and EURC to EUR. |
 | Verification | A submitted KYB application is approved immediately. Rails open without a compliance queue. |
 | Background work | Off. Every call projects its own rows before it returns, so there is nothing to wait for that you did not ask for. |
-| Cards, swaps, cross-chain routing | Disabled. They are not part of the whitelabel API. |
+| Swaps | Not served. The emulated chain has no exchange venue behind it and no custodial dollar balance is issued, so `POST /dapi/v1/swaps` answers a refusal rather than a quote ([Swaps](/whitelabel/swaps)). |
+| Cards, cross-chain routing | Disabled. They are not part of the whitelabel API. |
 | Your source IP | As real as in production. Every call is checked against the allowlist you registered with the developer key, so a sandbox host on a new egress IP answers `403` on every route. |
 
 <SandboxCapsSnippet />

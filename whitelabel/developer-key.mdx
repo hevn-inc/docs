@@ -57,8 +57,8 @@ change afterwards.
 | --- | --- |
 | `payout:sign` | `POST /dapi/v1/payouts/{payoutId}/confirm` |
 | `escrow:sign` | `POST /dapi/v1/escrow/{escrowId}/actions/{idempotencyKey}/confirm` |
+| `swap:sign` | `POST /dapi/v1/swaps/{swapId}/confirm` |
 | `recipient:write` | `POST /dapi/v1/contacts`, `PATCH /dapi/v1/contacts/{contactId}`, `DELETE /dapi/v1/contacts/{contactId}` |
-| `swap:sign` | Nothing today. The app accepts it, and no route reads it yet |
 
 Those are the only four values. Everything else on `/dapi/v1` — reading a balance, booking a payout,
 opening a rail, filing KYB, walking the ledger — is open to any platform session, so scopes gate the

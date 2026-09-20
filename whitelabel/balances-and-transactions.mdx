@@ -47,9 +47,18 @@ balance, err := northwind.Get("/client/balance")
   "totalUsd": "1701.05" }
 ```
 
-A client holds one balance per **account**, and an account is named by the asset it holds: `USDC` is
-the USD account, `EURC` the EUR one. That is the same name a payout's `sourceAccount` takes and the
-same name an incoming transfer's `destinationAccount` settles into — one vocabulary end to end.
+A client holds one balance per **account**. Two of them are the stablecoins on its wallet and are named after the token they hold; the third is money a partner bank holds for it in dollars:
+
+| Account | Where the money is | Currency |
+| --- | --- | --- |
+| `USDC` | the client's Base smart wallet | USD |
+| `EURC` | the same smart wallet | EUR |
+| `FDIC_USD` | a virtual account a partner bank holds for the client | USD |
+
+That is the same name a payout's `sourceAccount` takes, the same name an incoming transfer's
+`destinationAccount` settles into, and the same name a [swap](/whitelabel/swaps) moves between — one
+vocabulary end to end. A client with no custodial balance has no `FDIC_USD` row, and a row that is
+there is read from the partner bank at the moment you ask.
 
 Every number is a decimal string in the major unit — no atomic units, no floats. `balance` carries the account's own precision, `usdValue` and `totalUsd` are rounded to cents. `baseSmartWallet` is the address funds live at and the address a crypto payer sends to; it is the only address on this surface.
 

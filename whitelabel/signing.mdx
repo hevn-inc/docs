@@ -50,7 +50,22 @@ sequenceDiagram
 | --- | --- | --- | --- |
 | Fiat out over a bank rail | `POST /dapi/v1/payouts` | `POST /dapi/v1/payouts/{payoutId}/confirm` | 120 s |
 | USDC out on Base | `POST /dapi/v1/payouts` with a wallet contact | `POST /dapi/v1/payouts/{payoutId}/confirm` | 120 s |
+| Money between two accounts one client owns | `POST /dapi/v1/swaps` | `POST /dapi/v1/swaps/{swapId}/confirm` | 120 s |
 | An escrow deal, and every escrow action | `POST /dapi/v1/escrow`, `POST /dapi/v1/escrow/{escrowId}/actions` | `POST /dapi/v1/escrow/{escrowId}/actions/{idempotencyKey}/confirm` | 60 s |
+
+## What the approval authorizes
+
+`authorization` on a payout or a swap says which of two things the one signature covers.
+
+| `authorization` | What HEVN does with your co-signature | What to check before signing |
+| --- | --- | --- |
+| `debit` | funds the payment by moving tokens out of the client's Base smart wallet | `debit.amount`, `debit.token` and `debit.address` |
+| `intent` | signs the payment's own terms with the client's smart wallet, and settles it with the partner — nothing leaves the wallet | `quote`, and `intent.digest` if you reproduce the terms yourself |
+
+A payout from a wallet account is `debit`; one with `"sourceAccount": "FDIC_USD"` is `intent`, because
+the money is spent where the partner bank already holds it. A swap is whichever its route needs. The
+bytes you sign, the confirm route and the retry rules are identical either way — only `debit` versus
+`intent` on the response differs.
 
 Payouts act on a client — send `X-Hevn-Account`. Escrow is always operated by you, so it
 refuses that header. Every confirm body is the same two fields:

@@ -263,7 +263,7 @@
           "accounts"
         ],
         "summary": "Create a client",
-        "description": "Provision a company account for one of your clients. The id is knowable at once, so poll `pollUrl` with the returned `id` in `X-Hevn-Account` until `status` is `ready` — about 30 seconds. An identical resubmit answers 200 with `Idempotency-Replayed: true` and the same id.",
+        "description": "Provision a company account for one of your clients. The id is knowable at once, so poll `pollUrl` with the returned `id` in `X-Hevn-Account` until `status` is `ready` — about 30 seconds. An identical resubmit answers 200 with `Idempotency-Replayed: true` and the same id. Developer-role callers may set `transferPolicy`; otherwise all allow flags default to true and both security-state flags default to false.",
         "operationId": "create_client_clients_post",
         "security": [
           {
@@ -2211,6 +2211,389 @@
         }
       }
     },
+    "/swaps": {
+      "post": {
+        "tags": [
+          "transfers"
+        ],
+        "summary": "Create a transfer between the client's own accounts",
+        "description": "Price a move between two accounts the client owns, reserve it idempotently and return the approval to sign. `authorization` says what that approval covers: a `debit` of the client's wallet that funds the move, or an `intent` its smart wallet signs so the backend can settle it.",
+        "operationId": "create_swap_swaps_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Hevn-Account",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself.",
+              "examples": [
+                "cl_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+              ],
+              "title": "X-Hevn-Account"
+            },
+            "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
+          },
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Your own key for this write, `^[A-Za-z0-9._:-]{1,128}$`. A retry with the same key replays the first answer; the same key with a different request is refused.",
+              "examples": [
+                "po-inv-2026-114"
+              ],
+              "title": "Idempotency-Key"
+            },
+            "description": "Your own key for this write, `^[A-Za-z0-9._:-]{1,128}$`. A retry with the same key replays the first answer; the same key with a different request is refused."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SwapCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SwapResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/swaps/preview": {
+      "post": {
+        "tags": [
+          "transfers"
+        ],
+        "summary": "Price a transfer between the client's own accounts",
+        "description": "Compare every route that can serve this pair of accounts and return the best price. Nothing is booked with a provider and nothing is signed.",
+        "operationId": "preview_swap_swaps_preview_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Hevn-Account",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself.",
+              "examples": [
+                "cl_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+              ],
+              "title": "X-Hevn-Account"
+            },
+            "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
+          },
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SwapPreviewRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SwapPreviewResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/swaps/{swapId}/confirm": {
+      "post": {
+        "tags": [
+          "transfers"
+        ],
+        "summary": "Authorize a transfer between the client's own accounts",
+        "description": "Verify the developer-key signature against the immutable approval and settle the move. A retry cannot change the accounts, the amount or the quote it was fixed at.",
+        "operationId": "confirm_swap_swaps__swapId__confirm_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "swapId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Swapid"
+            }
+          },
+          {
+            "name": "X-Hevn-Account",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself.",
+              "examples": [
+                "cl_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+              ],
+              "title": "X-Hevn-Account"
+            },
+            "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
+          },
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SwapReceiptResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SwapReceiptResponse"
+                }
+              }
+            },
+            "description": "Accepted"
+          }
+        }
+      }
+    },
+    "/swaps/{swapId}": {
+      "get": {
+        "tags": [
+          "transfers"
+        ],
+        "summary": "Retrieve a transfer between the client's own accounts",
+        "description": "Retrieve the current lifecycle of a swap, the quote it was fixed at and any actionable failure.",
+        "operationId": "read_swap_swaps__swapId__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "swapId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Swapid"
+            }
+          },
+          {
+            "name": "X-Hevn-Account",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself.",
+              "examples": [
+                "cl_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+              ],
+              "title": "X-Hevn-Account"
+            },
+            "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
+          },
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SwapReadResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/contacts": {
       "post": {
         "tags": [
@@ -3603,8 +3986,8 @@
         "tags": [
           "accounts"
         ],
-        "summary": "Read a client's on-chain balance",
-        "description": "The balance held by the Base smart wallet of the client selected by `X-Hevn-Account`, one row per settlement token.",
+        "summary": "Read a client's balances",
+        "description": "One row per account the client holds: the tokens on the Base smart wallet of the client selected by `X-Hevn-Account`, plus any custodial balance. A custodial row is read live from the provider that holds it and is left out when that provider cannot be reached.",
         "operationId": "read_balance_client_balance_get",
         "security": [
           {
@@ -5196,8 +5579,8 @@
       "AccountBalanceView": {
         "properties": {
           "account": {
-            "$ref": "#/components/schemas/BalanceAccount",
-            "description": "Account this balance belongs to, named by the asset it holds."
+            "$ref": "#/components/schemas/AccountKey",
+            "description": "Account this balance belongs to."
           },
           "balance": {
             "type": "string",
@@ -5219,6 +5602,50 @@
           "usdValue"
         ],
         "title": "AccountBalanceView"
+      },
+      "AccountKey": {
+        "type": "string",
+        "enum": [
+          "USDC",
+          "EURC",
+          "FDIC_USD"
+        ],
+        "title": "AccountKey"
+      },
+      "ApprovalView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Single-use approval identifier."
+          },
+          "payload": {
+            "type": "string",
+            "title": "Payload",
+            "description": "Base64 canonical authorization payload to sign with the developer key."
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expiresat",
+            "description": "UTC timestamp after which this approval is refused."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "payload",
+          "expiresAt"
+        ],
+        "title": "ApprovalView"
+      },
+      "AuthorizationKind": {
+        "type": "string",
+        "enum": [
+          "debit",
+          "intent"
+        ],
+        "title": "AuthorizationKind"
       },
       "BalanceAccount": {
         "type": "string",
@@ -5316,7 +5743,7 @@
               }
             ],
             "title": "Bankname",
-            "description": "Name of the destination financial institution."
+            "description": "Name of the destination financial institution; required for ACH and Fedwire contacts."
           },
           "bankAddress": {
             "anyOf": [
@@ -6054,6 +6481,17 @@
             ],
             "title": "Phone",
             "description": "Phone number in international E.164 format."
+          },
+          "transferPolicy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InitialTransferPolicy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Initial account transfer controls, available only to developer-role callers. When omitted, every allow flag is true while isFrozen and recoveryModeActivated are false."
           }
         },
         "additionalProperties": false,
@@ -6232,6 +6670,17 @@
             ],
             "title": "Pollurl",
             "description": "Relative API URL to poll with this response's id in `X-Hevn-Account`."
+          },
+          "transferPolicy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransferPolicyResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Account-level controls for the ways this client may move money."
           }
         },
         "type": "object",
@@ -6761,7 +7210,7 @@
               }
             ],
             "title": "Bankname",
-            "description": "Name of the destination financial institution."
+            "description": "Name of the destination financial institution; required for ACH and Fedwire contacts."
           },
           "bankAddress": {
             "anyOf": [
@@ -6877,13 +7326,13 @@
           "destinationAccount": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/BalanceAccount"
+                "$ref": "#/components/schemas/AccountKey"
               },
               {
                 "type": "null"
               }
             ],
-            "description": "Digital asset used to settle this method."
+            "description": "Account credited when this method settles."
           },
           "state": {
             "$ref": "#/components/schemas/RequisiteState",
@@ -7353,6 +7802,45 @@
         ],
         "title": "CountryCode",
         "description": "ISO 3166-1 alpha-2 country codes."
+      },
+      "DebitView": {
+        "properties": {
+          "address": {
+            "type": "string",
+            "title": "Address",
+            "description": "On-chain address receiving the funding debit."
+          },
+          "amount": {
+            "type": "string",
+            "title": "Amount",
+            "description": "Human-readable token amount debited.",
+            "example": "500.00"
+          },
+          "amountAtomic": {
+            "type": "string",
+            "title": "Amountatomic",
+            "description": "Integer token amount in the asset's smallest unit."
+          },
+          "token": {
+            "type": "string",
+            "title": "Token",
+            "description": "Digital asset debited to fund the transfer."
+          },
+          "chainId": {
+            "type": "integer",
+            "title": "Chainid",
+            "description": "Numeric network identifier on which the debit executes."
+          }
+        },
+        "type": "object",
+        "required": [
+          "address",
+          "amount",
+          "amountAtomic",
+          "token",
+          "chainId"
+        ],
+        "title": "DebitView"
       },
       "DocumentContentRequest": {
         "properties": {
@@ -8340,6 +8828,82 @@
         ],
         "title": "HighRiskActivity"
       },
+      "InitialTransferPolicy": {
+        "properties": {
+          "allowFiat": {
+            "type": "boolean",
+            "title": "Allowfiat",
+            "description": "Allow account-initiated fiat payouts, subject to freeze and recovery controls.",
+            "default": true
+          },
+          "allowCrypto": {
+            "type": "boolean",
+            "title": "Allowcrypto",
+            "description": "Allow account-initiated on-chain transfers, including transfers to another platform account, subject to freeze and recovery controls.",
+            "default": true
+          },
+          "allowThirdParty": {
+            "type": "boolean",
+            "title": "Allowthirdparty",
+            "description": "Allow fiat or on-chain payouts to an external contact. Email and escrow payments within the same platform group use narrower controls.",
+            "default": true
+          },
+          "allowEscrowThirdParty": {
+            "type": "boolean",
+            "title": "Allowescrowthirdparty",
+            "description": "Allow escrow to another platform account. This control is independent from allowThirdParty; same-group escrow also requires allowPartnerGroupPayments.",
+            "default": true
+          },
+          "allowSwap": {
+            "type": "boolean",
+            "title": "Allowswap",
+            "description": "Allow balance swaps, subject to freeze and recovery controls.",
+            "default": true
+          },
+          "allowPartnerGroupPayments": {
+            "type": "boolean",
+            "title": "Allowpartnergrouppayments",
+            "description": "Allow email and escrow payments between accounts in the same platform group. Email payments also require allowCrypto; escrow also requires allowEscrowThirdParty.",
+            "default": true
+          },
+          "isFrozen": {
+            "type": "boolean",
+            "title": "Isfrozen",
+            "description": "Block every new account-initiated money movement, overriding every allow flag.",
+            "default": false
+          },
+          "recoveryModeActivated": {
+            "type": "boolean",
+            "title": "Recoverymodeactivated",
+            "description": "Restrict money movement to first-party fiat payouts whose Contact belongs to this account and whose account-holder name matches the account name.",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "InitialTransferPolicy",
+        "description": "Initial money-movement controls accepted only from a developer-role client creator.\n\n``isFrozen`` overrides every permission. When the account is not frozen,\n``recoveryModeActivated`` restricts it to first-party fiat withdrawals.\nThe remaining flags are then evaluated for the requested operation."
+      },
+      "IntentView": {
+        "properties": {
+          "digest": {
+            "type": "string",
+            "title": "Digest",
+            "description": "EIP-712 digest of the terms authorized by this approval."
+          },
+          "settles": {
+            "type": "string",
+            "title": "Settles",
+            "description": "How the backend settles once the intent is authorized."
+          }
+        },
+        "type": "object",
+        "required": [
+          "digest",
+          "settles"
+        ],
+        "title": "IntentView"
+      },
       "IntermediaryBank": {
         "properties": {
           "bic": {
@@ -8601,8 +9165,8 @@
             "description": "Network from which an on-chain incoming transfer is funded."
           },
           "destinationAccount": {
-            "$ref": "#/components/schemas/BalanceAccount",
-            "description": "Digital asset delivered to the account after settlement.",
+            "$ref": "#/components/schemas/AccountKey",
+            "description": "Account credited after settlement. Incoming transfers settle to a token account.",
             "default": "USDC"
           }
         },
@@ -8808,9 +9372,15 @@
             "example": "500.00"
           },
           "destinationAccount": {
-            "type": "string",
-            "title": "Destinationaccount",
-            "description": "Digital asset used to settle the incoming transfer."
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccountKey"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Account credited by this incoming transfer."
           },
           "feeAmount": {
             "anyOf": [
@@ -8855,8 +9425,7 @@
         "required": [
           "amount",
           "currency",
-          "settlementAmount",
-          "destinationAccount"
+          "settlementAmount"
         ],
         "title": "PayinQuoteView"
       },
@@ -8968,33 +9537,6 @@
           "createdAt"
         ],
         "title": "PayinView"
-      },
-      "PayoutApprovalView": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id",
-            "description": "Single-use approval identifier."
-          },
-          "payload": {
-            "type": "string",
-            "title": "Payload",
-            "description": "Base64 canonical authorization payload to sign with the developer key."
-          },
-          "expiresAt": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Expiresat",
-            "description": "UTC timestamp after which this approval is refused."
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "payload",
-          "expiresAt"
-        ],
-        "title": "PayoutApprovalView"
       },
       "PayoutAttentionKind": {
         "type": "string",
@@ -9210,8 +9752,8 @@
             "description": "Optional receiving-account identifier used to select a specific funding route."
           },
           "sourceAccount": {
-            "$ref": "#/components/schemas/BalanceAccount",
-            "description": "Settlement token this payout is funded with. The contact and the rail decide whether it can be used.",
+            "$ref": "#/components/schemas/AccountKey",
+            "description": "Account this payout is paid from. `USDC` and `EURC` debit the client's wallet; `FDIC_USD` spends the custodial USD balance and is authorized by an intent signature instead of a debit.",
             "default": "USDC"
           }
         },
@@ -9222,45 +9764,6 @@
           "publicKey"
         ],
         "title": "PayoutCreateRequest"
-      },
-      "PayoutDebitView": {
-        "properties": {
-          "address": {
-            "type": "string",
-            "title": "Address",
-            "description": "On-chain address receiving the funding debit."
-          },
-          "amount": {
-            "type": "string",
-            "title": "Amount",
-            "description": "Human-readable token amount debited.",
-            "example": "500.00"
-          },
-          "amountAtomic": {
-            "type": "string",
-            "title": "Amountatomic",
-            "description": "Integer token amount in the asset's smallest unit."
-          },
-          "token": {
-            "type": "string",
-            "title": "Token",
-            "description": "Digital asset debited to fund the transfer."
-          },
-          "chainId": {
-            "type": "integer",
-            "title": "Chainid",
-            "description": "Numeric network identifier on which the debit executes."
-          }
-        },
-        "type": "object",
-        "required": [
-          "address",
-          "amount",
-          "amountAtomic",
-          "token",
-          "chainId"
-        ],
-        "title": "PayoutDebitView"
       },
       "PayoutFailureView": {
         "properties": {
@@ -9718,10 +10221,15 @@
             ],
             "description": "Price, fee and conversion terms fixed for this transfer."
           },
+          "authorization": {
+            "$ref": "#/components/schemas/AuthorizationKind",
+            "description": "Whether the approval authorizes a balance debit or a signature over the transfer's terms.",
+            "default": "debit"
+          },
           "approval": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PayoutApprovalView"
+                "$ref": "#/components/schemas/ApprovalView"
               },
               {
                 "type": "null"
@@ -9732,13 +10240,24 @@
           "debit": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PayoutDebitView"
+                "$ref": "#/components/schemas/DebitView"
               },
               {
                 "type": "null"
               }
             ],
             "description": "Exact on-chain debit used to fund this transfer."
+          },
+          "intent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IntentView"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Terms authorized by the signature, when this transfer is not funded by a debit."
           },
           "contact": {
             "anyOf": [
@@ -9903,8 +10422,10 @@
           "contact_changed",
           "user_operation_rejected",
           "user_operation_unavailable",
+          "transfer_policy_denied",
           "integrator_inactive",
           "client_creation_not_enabled",
+          "client_policy_not_enabled",
           "email_in_use",
           "name_in_use",
           "client_request_conflict",
@@ -9951,7 +10472,13 @@
           "payin_not_available",
           "payin_expired",
           "payin_not_found",
-          "transaction_not_found"
+          "transaction_not_found",
+          "account_unavailable",
+          "account_not_supported",
+          "swap_not_found",
+          "swap_route_unavailable",
+          "swap_not_confirmable",
+          "intent_not_signable"
         ],
         "title": "PlatformErrorCode"
       },
@@ -12974,22 +13501,22 @@
           },
           "supportedAccounts": {
             "items": {
-              "$ref": "#/components/schemas/BalanceAccount"
+              "$ref": "#/components/schemas/AccountKey"
             },
             "type": "array",
             "title": "Supportedaccounts",
-            "description": "Settlement tokens accepted by this payment method."
+            "description": "Accounts this payment method can settle to."
           },
           "destinationAccount": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/BalanceAccount"
+                "$ref": "#/components/schemas/AccountKey"
               },
               {
                 "type": "null"
               }
             ],
-            "description": "Digital asset used for settlement."
+            "description": "Account credited on settlement."
           },
           "minimumDeposit": {
             "anyOf": [
@@ -13956,6 +14483,534 @@
         ],
         "title": "SessionResponse"
       },
+      "SwapCreateRequest": {
+        "properties": {
+          "sourceAccount": {
+            "$ref": "#/components/schemas/AccountKey",
+            "description": "Account the money leaves."
+          },
+          "destinationAccount": {
+            "$ref": "#/components/schemas/AccountKey",
+            "description": "Account the money lands on."
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                  }
+                ],
+                "type": "string",
+                "example": "500.00"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount",
+            "description": "Exact amount to debit from the source account."
+          },
+          "amountTo": {
+            "anyOf": [
+              {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                  }
+                ],
+                "type": "string",
+                "example": "500.00"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amountto",
+            "description": "Exact amount the destination account should receive."
+          },
+          "publicKey": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Publickey",
+            "description": "Base64 DER SubjectPublicKeyInfo for the registered P-256 developer key."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "sourceAccount",
+          "destinationAccount",
+          "publicKey"
+        ],
+        "title": "SwapCreateRequest"
+      },
+      "SwapFailureView": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "description": "Stable machine-readable code for the swap failure."
+          }
+        },
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "title": "SwapFailureView"
+      },
+      "SwapPreviewRequest": {
+        "properties": {
+          "sourceAccount": {
+            "$ref": "#/components/schemas/AccountKey",
+            "description": "Account the money leaves."
+          },
+          "destinationAccount": {
+            "$ref": "#/components/schemas/AccountKey",
+            "description": "Account the money lands on."
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                  }
+                ],
+                "type": "string",
+                "example": "500.00"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount",
+            "description": "Exact amount to debit from the source account."
+          },
+          "amountTo": {
+            "anyOf": [
+              {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                  }
+                ],
+                "type": "string",
+                "example": "500.00"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amountto",
+            "description": "Exact amount the destination account should receive."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "sourceAccount",
+          "destinationAccount"
+        ],
+        "title": "SwapPreviewRequest"
+      },
+      "SwapPreviewResponse": {
+        "properties": {
+          "sourceAccount": {
+            "$ref": "#/components/schemas/AccountKey",
+            "description": "Account the money would leave."
+          },
+          "destinationAccount": {
+            "$ref": "#/components/schemas/AccountKey",
+            "description": "Account the money would land on."
+          },
+          "quote": {
+            "$ref": "#/components/schemas/SwapQuoteView",
+            "description": "Best price available for this move right now."
+          }
+        },
+        "type": "object",
+        "required": [
+          "sourceAccount",
+          "destinationAccount",
+          "quote"
+        ],
+        "title": "SwapPreviewResponse"
+      },
+      "SwapQuoteView": {
+        "properties": {
+          "fromAmount": {
+            "type": "string",
+            "title": "Fromamount",
+            "description": "Amount debited from the source account.",
+            "example": "500.00"
+          },
+          "fromCurrency": {
+            "type": "string",
+            "title": "Fromcurrency",
+            "description": "Currency or digital asset debited."
+          },
+          "toAmount": {
+            "type": "string",
+            "title": "Toamount",
+            "description": "Amount credited to the destination account.",
+            "example": "500.00"
+          },
+          "toCurrency": {
+            "type": "string",
+            "title": "Tocurrency",
+            "description": "Currency or digital asset credited."
+          },
+          "rate": {
+            "type": "string",
+            "title": "Rate",
+            "description": "Conversion rate from the source amount to the destination amount.",
+            "example": "500.00"
+          },
+          "feeAmount": {
+            "type": "string",
+            "title": "Feeamount",
+            "description": "Total fee charged in feeCurrency.",
+            "example": "500.00"
+          },
+          "feeCurrency": {
+            "type": "string",
+            "title": "Feecurrency",
+            "description": "Currency in which the fee is charged."
+          },
+          "minimumToAmount": {
+            "anyOf": [
+              {
+                "type": "string",
+                "example": "500.00"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimumtoamount",
+            "description": "Worst-case amount credited when the route carries slippage."
+          },
+          "estimated": {
+            "type": "boolean",
+            "title": "Estimated",
+            "description": "Whether the delivered amount is an estimate settled later, rather than a locked price.",
+            "default": false
+          },
+          "etaHours": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Etahours",
+            "description": "Expected hours until the destination account is credited."
+          },
+          "expiresAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expiresat",
+            "description": "UTC timestamp after which this price is no longer honored."
+          }
+        },
+        "type": "object",
+        "required": [
+          "fromAmount",
+          "fromCurrency",
+          "toAmount",
+          "toCurrency",
+          "rate",
+          "feeAmount",
+          "feeCurrency"
+        ],
+        "title": "SwapQuoteView"
+      },
+      "SwapReadResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^(?:swp_)?[A-Za-z0-9._:\\-]{1,216}$",
+            "title": "Id",
+            "description": "Stable public identifier for this swap.",
+            "examples": [
+              "swp_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/SwapState",
+            "description": "Current public lifecycle status of the swap."
+          },
+          "sourceAccount": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccountKey"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Account the money leaves."
+          },
+          "destinationAccount": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccountKey"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Account the money lands on."
+          },
+          "quote": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SwapQuoteView"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Terms fixed when the swap was created."
+          },
+          "transactionHash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transactionhash",
+            "description": "On-chain transaction hash, when broadcast."
+          },
+          "transactionId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?:txn_)?[A-Za-z0-9._:\\-]{1,216}$",
+                "examples": [
+                  "txn_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transactionid",
+            "description": "Ledger transaction identifier, when projected."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat",
+            "description": "UTC timestamp when the swap was created."
+          },
+          "settledAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Settledat",
+            "description": "UTC timestamp when settlement completed."
+          },
+          "failure": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SwapFailureView"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Terminal or actionable failure details."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "createdAt"
+        ],
+        "title": "SwapReadResponse"
+      },
+      "SwapReceiptResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^(?:swp_)?[A-Za-z0-9._:\\-]{1,216}$",
+            "title": "Id",
+            "description": "Stable public identifier for this swap.",
+            "examples": [
+              "swp_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/SwapState",
+            "description": "Current public lifecycle status of the swap."
+          },
+          "transactionHash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transactionhash",
+            "description": "On-chain transaction hash, when broadcast."
+          },
+          "pollUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pollurl",
+            "description": "Relative API URL to poll while processing continues."
+          },
+          "failure": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SwapFailureView"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Terminal or actionable failure details."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "status"
+        ],
+        "title": "SwapReceiptResponse"
+      },
+      "SwapResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^(?:swp_)?[A-Za-z0-9._:\\-]{1,216}$",
+            "title": "Id",
+            "description": "Stable public identifier for this swap.",
+            "examples": [
+              "swp_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/SwapState",
+            "description": "Current public lifecycle status of the swap."
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "title": "Idempotencykey",
+            "description": "Caller-supplied key that makes an identical retry return this result."
+          },
+          "sourceAccount": {
+            "$ref": "#/components/schemas/AccountKey",
+            "description": "Account the money leaves."
+          },
+          "destinationAccount": {
+            "$ref": "#/components/schemas/AccountKey",
+            "description": "Account the money lands on."
+          },
+          "quote": {
+            "$ref": "#/components/schemas/SwapQuoteView",
+            "description": "Price, fee and conversion terms fixed for this swap."
+          },
+          "authorization": {
+            "$ref": "#/components/schemas/AuthorizationKind",
+            "description": "Whether the approval authorizes a balance debit or a signature over the swap's terms."
+          },
+          "approval": {
+            "$ref": "#/components/schemas/ApprovalView",
+            "description": "Authorization to sign with the developer key before settlement."
+          },
+          "debit": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DebitView"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Exact on-chain debit used to fund this swap."
+          },
+          "intent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IntentView"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Terms authorized by the signature, when this swap is not funded by a debit."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "idempotencyKey",
+          "sourceAccount",
+          "destinationAccount",
+          "quote",
+          "authorization",
+          "approval"
+        ],
+        "title": "SwapResponse"
+      },
+      "SwapState": {
+        "type": "string",
+        "enum": [
+          "awaitingSignature",
+          "submitted",
+          "settled",
+          "failed"
+        ],
+        "title": "SwapState"
+      },
       "TokenResponse": {
         "properties": {
           "accessToken": {
@@ -14024,7 +15079,7 @@
           "account": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/BalanceAccount"
+                "$ref": "#/components/schemas/AccountKey"
               },
               {
                 "type": "null"
@@ -14483,6 +15538,63 @@
           "createdAt"
         ],
         "title": "TransactionView"
+      },
+      "TransferPolicyResponse": {
+        "properties": {
+          "allowFiat": {
+            "type": "boolean",
+            "title": "Allowfiat",
+            "description": "Allow account-initiated fiat payouts, subject to freeze and recovery controls."
+          },
+          "allowCrypto": {
+            "type": "boolean",
+            "title": "Allowcrypto",
+            "description": "Allow account-initiated on-chain transfers, including transfers to another platform account, subject to freeze and recovery controls."
+          },
+          "allowThirdParty": {
+            "type": "boolean",
+            "title": "Allowthirdparty",
+            "description": "Allow fiat or on-chain payouts to an external contact. Email and escrow payments within the same platform group use narrower controls."
+          },
+          "allowEscrowThirdParty": {
+            "type": "boolean",
+            "title": "Allowescrowthirdparty",
+            "description": "Allow escrow to another platform account. This control is independent from allowThirdParty; same-group escrow also requires allowPartnerGroupPayments."
+          },
+          "allowSwap": {
+            "type": "boolean",
+            "title": "Allowswap",
+            "description": "Allow balance swaps, subject to freeze and recovery controls."
+          },
+          "allowPartnerGroupPayments": {
+            "type": "boolean",
+            "title": "Allowpartnergrouppayments",
+            "description": "Allow email and escrow payments between accounts in the same platform group. Email payments also require allowCrypto; escrow also requires allowEscrowThirdParty."
+          },
+          "isFrozen": {
+            "type": "boolean",
+            "title": "Isfrozen",
+            "description": "Block every new money movement, overriding every allow flag."
+          },
+          "recoveryModeActivated": {
+            "type": "boolean",
+            "title": "Recoverymodeactivated",
+            "description": "Restrict money movement to first-party fiat payouts whose Contact belongs to this account and whose account-holder name matches the account name."
+          }
+        },
+        "type": "object",
+        "required": [
+          "allowFiat",
+          "allowCrypto",
+          "allowThirdParty",
+          "allowEscrowThirdParty",
+          "allowSwap",
+          "allowPartnerGroupPayments",
+          "isFrozen",
+          "recoveryModeActivated"
+        ],
+        "title": "TransferPolicyResponse",
+        "description": "Effective account-level money-movement controls.\n\n``isFrozen`` overrides every permission. When the account is not frozen,\n``recoveryModeActivated`` restricts it to first-party fiat withdrawals.\nThe remaining flags are then evaluated for the requested operation."
       },
       "UserAddress": {
         "properties": {

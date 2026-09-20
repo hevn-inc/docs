@@ -122,6 +122,14 @@ other chain, or expecting any other token, is paid through a cross-chain route â
 `decimals` and contract `address`. Read it at startup rather than hardcoding the codes in
 [Chain codes](/whitelabel/reference/rails#chain-codes).
 
+## Between a client's own accounts
+
+A client holds up to three accounts: `USDC` and `EURC` on its Base smart wallet, and
+`FDIC_USD` when a partner bank holds a dollar virtual account for it. `POST /dapi/v1/swaps` moves
+money between any two of them it holds, and which pairs can be served at a given moment is answered
+by pricing them â€” `POST /dapi/v1/swaps/preview` returns the best route or refuses with
+`422 swap_route_unavailable` ([Swaps](/whitelabel/swaps)).
+
 ## What actually decides availability
 
 Four things narrow the catalogue above, and each one has a refusal that names it.

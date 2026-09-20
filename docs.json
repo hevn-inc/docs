@@ -110,6 +110,7 @@
             "pages": [
               "whitelabel/payins",
               "whitelabel/payouts",
+              "whitelabel/swaps",
               "whitelabel/balances-and-transactions"
             ]
           },
@@ -236,6 +237,16 @@
               "POST /payouts/preview",
               "POST /payouts/{payoutId}/confirm",
               "GET /payouts/{payoutId}"
+            ]
+          },
+          {
+            "group": "Swaps",
+            "openapi": "openapi.json",
+            "pages": [
+              "POST /swaps",
+              "POST /swaps/preview",
+              "POST /swaps/{swapId}/confirm",
+              "GET /swaps/{swapId}"
             ]
           },
           {

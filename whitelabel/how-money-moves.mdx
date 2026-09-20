@@ -31,9 +31,12 @@ flowchart LR
 in `X-Hevn-Account`, reads it on chain, one row per account the client holds, and no HEVN database holds an
 authoritative copy.
 
-Two tokens can sit there: **USDC** and **EURC**. Which one a rail settles into is the rail's
-`destinationAccount`, fixed when the rail is opened and reported next to its `supportedAccounts`; per
-deposit, `POST /dapi/v1/payins` takes the `destinationAccount` you want that arrival delivered in.
+Two accounts sit there, each named after the stablecoin it holds: **`USDC`** and **`EURC`**. A
+third, **`FDIC_USD`**, is not on the wallet at all — it is a virtual account a partner bank holds for
+the client in dollars. Which account a rail settles into is the rail's `destinationAccount`, fixed
+when the rail is opened and reported next to its `supportedAccounts`; per deposit,
+`POST /dapi/v1/payins` takes the `destinationAccount` you want that arrival delivered in. Moving
+money between two of a client's own accounts is its own resource — see [Swaps](/whitelabel/swaps).
 
 ## Fiat in is a conversion you priced
 
@@ -88,8 +91,8 @@ balance, or `amountTo` to pin what the beneficiary receives — never both, and 
 other side yourself.
 
 A wallet contact is the same envelope with no fiat leg. `POST /dapi/v1/payouts` with a contact that
-is an address, then the same confirm route, pays from an account — USDC or EURC, whichever you
-name in `sourceAccount` — from the client's wallet straight to it. It is still quoted, and the quote's
+is an address, then the same confirm route, pays from an account — `USDC` or `EURC`,
+whichever you name in `sourceAccount` — from the client's wallet straight to it. It is still quoted, and the quote's
 deposit address is the contact's own address, so `debit.address` is where the money actually lands. No
 conversion, no partner, no second resource to learn.
 

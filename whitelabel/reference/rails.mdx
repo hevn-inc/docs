@@ -115,7 +115,7 @@ The bank segment is the partner behind the rail and is not something to branch o
 
 ## Accounts a rail settles into
 
-`supportedAccounts` on a rail record is which of the client's accounts that rail can deliver into.
+`supportedAccounts` on a rail record is which of the client's accounts that rail can deliver into, named as `USDC` or `EURC`.
 
 A rail's token is fixed when the rail is opened, so choosing the token means choosing the rail id: rails that can deliver either token ship as a pair of ids, one per token, with the EURC variant's id ending in `_eurc`. `destinationAccount` on the record echoes what the open rail delivers.
 

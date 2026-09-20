@@ -86,7 +86,7 @@ The client needs an **active rail** in the currency the payer sends — see [Vir
     - **`amount` or `amountTo`, exactly one.** `amount` is what the payer sends in `currency`; `amountTo` is what should land on the wallet, and HEVN grosses the payer's side up to reach it.
     - **`rail` or `originChainId`, exactly one.** `rail` prices money arriving over a payment method; `originChainId` prices money arriving on a chain. Sending both, or neither, is refused.
     - **`rail` here is a payment *method*** — `sepa`, `ach`, `swift`, `fedwire`, `pix`, … — not the rail id you opened with `POST /dapi/v1/banks`. The two are different vocabularies; [Rails](/whitelabel/reference/rails) lists both.
-    - **`destinationAccount`** is the stablecoin the payin is delivered in, `USDC` (the default) or `EURC`. It has to be a token one of the client's matching rails settles into; when it is not, the call refuses with the pairs that work (see below).
+    - **`destinationAccount`** is the account the payin is delivered into, `USDC` (the default) or `EURC`. It has to be an account one of the client's matching rails settles into; when it is not, the call refuses with the pairs that work (see below). Money arriving over a rail always lands on the wallet, so `FDIC_USD` is refused here with `422 account_not_supported`.
 
     The price holds until `expiresAt`. Read it; do not cache a quote.
   </Step>

@@ -17,7 +17,7 @@ Every refusal from `/dapi/v1` has the same body. `code` is a stable lowercase sl
 
 | Key | Contract |
 | --- | --- |
-| `code` | One of the 109 slugs below. Stable across releases. Lowercase, `snake_case`, never a class name. |
+| `code` | One of the slugs below. Stable across releases. Lowercase, `snake_case`, never a class name. |
 | `message` | One sentence, safe to log or show an operator. Rewritten whenever it can be made clearer — do not parse it. |
 | `details` | camelCase, and present only when there is something to carry: the id the key already owns, the fields that failed, the amount available. On a `5xx` it also carries `requestId`. |
 
@@ -177,9 +177,15 @@ Booking a payout — to a bank account or to a wallet — and the contacts it pa
 | `amount_below_minimum` | 422 | Below the route's minimum. `POST /dapi/v1/payouts/preview` reports it as `minAmount`. |
 | `amount_above_maximum` | 422 | Above the route's maximum. |
 | `amount_precision_unsupported` | 422 | More decimals than the asset allows. Amounts are refused, never rounded. |
+| `account_unavailable` | 422 | The client holds no such account. A client with no custodial virtual account cannot name `FDIC_USD`. |
+| `account_not_supported` | 422 | The account cannot be used for this operation: a payin cannot settle into `FDIC_USD`, and a payout from it needs the rail that holds it. |
 | `payout_not_found` | 404 | Unknown payout id for this client. |
 | `payout_not_fundable` | 409 | This payout can no longer be funded. Book a new one. |
 | `quote_expired` | 409 | The price expired. Book again with the same `Idempotency-Key` to get a fresh one. |
+| `swap_not_found` | 404 | Unknown swap id for this client. |
+| `swap_route_unavailable` | 422 | Nothing can move money between these two accounts right now. |
+| `swap_not_confirmable` | 409 | The swap is not waiting for a signature. Read it before confirming again. |
+| `intent_not_signable` | 409 | This quote is no longer authorized by a signature — it was already spent, or it is funded by a debit. |
 | `bundler_rejected` | 502 | The chain rejected the operation. Confirm again with backoff. |
 | `bundler_unavailable` | 502 | Chain infrastructure is unreachable. Confirm again with backoff. |
 

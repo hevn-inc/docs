@@ -59,6 +59,8 @@ Do not write "end user", "sub-account", "merchant" or "tenant".
 | **quote** | The priced terms of one payin or payout | "estimate", "rate" |
 | **approval** | The bytes HEVN builds for the integrator to sign | "transaction", "payload" on its own |
 | **settlement token** | The stablecoin a rail delivers — USDC or EURC | "coin", "asset" |
+| **account** | One of `USDC`, `EURC`, `FDIC_USD` — what every `sourceAccount`, `destinationAccount` and balance row names | "wallet"; and do not call `FDIC_USD` a token |
+| **swap** | A move between two accounts the same client owns. The `swp_…` resource | "conversion", "exchange", "transfer" |
 
 "Recipient" is not used anywhere. It is ambiguous between the contact, the
 beneficiary and the client.

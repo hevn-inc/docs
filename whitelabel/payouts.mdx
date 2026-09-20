@@ -215,7 +215,7 @@ Two optional reads price a payout before you book one. `GET /dapi/v1/contacts/{c
     | What the beneficiary sees | `paymentReference`, up to 140 characters. |
     | What the destination rail demands | `purpose` when `capabilities` reports `purposeRequired`, and up to ten `documentIds` from [document upload](/whitelabel/onboarding) when it reports `documentsRequired`. |
     | Which of several accounts to pay | `bankId` (`bnk_…`), the same id `capabilities` returns on each option, when a contact has more than one. Omit it and HEVN picks the account `capabilities` would pick. |
-    | Which account pays for it | `sourceAccount`, `USDC` (the default) or `EURC` — the client account debited. A wallet contact must be able to receive it: asking to pay a USDC address in EURC is refused with `400`, and so is a token the rail cannot be funded with. |
+    | Which account pays for it | `sourceAccount`, `USDC` (the default), `EURC` or `FDIC_USD`. The first two debit the client's wallet; `FDIC_USD` spends the custodial dollar balance and is authorized differently (see below). A wallet contact must be able to receive what you name: asking to pay a USDC address from `EURC` is refused with `400`, and so is an account the rail cannot be funded with. |
 
     Amounts are decimal strings in the major unit — `"500.00"`, never `500` and never atomic units. More precision than the asset allows is refused, never rounded ([Conventions](/whitelabel/conventions#money)).
   </Step>
@@ -432,6 +432,84 @@ Routing has to be available for the account. When it is not, booking answers `40
 Two refusals belong to this route alone: `400` when the address resolves to the client's own wallet — a payout cannot pay the account that sends it — and `409 insufficient_funds` when the balance does not cover the amount (there is no fiat leg to absorb it).
 
 A confirmed wallet payout carries `transactionHash`, and the durable record is the client's ledger: the row shows up with `isIncome: false` and `type: "crypto"` — or `internal`, when the address belongs to another HEVN account. Read it through `GET /dapi/v1/transactions` ([Balances and transactions](/whitelabel/balances-and-transactions#walk-the-ledger)).
+
+## Pay out of the custodial balance
+
+A client that holds a custodial dollar balance can pay a beneficiary straight out of it. Send
+`"sourceAccount": "FDIC_USD"` and nothing leaves the client's wallet: the partner bank debits the
+account it already holds for the client, so the payout is authorized by a signature over its own
+terms rather than by a debit.
+
+<CodeGroup>
+```bash cURL
+curl -s -X POST "$HEVN_API/payouts" \
+  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+  -H "X-Hevn-Account: $HEVN_CLIENT_ID" \
+  -H "Idempotency-Key: payout-A-1188" \
+  -H "Content-Type: application/json" \
+  -d '{"contactId":"ct_3K9…","amount":"500.00","sourceAccount":"FDIC_USD","publicKey":"'$HEVN_PUBLIC_KEY'"}'
+```
+
+```python Python
+payout = northwind.post("/payouts", {
+    "contactId": "ct_3K9…",
+    "amount": "500.00",
+    "sourceAccount": "FDIC_USD",
+    "publicKey": key.public_key,
+}, idempotency_key="payout-A-1188")
+
+signature = key.sign_payload(payout["approval"]["payload"])
+receipt = northwind.confirm_until_settled(f"/payouts/{payout['id']}/confirm", signature)
+```
+
+```javascript Node
+const payout = await northwind.post("/payouts", {
+  contactId: "ct_3K9…",
+  amount: "500.00",
+  sourceAccount: "FDIC_USD",
+  publicKey: key.publicKey,
+}, { idempotencyKey: "payout-A-1188" });
+
+const signature = key.signPayload(payout.approval.payload);
+const receipt = await northwind.confirmUntilSettled(`/payouts/${payout.id}/confirm`, signature);
+```
+
+```go Go
+payout, err := northwind.Post("/payouts", hevn.Body{
+	"contactId":     "ct_3K9…",
+	"amount":        "500.00",
+	"sourceAccount": "FDIC_USD",
+	"publicKey":     key.PublicKey,
+}, hevn.IdempotencyKey("payout-A-1188"))
+
+signature, err := key.SignPayload(payout.Str("approval.payload"))
+receipt, err := northwind.ConfirmUntilSettled("/payouts/"+payout.Str("id")+"/confirm", signature)
+```
+</CodeGroup>
+
+The response carries `"authorization": "intent"` and an `intent` object instead of `debit`, because
+there is no on-chain debit to check:
+
+```json Response — 201
+{ "id": "po_4c8a13d7f2",
+  "kind": "fiat",
+  "status": "awaitingSignature",
+  "authorization": "intent",
+  "quote": { "fromAmount": "500.00", "fromCurrency": "USD", "toAmount": "462.14", "toCurrency": "EUR" },
+  "approval": { "id": "b1e7…", "payload": "eyJib2R5Ijp7…", "expiresAt": "2026-09-20T18:10:59Z" },
+  "intent": { "digest": "0x9c1f…", "settles": "message_signature" } }
+```
+
+What you check is the `quote`, and everything after it is unchanged: sign `approval.payload`, post it
+to the same confirm route, poll the same read. Two rules are specific to this source:
+
+- The client has to hold the account. Without one, the call answers `422 account_unavailable`.
+- The beneficiary has to be reachable from the rail that holds the balance. A `bankId` on another
+  rail is `422 account_not_supported` — the balance is where it is, and HEVN will not silently pay
+  from somewhere else.
+
+To move that balance onto the client's wallet instead of paying someone with it, use
+[Swaps](/whitelabel/swaps).
 
 ## Retries and idempotency
 
