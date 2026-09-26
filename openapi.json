@@ -11287,20 +11287,6 @@
             ],
             "description": "High-level business category."
           },
-          "businessTypeDetails": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 4000,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Businesstypedetails",
-            "description": "Additional detail when businessType does not fully describe the activity."
-          },
           "businessIndustry": {
             "anyOf": [
               {
@@ -11984,18 +11970,6 @@
             ],
             "title": "Businesstype",
             "description": "High-level business activity category."
-          },
-          "businessTypeDetails": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Businesstypedetails",
-            "description": "Additional business activity detail."
           },
           "businessIndustry": {
             "anyOf": [
