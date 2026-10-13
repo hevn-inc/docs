@@ -1,0 +1,236 @@
+---
+title: "API reference"
+description: "Every route a remote transfer key can call: balance, address lookup, transfers to contacts, invoices, quotes and email addresses, and transfer history."
+---
+
+All routes on this page take a remote transfer key in `X-Api-Key` and answer JSON with camelCase keys.
+Amounts are USDC on Base, as decimal numbers.
+
+| | |
+| --- | --- |
+| Base URL | `https://api.hevn.finance/api/v1/remote_spend_limit` |
+| Credential | `X-Api-Key: rsl_…` |
+| Idempotency | `Idempotency-Key` header on the two transfer routes |
+
+<Note>
+  The same routes are also served under `/api/v1/mcp`, the feature's former name. That prefix is
+  **deprecated** and kept only for existing integrations; use `/api/v1/remote_spend_limit`.
+</Note>
+
+```bash
+export HEVN_RT="https://api.hevn.finance/api/v1/remote_spend_limit"
+export HEVN_RT_KEY="rsl_…"   # from Settings → Remote Transfers, shown once
+```
+
+## Get balance
+
+`GET /get_balance` reads your smart wallet's USDC balance and what this key may still spend in the
+current period, both live from the chain.
+
+```bash
+curl "$HEVN_RT/get_balance" -H "X-Api-Key: $HEVN_RT_KEY"
+```
+
+```json
+{
+  "email": "ops@northwind.example",
+  "address": "0x4E1d…a07B",
+  "balance": 1250.5,
+  "remaining": 400.0
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `email` | The account the key belongs to |
+| `address` | Your Base smart wallet — where the money is spent from |
+| `balance` | USDC in that wallet |
+| `remaining` | USDC this key may still spend in the current permission period. `0` when no spend permission is active |
+
+`404 Smart wallet not found` if the account has no smart wallet yet.
+
+## Resolve address
+
+`GET /resolve_address?email=` returns the Base smart wallet that belongs to an email address.
+
+```bash
+curl "$HEVN_RT/resolve_address?email=vendor@example.com" -H "X-Api-Key: $HEVN_RT_KEY"
+```
+
+```json
+{ "email": "vendor@example.com", "address": "0x9b2C…44De" }
+```
+
+If the email has no HEVN account, HEVN creates one and records its wallet address, which only the
+owner of that email can ever control — see
+[deterministic addresses](/general/smart-wallets#deterministic-counterfactual-addresses). The lookup
+counts against the rate limit.
+
+## Transfer
+
+`POST /transfer` pays something your account already knows about: a contact, an invoice addressed to
+you, or a payout quote you created.
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `contactId` | UUID | Pay one of your contacts. Requires `amount` |
+| `amount` | number | USDC to send. Used with `contactId` only |
+| `invoiceId` | UUID | Pay an invoice where you are the client. The amount is the invoice's |
+| `quoteId` | string | Fund a payout quote you created in the app — a bank payout or a cross-chain withdrawal. The amount and the destination are the quote's |
+| `memo` | string | Optional note recorded on the transaction |
+
+Send exactly one of `contactId`, `invoiceId` or `quoteId`. None of them is `422`. If you send more than
+one, `invoiceId` wins over `quoteId`, and `quoteId` over `contactId`.
+
+Header `Idempotency-Key` is optional. It is the deduplication reference only when the body has no
+`invoiceId` or `quoteId`, so send it on every contact transfer — see
+[A transfer runs at most once](/remote-transfers/overview#a-transfer-runs-at-most-once).
+
+<CodeGroup>
+
+```bash Contact
+curl -X POST "$HEVN_RT/transfer" \
+  -H "X-Api-Key: $HEVN_RT_KEY" \
+  -H "Idempotency-Key: payroll-2026-10-alice" \
+  -H "Content-Type: application/json" \
+  -d '{"contactId": "0c8e5f0a-3a6b-4d1e-9b7c-5e2f1a9d8c34", "amount": 250, "memo": "October retainer"}'
+```
+
+```bash Invoice
+curl -X POST "$HEVN_RT/transfer" \
+  -H "X-Api-Key: $HEVN_RT_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"invoiceId": "b7a1d3e2-6c4f-4a8b-8e1d-0f9c2b5a7d63"}'
+```
+
+```bash Quote
+curl -X POST "$HEVN_RT/transfer" \
+  -H "X-Api-Key: $HEVN_RT_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"quoteId": "q_8f2a…"}'
+```
+
+</CodeGroup>
+
+`200 OK`:
+
+```json
+{ "txHash": "0x5d9e…c1a2", "userCreated": false, "emailSent": false }
+```
+
+`txHash` is the onchain transaction. `userCreated` and `emailSent` are always `false` on this route.
+
+Where the money goes:
+
+| Body | Destination | Amount |
+| --- | --- | --- |
+| `contactId` | The contact's saved wallet address, or the HEVN wallet of the account behind the contact | `amount` |
+| `invoiceId` | The HEVN wallet of the invoice's contractor | The invoice amount |
+| `quoteId` | The one-time deposit address the quote carries | The quote amount |
+
+Errors specific to this route:
+
+| Status | `detail` | Cause |
+| --- | --- | --- |
+| 400 | `amount is required for contact transfers` | `contactId` without `amount` |
+| 400 | `Contact has no wallet address` | The contact has neither a wallet address nor a HEVN account |
+| 400 | `Invoice has no contractor email` | The invoice cannot be paid to a wallet |
+| 400 | `Quote has no deposit address` | The quote is not ready to fund |
+| 403 | `Invoice does not belong to this account` | You are not the invoice's client |
+| 404 | `Contact not found`, `Invoice not found`, `Quote not found` | The id does not exist or is not yours |
+| 409 | `This payout can no longer be funded. Request a new quote.` | The quote expired or moved on. Create a new one in the app |
+
+## Transfer to an email address
+
+`POST /transfer_to_user` pays any email address. If the email has no HEVN account, HEVN creates one,
+sends the money to its wallet and emails the owner an invitation to claim it. An existing account gets
+a payment-received email.
+
+| Field | Type | Required | Meaning |
+| --- | --- | --- | --- |
+| `amount` | number | yes | USDC to send |
+| `email` | string | yes | The receiving email address |
+| `memo` | string | no | Accepted, not recorded by this route |
+
+Header `Idempotency-Key` is **required**; without it the request is `422`.
+
+```bash
+curl -X POST "$HEVN_RT/transfer_to_user" \
+  -H "X-Api-Key: $HEVN_RT_KEY" \
+  -H "Idempotency-Key: bounty-1042" \
+  -H "Content-Type: application/json" \
+  -d '{"amount": 75, "email": "contributor@example.com"}'
+```
+
+```json
+{ "txHash": "0x3a7f…e90b", "userCreated": true, "emailSent": true }
+```
+
+| Field | Meaning |
+| --- | --- |
+| `txHash` | The onchain transaction |
+| `userCreated` | `true` when this transfer created the receiving HEVN account |
+| `emailSent` | `true` when the notification email went out |
+
+Retrying with the same `Idempotency-Key` replays: the response carries the recorded `txHash` and
+nothing is sent again. On a replay `userCreated` and `emailSent` are `false`. Every new transfer also
+saves the receiver as one of your contacts.
+
+## List transfers
+
+`GET /transfers` lists the transfers this account made through `POST /transfer_to_user`, newest first.
+Transfers made through `POST /transfer` appear in the app's transaction history, not here.
+
+| Query | Default | Meaning |
+| --- | --- | --- |
+| `limit` | `50` | 1 to 200 |
+| `offset` | `0` | Rows to skip |
+| `idempotency_key` | — | Filter to one transfer by its stored id, `<keyId>_<Idempotency-Key>` |
+
+```bash
+curl "$HEVN_RT/transfers?limit=20" -H "X-Api-Key: $HEVN_RT_KEY"
+```
+
+```json
+[
+  {
+    "txHash": "0x3a7f…e90b",
+    "amount": 75.0,
+    "receiverEmail": "contributor@example.com",
+    "receiverAddress": "0x9b2C…44De",
+    "transactionLink": "https://basescan.org/tx/0x3a7f…e90b",
+    "time": "2026-10-12T10:02:11Z"
+  }
+]
+```
+
+`receiverEmail` holds the name saved on the contact: the receiver's full name when their account has
+one, otherwise their email address.
+
+## Errors
+
+Every refusal has one body:
+
+```json
+{ "detail": "Insufficient spend allowance: remaining 12.500000 USDC, need 50 USDC" }
+```
+
+`detail` is a human-readable sentence. Branch on the status code, and log `detail`.
+
+| Status | `detail` | What to do |
+| --- | --- | --- |
+| 401 | `Invalid API key` | The key is wrong or was deleted |
+| 403 | `IP not allowed` | The request came from outside the key's IP allowlist |
+| 403 | `No active spend permission for this API key. …` | Grant the key a spending limit in **Settings → Remote Transfers** |
+| 403 | `Spend limit exceeded for this API key` | The key's lifetime `maxSpend` would be crossed. Create a new key |
+| 400 | `Insufficient spend allowance: …` | The onchain allowance for this period is used up. Wait for the period to reset, or raise the limit in the app |
+| 400 | `Smart wallet not found` | The account has no smart wallet |
+| 400 | `API key has no spender wallet. …`, `API key spender wallet does not match the key. …` | The key predates spender wallets. Create a new key |
+| 400 | `Transfer failed: …` | The user operation was rejected. Safe to retry with the same reference |
+| 409 | `This transfer was already sent: …` | The payment id was used before. Do not retry; the first transfer stands |
+| 422 | FastAPI validation body | A required field, header or `X-Api-Key` is missing, or a value has the wrong type |
+| 429 | `Too many requests. Try again later.` | 60 requests per hour per key on `/transfer`, `/transfer_to_user` and `/resolve_address`. Wait for `Retry-After` seconds |
+
+<Card title="Back to the overview" icon="arrow-left" href="/remote-transfers/overview">
+  How keys, spender wallets and spend permissions fit together.
+</Card>

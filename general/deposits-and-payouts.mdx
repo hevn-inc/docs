@@ -35,7 +35,7 @@ Sending money to external bank details works in the opposite direction, and agai
 
 <Steps>
   <Step title="You request a payout">
-    Via the app, CLI, or API you create a payout to a bank beneficiary. This is a platform (JWT / API key) action — it produces a quote, not a money movement.
+    Via the app or the API you create a payout to a bank beneficiary. This is a platform (JWT) action — it produces a quote, not a money movement.
   </Step>
   <Step title="The banking partner issues a one-time crypto address">
     The licensed banking partner returns a **single-use deposit address** dedicated to this specific payout. The address travels through HEVN's isolated [provider microservice](/general/architecture#provider-isolation-signed-responses), which signs it — the client verifies that signature before ever showing you the address.

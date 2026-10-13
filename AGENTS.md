@@ -14,7 +14,7 @@ The site has four tabs, and each one has a different reader:
 | --- | --- | --- |
 | **General** | anyone evaluating HEVN | How the platform is built, and why HEVN cannot touch the money |
 | **Whitelabel** | a backend engineer integrating HEVN | How to create accounts for your own customers and move their money from code |
-| **CLI** | an operator or an AI agent | How to run HEVN workflows from a terminal |
+| **Remote Transfers** | an engineer automating their own account | How to let a server or script send USDC from that account with a capped key. Advanced use only |
 | **REST API** | the same engineer, mid-integration | The exact contract for every operation |
 
 ## Terminology

@@ -56,7 +56,7 @@ Every action from the wallet is an ERC-4337 *user operation* carrying a **unique
 
 HEVN builds on this for money movement. For each payout to a [one-time withdrawal address](/general/deposits-and-payouts#fiat-payouts) — a banking-partner offramp or a [1Click](/general/cross-chain) swap — the client derives the operation's **nonce from that one-time deposit address**. One address, one nonce, one possible execution:
 
-- If the app, the CLI, or the network retries a submission, the same operation lands at most once onchain.
+- If the app or the network retries a submission, the same operation lands at most once onchain.
 - A second transfer to the same one-time address would need the same nonce — which the `EntryPoint` has already consumed. Double-sending a payout is rejected by the wallet layer itself, not by HEVN's backend deduplicating requests.
 
 <Note>

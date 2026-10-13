@@ -15,7 +15,7 @@ audience is `platform`, it carries a `developer_key_id` claim, and `/dapi/v1` re
 `401 unauthenticated` with no bearer, `403 forbidden` with `details.reason: "developerSessionRequired"` for an ordinary
 token or a refresh token on a business route. The refresh token, audience `platform-refresh`, is taken by
 `POST /auth/refresh` alone. The optional `x-api-key` the schema shows on every operation is an artefact of a shared
-dependency: an API key belongs to the [CLI](/cli/overview) and cannot authenticate here at all.
+dependency: an API key belongs to [remote transfers](/remote-transfers/overview) and cannot authenticate here at all.
 
 This page is the reference summary. [Sessions](/whitelabel/sessions) is the same flow with runnable
 Python, Node and Go.

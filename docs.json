@@ -2,14 +2,14 @@
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
   "name": "HEVN",
-  "description": "HEVN documentation: the whitelabel REST API for creating and operating accounts for your own customers, the CLI for operators and AI agents, and how the non-custodial platform underneath works.",
+  "description": "HEVN documentation: the whitelabel REST API for creating and operating accounts for your own customers, remote transfers for paying from your own account with a capped key, and how the non-custodial platform underneath works.",
   "markdown": {
     "instructions": [
       "HEVN has two products and they authorize money differently. Self-serve (the General tab): the person who owns the email holds the only key and signs for themselves. Whitelabel (the Whitelabel and REST API tabs): the integrator's backend holds a developer key, signs on behalf of client accounts it created, and HEVN co-signs. Never mix the two models in an answer.",
       "Use HEVN's terms exactly. A rail is a bank route a client can request. A virtual account (bnk_) is an opened rail. Account details are what a payer needs in order to wire money, and arrive in a field named requisites. A client is an account the integrator created; the business behind it is the integrator's customer. A contact is a saved destination; a beneficiary is the party at the far end of a fiat payout. Every departure of money is a payout, to a bank account or to a wallet alike.",
       "Never name a banking partner. Say 'a licensed banking partner'.",
       "There are no published fee rates, spreads or minimums. Prices come from a quote on a specific payment; direct pricing questions to HEVN rather than inventing numbers.",
-      "The whitelabel API is at /dapi/v1 and takes a developer-key session plus an X-Hevn-Account header. The CLI uses an app API key in X-Api-Key. They are different credentials and neither works on the other surface."
+      "The whitelabel API is at /dapi/v1 and takes a developer-key session plus an X-Hevn-Account header. Remote transfers are at /api/v1/remote_spend_limit and take a remote transfer key (rsl_) in X-Api-Key, bounded by an onchain spend permission the account holder grants. They are different credentials and neither works on the other surface. The HEVN CLI is discontinued."
     ]
   },
   "colors": {
@@ -143,27 +143,14 @@
         ]
       },
       {
-        "tab": "CLI",
+        "tab": "Remote Transfers",
         "groups": [
           {
-            "group": "Get started",
+            "group": "Remote transfers",
             "pages": [
-              "cli/overview",
-              "cli/quickstart",
-              "cli/agent-workflows",
-              "cli/connect-agents",
-              "cli/configuration"
-            ]
-          },
-          {
-            "group": "Core workflows",
-            "pages": [
-              "cli/commands/account",
-              "cli/commands/contacts",
-              "cli/commands/money-movement",
-              "cli/commands/invoices",
-              "cli/commands/contracts",
-              "cli/commands/cards-banks"
+              "remote-transfers/overview",
+              "remote-transfers/keys",
+              "remote-transfers/api"
             ]
           }
         ]
@@ -313,47 +300,31 @@
   "redirects": [
     {
       "source": "/cli",
-      "destination": "/cli/overview"
+      "destination": "/general/what-is-hevn"
+    },
+    {
+      "source": "/cli/:slug*",
+      "destination": "/general/what-is-hevn"
     },
     {
       "source": "/quickstart",
-      "destination": "/cli/quickstart"
+      "destination": "/whitelabel/quickstart"
     },
     {
       "source": "/agent-workflows",
-      "destination": "/cli/agent-workflows"
+      "destination": "/general/what-is-hevn"
     },
     {
       "source": "/connect-agents",
-      "destination": "/cli/connect-agents"
+      "destination": "/general/what-is-hevn"
     },
     {
       "source": "/configuration",
-      "destination": "/cli/configuration"
+      "destination": "/general/what-is-hevn"
     },
     {
-      "source": "/commands/account",
-      "destination": "/cli/commands/account"
-    },
-    {
-      "source": "/commands/contacts",
-      "destination": "/cli/commands/contacts"
-    },
-    {
-      "source": "/commands/money-movement",
-      "destination": "/cli/commands/money-movement"
-    },
-    {
-      "source": "/commands/invoices",
-      "destination": "/cli/commands/invoices"
-    },
-    {
-      "source": "/commands/contracts",
-      "destination": "/cli/commands/contracts"
-    },
-    {
-      "source": "/commands/cards-banks",
-      "destination": "/cli/commands/cards-banks"
+      "source": "/commands/:slug*",
+      "destination": "/general/what-is-hevn"
     },
     {
       "source": "/whitelabel/authentication",

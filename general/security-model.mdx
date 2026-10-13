@@ -11,7 +11,7 @@ HEVN's security posture follows from one design decision: **the platform never h
 | --- | --- | --- |
 | Private key | Sharded (Shamir) across the user's session and Privy's TEE infrastructure; never assembled outside a TEE | User only |
 | USDC balance | The user's smart wallet contract on Base | Onchain owners only (the user, plus anyone they [explicitly added](/general/shared-access)) |
-| Virtual account details, invoices, contacts | HEVN backend | HEVN, scoped by the user's JWT / API keys |
+| Virtual account details, invoices, contacts | HEVN backend | HEVN, scoped by the user's JWT |
 | Funds in a fiat payout | Banking partner's one-time address, then bank rails | Banking partner, for that payout only |
 | Funds in a cross-chain swap | 1Click settlement layer, per one-time quote | NEAR Intents protocol, for that swap only |
 
@@ -21,10 +21,12 @@ HEVN's security posture follows from one design decision: **the platform never h
   <Accordion title="HEVN is fully compromised or disappears">
     Funds at rest are unaffected. No HEVN system holds a wallet key or an owner role: an attacker with full control of HEVN's backend could read and tamper with metadata (invoices, contacts, bank detail records) but could not sign a single wallet operation. The wallet itself remains accessible through Privy — or via [key export](/general/privy-wallets#exit-hatch-key-export) — and standard Base tooling; it is an ordinary onchain smart wallet.
 
+    The exception is a [remote transfer key](/remote-transfers/overview) you created yourself. HEVN derives the signer of each key's spender wallet server-side from the key your program sends, so a compromised backend could spend through such a key — but only within the spend permission you granted it, which the `SpendPermissionManager` contract enforces onchain. An account with no remote transfer keys has no such exposure.
+
     The honest residual risk is **display integrity**: a compromised platform could try to show a false destination address (a fake payout or deposit address) and let the user sign a transfer to the attacker. HEVN's primary defense is [provider isolation with signed responses](/general/architecture#provider-isolation-signed-responses): payout details and one-time deposit addresses are fetched and signed by dedicated per-provider microservices, and the client verifies the signature before displaying anything — a forged address from the main backend fails verification. The last line of defense is still the signer: for large transfers, verify the destination through an independent channel before signing.
   </Accordion>
-  <Accordion title="A HEVN JWT or API key leaks">
-    A leaked JWT exposes the platform surface only: reading data and editing metadata — no spending. A leaked API key adds, at worst, spending **within the onchain allowance the owner granted it** for the current period — the [`SpendPermissionManager`](/general/shared-access#limited-access-spend-permissions) contract rejects anything beyond that. Revoke the spend permission onchain and the key in the app; the wallet owner key itself is never exposed. See [Authentication](/general/authentication#api-keys-cli-rest-api-agents).
+  <Accordion title="A HEVN JWT or remote transfer key leaks">
+    A leaked JWT exposes the platform surface only: reading data and editing metadata — no spending. A leaked [remote transfer key](/remote-transfers/overview) adds, at worst, spending **within the onchain allowance the owner granted it** for the current period — the [`SpendPermissionManager`](/general/shared-access#limited-access-spend-permissions) contract rejects anything beyond that. Delete the key in the app, which revokes its spend permission onchain; the wallet owner key itself is never exposed. See [Authentication](/general/authentication#remote-transfer-keys).
   </Accordion>
   <Accordion title="Privy has an outage — or disappears entirely">
     An outage delays signing (you temporarily can't authorize new operations), and no one else gains any capability during it. For the extreme case, the escape hatch is [key export](/general/privy-wallets#exit-hatch-key-export): the exported owner key controls the smart wallet with standard Ethereum tooling, independent of both Privy and HEVN. Privy is a deliberate trust assumption of the current architecture — see [Trust assumptions](/general/trust-assumptions).

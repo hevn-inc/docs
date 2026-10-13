@@ -55,7 +55,7 @@ route, with `401 unauthenticated` or `403 forbidden` and `details.reason: "devel
 `/api/v1` routes refuse a platform token just as firmly, in the other direction.
 
 The schema shows an optional `x-api-key` parameter on every operation. That is an artefact of a shared dependency, not
-a credential: an API key belongs to the [CLI](/cli/overview) and can never authenticate here, because the boundary
+a credential: an API key belongs to [remote transfers](/remote-transfers/overview) and can never authenticate here, because the boundary
 refuses the request before the key is read.
 
 HEVN re-reads the developer key on every request: it must still exist, the request must arrive from an address inside
