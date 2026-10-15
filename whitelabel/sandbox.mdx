@@ -190,7 +190,7 @@ moved, err := northwind.Post("/sandbox/payouts/"+payout.Str("id")+"/status",
 
 `status` shares its type with a payout's own status, so the schema also admits `awaitingSignature` — the one value this route never accepts. Sending it answers `422 validation_failed` with `details.fields[0].code = "value_error"` and the four legal values in the message; the four above are the whole vocabulary.
 
-Keep two test payouts more than `0.20` apart in amount: returned money is attributed to a refunded payout by amount, within a `0.20` tolerance.
+Keep two test payouts more than `0.20` apart in amount — see [how returns are attributed](/whitelabel/reference/limits#sandbox).
 
 ## What the sandbox does for you
 

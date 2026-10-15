@@ -120,7 +120,7 @@ deleting a key stops the sessions it already minted rather than waiting for them
 | `forbidden` | 403 | With `details.requiredScope`: the key does not hold the scope this route needs, and `details.scope` lists the ones it does. Scopes are fixed when a key is created, so this needs a key that has it — the four values are on [Developer key](/whitelabel/developer-key#scopes). |
 | `forbidden` | 403 | With no `details`: the key behind the session was deleted, or the call left an address outside its allowlist. Resume from an allowlisted host, or create a key that covers this one. |
 | `key_not_registered` | 403 | The public key you named in a signature is not one of this account's keys. |
-| `invalid_credentials` | 401 | At login only. A deleted key, an off-allowlist IP, an unknown email and a bad signature are all one code, deliberately. |
+| `invalid_credentials` | 401 | At login: a deleted key, an off-allowlist IP, an unknown email and a bad signature are all one code, deliberately. At refresh: the refresh token is malformed, expired or from another environment — log in again. |
 | `developer_key_not_found` | 404 | A `dk_…` id that is not yours was given to the key-management routes. |
 | `developer_key_already_exists` | 409 | That public key already belongs to a key on this account. Keys are immutable and additive — create a second one and delete the first. |
 

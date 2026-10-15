@@ -35,7 +35,7 @@ Four things are granted by HEVN rather than by the API — in the sandbox exactl
 | An active integrator profile | `403 integrator_inactive` on `POST /dapi/v1/clients`, and `403 account_forbidden` on every call that acts for a client you already have | Before you write production code. It follows a partnership review, off-platform. |
 | Client creation | `403 client_creation_not_enabled` on `POST /dapi/v1/clients` | Same conversation. It is granted separately from the profile. |
 | Escrow operation | Escrow actions are refused | Only if funds must be locked on chain between your own customers. |
-| The rails you need | `403 rail_not_available` on `POST /dapi/v1/banks` | Name the currencies and countries you sell into. Rail availability is per integrator, per client and per partner. |
+| The rails you need | `403 rail_not_available` on `POST /dapi/v1/banks` | Name the currencies and countries you sell into. Rail availability is per client and per partner. |
 
 Confirm all four the same way you would in the sandbox: create one client, read `GET /dapi/v1/banks` for it, and check that the rails you expect are listed.
 

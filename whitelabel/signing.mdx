@@ -60,7 +60,7 @@ sequenceDiagram
 | `authorization` | What HEVN does with your co-signature | What to check before signing |
 | --- | --- | --- |
 | `debit` | funds the payment by moving tokens out of the client's Base smart wallet | `debit.amount`, `debit.token` and `debit.address` |
-| `intent` | signs the payment's own terms with the client's smart wallet, and settles it with the partner — nothing leaves the wallet | `quote`, and `intent.digest` if you reproduce the terms yourself |
+| `intent` | signs the payment's own terms with the client's smart wallet, and settles it with the partner — nothing leaves the wallet | `quote`, and that `params.hash` wraps `intent.digest` (see [What the hash is](#what-the-hash-is)) |
 
 A payout from a wallet account is `debit`; one with `"sourceAccount": "FDIC_USD"` is `intent`, because
 the money is spent where the partner bank already holds it. A swap is whichever its route needs. The
@@ -94,14 +94,30 @@ no whitespace):
     "params": { "hash": "0x9c1f7b4a2e5d80c6314fa7b95d0e28c4f61ab3907d5c2e84061bf39d7a2c5e18" }
   },
   "headers": {
-    "privy-idempotency-key": "quote-sign:5f3c…e1",
+    "privy-app-id": "cm…",
     "privy-request-expiry": "1773679531000"
   },
   "method": "POST",
-  "url": "…",
+  "url": "https://api.privy.io/v1/wallets/<walletId>/rpc",
   "version": 1
 }
 ```
+
+For payouts and swaps `method` is always `POST`, `body.method` is always `secp256k1_sign` and
+`params` holds only `hash`.
+
+| Field | Value |
+| --- | --- |
+| `url` | `https://api.privy.io/v1/wallets/<walletId>/rpc` in every environment |
+| `headers.privy-app-id` | The HEVN Privy app of the environment — it binds the signature to sandbox or production |
+| `headers.privy-request-expiry` | Epoch milliseconds, two minutes after prepare; always equal to `approval.expiresAt` |
+
+### What the hash is
+
+| `authorization` | `body.params.hash` |
+| --- | --- |
+| `debit` | The ERC-4337 v0.6 `userOpHash` of the transfer: EntryPoint `0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789`, chain `8453` (sandbox `84532`). The operation's `callData` is one `transfer(debit.address, debit.amountAtomic)` on `debit.token`, so the hash commits to all of `debit`. It is not reproducible on your side — check `debit`. |
+| `intent` | The Coinbase Smart Wallet replay-safe hash of `intent.digest`: EIP-712 with domain `{name: "Coinbase Smart Wallet", version: "1", chainId, verifyingContract: <client smart wallet>}` over `CoinbaseSmartWalletMessage(bytes32 hash)` with `hash = intent.digest`. It is never equal to `intent.digest` itself. |
 
 <Warning>
   **Sign `base64decode(payload)` verbatim.** Never parse the JSON and re-serialize it. Any library
@@ -144,11 +160,12 @@ You are not trusted to describe the operation, and you are not asked to. At prep
   that is not in a fundable state;
 - checks that your account controls the client's wallet and that the wallet's live on-chain owner is
   your signer;
-- builds a **single stablecoin transfer** from the client's wallet, with the amount and destination
-  taken from what it just booked, and checks the balance covers it;
+- for `debit`, builds a **single stablecoin transfer** from the client's wallet, with the amount and
+  destination taken from what it just booked, and checks the balance covers it; for `intent`, builds
+  the typed terms from the booked quote;
 - re-validates that built operation against the stored terms before it hands you anything to sign;
-- pins an idempotency key of its own on the authorization, so the same signature cannot be replayed
-  as a different request;
+- pins the environment's Privy app and a two-minute expiry into the signed headers, and consumes the
+  approval on first use, so the same signature cannot be replayed;
 - binds the approval to your account, the target, the wallet and your signer, and stores it with an
   expiry.
 

@@ -93,7 +93,7 @@ Every emulated credit is paid by one shared faucet account, so the sandbox caps 
 | Money calls | 60 per account per hour | `429 rate_limited` |
 | Faucet account balance | must cover the credit, and gas must be non-zero | `503 provider_unavailable` |
 
-Keep two test payouts more than `0.20` apart in amount: returned money is attributed to a refunded payout by amount, within a `0.20` tolerance, so two near-identical test payouts can end up labelled with each other's refund.
+Keep two test payouts more than `0.20` apart in amount. Returned money is attributed to a refunded payout by the provider's transaction hash where the provider reports one, otherwise by amount within a `0.20` tolerance — in sandbox and in production alike. A return that matches two payouts is attributed to neither, and a `refund` row carries no payout id: rely on the payout's own `refunded` status.
 
 <Note>
   Rate limiting is a deployment setting, and a sandbox host may run with the per-credential and per-account counters switched off. A run that never sees a `429` there is not evidence that your pacing fits the production budget — build the `Retry-After` path before you go live.

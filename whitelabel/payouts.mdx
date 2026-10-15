@@ -68,6 +68,7 @@ stateDiagram-v2
     submitted --> settled
     submitted --> failed: retry with POST /dapi/v1/payouts and the same Idempotency-Key
     settled --> refunded
+    failed --> refunded
 ```
 
 ## Save a contact
@@ -497,8 +498,11 @@ there is no on-chain debit to check:
   "authorization": "intent",
   "quote": { "fromAmount": "500.00", "fromCurrency": "USD", "toAmount": "462.14", "toCurrency": "EUR" },
   "approval": { "id": "b1e7…", "payload": "eyJib2R5Ijp7…", "expiresAt": "2026-09-20T18:10:59Z" },
-  "intent": { "digest": "0x9c1f…", "settles": "message_signature" } }
+  "intent": { "digest": "0x51d0…", "settles": "message_signature" } }
 ```
+
+The signed `params.hash` wraps `intent.digest` rather than equalling it — see
+[What the hash is](/whitelabel/signing#what-the-hash-is).
 
 What you check is the `quote`, and everything after it is unchanged: sign `approval.payload`, post it
 to the same confirm route, poll the same read. Two rules are specific to this source:

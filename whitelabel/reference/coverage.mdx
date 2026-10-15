@@ -10,7 +10,7 @@ send money the other way.
 
 <Warning>
   This page is the shape of the catalogue, not a promise for your account. Rail availability is
-  decided per integrator, per client and per partner, and the only authoritative answers are
+  decided per client and per partner, and the only authoritative answers are
   `GET /dapi/v1/banks` for a given client and
   `GET /dapi/v1/contacts/{contactId}/capabilities` for a given contact. Read them; do not derive
   from this page.
@@ -132,12 +132,11 @@ by pricing them — `POST /dapi/v1/swaps/preview` returns the best route or refu
 
 ## What actually decides availability
 
-Four things narrow the catalogue above, and each one has a refusal that names it.
+Three things narrow the catalogue above, and each one has a refusal that names it.
 
 | What | Effect | You see |
 | --- | --- | --- |
-| Your integrator agreement | Which rails HEVN enables for you at all | `403 rail_not_available` on `POST /dapi/v1/banks` |
-| The client's residency and legal form | Which of those rails this client may hold | The rail is absent from `GET /dapi/v1/banks` for that client |
+| The client's residency and legal form | Which rails this client may hold | The rail is absent from `GET /dapi/v1/banks` for that client, and `403 rail_not_available` on `POST /dapi/v1/banks` |
 | The client's verification state | Whether a rail can open, and whether it can go `active` | `422 rail_requirements_unmet` with `details.blockers` |
 | The partner behind the rail | Whether it is accepting business right now | `503 provider_unavailable`, or the rail reports `channel_unavailable` |
 
