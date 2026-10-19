@@ -10428,6 +10428,7 @@
           "client_policy_not_enabled",
           "email_in_use",
           "name_in_use",
+          "phone_in_use",
           "client_request_conflict",
           "client_not_found",
           "profile_locked",

@@ -148,6 +148,7 @@ are deliberately absent from `/dapi/v1`.
 | `client_creation_not_enabled` | 403 | Your account cannot create clients yet. HEVN enables this. |
 | `email_in_use` | 409 | That email already belongs to an account. Look it up with `GET /dapi/v1/clients?email=`. |
 | `name_in_use` | 409 | Company names are globally unique. Send a more specific legal name. |
+| `phone_in_use` | 409 | That phone already belongs to another account, on `POST /dapi/v1/clients` or `PATCH /dapi/v1/client`. Ask your customer for the company's own number. |
 | `client_request_conflict` | 409 | An identical client request is already in flight. Poll instead of creating again. |
 | `client_not_found` | 404 | Unknown client id, or not one of yours. |
 | `profile_locked` | 409 | The field is frozen after verification. `details.fields` names them. |
