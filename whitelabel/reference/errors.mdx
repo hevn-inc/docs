@@ -1,6 +1,6 @@
 ---
 title: "Errors"
-description: "One envelope and all 109 error slugs, grouped by resource, with what to do about each."
+description: "One envelope and all 112 error slugs, grouped by resource, with what to do about each."
 ---
 
 Every refusal from `/dapi/v1` has the same body. `code` is a stable lowercase slug — branch on it, and never on `message`.
@@ -60,8 +60,9 @@ A `422 validation_failed` names every field that failed, in wire spelling, with 
 | `429` | Rate limited. Sleep for `Retry-After` seconds, then retry. See [Limits](/whitelabel/reference/limits#rate-limits). |
 | `500` | Our fault. `details.requestId` identifies the failure. |
 | `501` | A mode that exists in the schema but is not enabled here. |
-| `502` | Chain infrastructure refused or was unreachable. Safe to retry a confirm. |
-| `503` | A partner or the database is temporarily unavailable. Retry with backoff. |
+| `503` | A partner, the chain infrastructure (bundler, paymaster) or the database is temporarily unavailable. Retry with backoff; retrying a confirm is safe. |
+
+No refusal is a `502`. A `502` with an HTML body comes from the network in front of the API, not from HEVN: it carries no slug, so treat it like a timeout.
 
 ## Request and transport
 
@@ -186,8 +187,8 @@ Booking a payout — to a bank account or to a wallet — and the contacts it pa
 | `swap_route_unavailable` | 422 | Nothing can move money between these two accounts right now. |
 | `swap_not_confirmable` | 409 | The swap is not waiting for a signature. Read it before confirming again. |
 | `intent_not_signable` | 409 | This quote is no longer authorized by a signature — it was already spent, or it is funded by a debit. |
-| `bundler_rejected` | 502 | The chain rejected the operation. Confirm again with backoff. |
-| `bundler_unavailable` | 502 | Chain infrastructure is unreachable. Confirm again with backoff. |
+| `bundler_rejected` | 503 | The chain rejected the operation. Confirm again with backoff. |
+| `bundler_unavailable` | 503 | Chain infrastructure is unreachable. Confirm again with backoff. |
 
 Four more slugs are in the published enum and never reach you. `contact_requires_quote` and
 `direct_transfer_unsupported` are both folded into `409 contact_not_payable` before the response is written.
@@ -243,8 +244,8 @@ These arrive at `POST /dapi/v1/payouts/{payoutId}/confirm`; two of them — `quo
 | `funding_token_unsupported` | 409 | The payout's `sourceAccount` is not one a developer key can fund on this route. |
 | `smart_wallet_not_deployed` | 409 | The client's wallet is not on chain yet. Wait for `status: "ready"`. |
 | `wallet_owner_unverified` | 409 | The wallet's owner set does not yet include the signer. Contact support. |
-| `user_operation_rejected` | 502 | The bundler rejected the operation. Confirm again. |
-| `user_operation_unavailable` | 502 | The bundler or paymaster is unavailable. Confirm again with backoff. |
+| `user_operation_rejected` | 503 | The bundler rejected the operation. Confirm again. |
+| `user_operation_unavailable` | 503 | The bundler or paymaster is unavailable. `details.reason` carries its answer. Confirm again with backoff. |
 
 ## KYB and documents
 
@@ -268,7 +269,7 @@ These arrive at `POST /dapi/v1/payouts/{payoutId}/confirm`; two of them — `quo
 | `escrow_not_operated_by_you` | 403 | You are a party to the deal but not its operator. |
 | `escrow_state_changed` | 409 | The deal moved since the action was prepared: nothing is capturable, the payment was already collected, or the approval already landed. Read the deal and pick from `availableActions`. |
 | `action_in_flight` | 409 | One signing wallet runs one action at a time, across every deal. The refusal carries no `details`, so track the deal you left in flight yourself, sync it, then retry. |
-| `simulation_failed` | 409 | The action would revert on chain. Check balances and windows, then prepare again. |
+| `simulation_failed` | 409 | The action would revert on chain, or the gas sponsor refused it. `details.reason` carries the chain's own answer. Check balances and windows, then prepare again. |
 | `stale_nonce` | 409 | The wallet's nonce moved between prepare and confirm. Prepare again with the same key. |
 | `amount_not_allowed` | 409 | `void` and `reclaim` take no amount. |
 | `amount_out_of_range` | 422 | The amount is outside what the deal allows. An over-large `capture` or `authorize` currently arrives as a bare `400 invalid_request` instead, with no `details` and the generic message. |
@@ -276,7 +277,17 @@ These arrive at `POST /dapi/v1/payouts/{payoutId}/confirm`; two of them — `quo
 | `token_not_supported` | 422 | Escrow settles in `USDC` or `EURC`, by symbol. |
 | `receiver_not_a_client` | 422 | Both parties must be clients you provisioned with `POST /clients`. An account you only referred is never an escrow party. |
 | `conflict` | 409 | A state conflict with no narrower slug — on escrow it is what an unclassified deal error becomes. Read `message`, re-read the deal. An approval that closed is `410 approval_expired`, one already used is `409 approval_consumed`. |
-| `bundler_rejected`, `bundler_unavailable` | 502 | Chain infrastructure. Confirm again with backoff. |
+| `bundler_rejected`, `bundler_unavailable` | 503 | Chain infrastructure. Confirm again with backoff. `bundler_unavailable` carries `details.reason`. |
+
+## Sandbox
+
+Only the sandbox answers these. Each one names the limit in `message` and `details`; see [Sandbox limits](/whitelabel/sandbox#limits).
+
+| Slug | Status | What to do |
+| --- | --- | --- |
+| `sandbox_client_limit_reached` | 403 | You already hold `details.limit` clients. Reuse one; failed requests do not count. |
+| `sandbox_amount_limit_exceeded` | 422 | A payout, escrow, payin credit or faucet credit above the sandbox cap. `details.maximum` is the cap and `details.operation` names which one. |
+| `sandbox_faucet_balance_too_high` | 409 | The faucet only tops up a wallet holding less than `details.threshold` of the token. Spend what the client has first. |
 
 ## Handling a refusal in code
 

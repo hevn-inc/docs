@@ -192,7 +192,7 @@ Confirm is designed to be repeated, and it never pays twice. This table is the w
 | `200` `status: "failed"` | It reached the chain and reverted | Re-open with the same `Idempotency-Key` |
 | `202` `status: "submitted"` | Sent, no receipt yet | **Confirm again**, same body, until you get a `200` |
 | A timeout or network error | Unknown | **Confirm again**, same body |
-| `502` `bundler_rejected` / `bundler_unavailable` | Chain infrastructure | Confirm again, with backoff |
+| `503` `bundler_rejected` / `bundler_unavailable` | Chain infrastructure | Confirm again, with backoff |
 | `409` `funding_in_progress` | An attempt is live | Wait, then confirm again |
 | `409` `already_funded` | **The money moved** | Success. Read `details.transactionHash` |
 | `409` `funding_attempt_expired` | The approval expired unsigned | Re-open with the same `Idempotency-Key` |
@@ -200,7 +200,7 @@ Confirm is designed to be repeated, and it never pays twice. This table is the w
 | `400` `signature_invalid` | Wrong bytes or wrong encoding | Fix the signing and confirm again |
 
 <Warning>
-  After a `202`, a `502` or a timeout, confirm again rather than re-opening — a signed operation may
+  After a `202`, a `503` or a timeout, confirm again rather than re-opening — a signed operation may
   still be in flight, and confirming is what resolves it. Re-open only on an explicit `failed` or
   `funding_attempt_expired`. Re-opening after a signed operation is not dangerous — the chain refuses
   the second one — it just answers `payment_slot_consumed` instead of telling you what happened.

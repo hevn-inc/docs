@@ -69,7 +69,7 @@ This confirm needs the `escrow:sign` scope; a key without it answers `403 forbid
 | `409 approval_consumed` | That approval already signed something. | Prepare again with the same key, then read the deal before you sign anything else. |
 | `409 action_in_flight` | Another action of yours is still on chain. | Sync this deal, then retry. The refusal carries no `details`; the deal to sync is the one you are acting on. |
 | `409 escrow_state_changed` | The deal moved since prepare — nothing capturable, or the payment was already collected. | Re-read the deal and pick from `availableActions`. |
-| `502 bundler_rejected`, `502 bundler_unavailable` | Chain infrastructure. | Confirm again with backoff. |
+| `503 bundler_rejected`, `503 bundler_unavailable` | Chain infrastructure. | Confirm again with backoff. |
 
 <CodeGroup>
 ```python Python

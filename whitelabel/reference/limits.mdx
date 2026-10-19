@@ -84,12 +84,17 @@ there is the DER-encoded public half, which is a different field from the 512-ch
 
 ## Sandbox
 
-Every emulated credit is paid by one shared faucet account, so the sandbox caps what a single account can mint. See [Sandbox](/whitelabel/sandbox).
+The sandbox runs on shared testnet infrastructure — one faucet account, one gas budget — so it caps what a single integrator can create and move. None of these limits exist in production. See [Sandbox](/whitelabel/sandbox#limits).
 
 | Limit | Value | Refusal |
 | --- | --- | --- |
+| Clients per integrator | `5`; failed, rejected and canceled requests do not count | `403 sandbox_client_limit_reached`, with `details.limit` and `details.clients` |
+| One payout | at most `1` of the debited account | `422 sandbox_amount_limit_exceeded`, `details.operation = "payout"` |
+| One escrow | `maxAmount` at most `1` | `422 sandbox_amount_limit_exceeded`, `details.operation = "escrow"` |
 | Smallest emulated credit | `0.10` of the token | `422 amount_below_minimum` |
-| Largest emulated credit, per call | `100`, live as `maxCredit` on `GET /dapi/v1/sandbox/treasury` | `422 amount_above_maximum`, with `details.maxCredit` |
+| One payin credit (bank deposit, completed payin) | `1`, live as `maxCredit` on `GET /dapi/v1/sandbox/treasury` | `422 sandbox_amount_limit_exceeded`, `details.operation = "payin"` |
+| One faucet credit (deposit without `bankId`) | `5` | `422 sandbox_amount_limit_exceeded`, `details.operation = "faucet"` |
+| Faucet eligibility | the wallet holds less than `1` of the token | `409 sandbox_faucet_balance_too_high`, with `details.balance` and `details.threshold` |
 | Money calls | 60 per account per hour | `429 rate_limited` |
 | Faucet account balance | must cover the credit, and gas must be non-zero | `503 provider_unavailable` |
 

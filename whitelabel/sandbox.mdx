@@ -63,19 +63,19 @@ treasury, err := api.Get("/sandbox/treasury")
 
 ```json Response — 200
 { "chainId": 84532, "address": "0x7d4E5E29e6d40735D4f9bB74a0234383068f8A21",
-  "gasBalance": "0.0412", "maxCredit": "100",
+  "gasBalance": "0.0412", "maxCredit": "1",
   "balances": [ { "token": "USDC", "tokenAddress": "0x036CbD…", "balance": "842.51" },
                 { "token": "EURC", "tokenAddress": "0x808456…", "balance": "310.00" } ] }
 ```
 
-`maxCredit` is the live per-call ceiling. When the faucet account is empty or out of gas, credits answer `503 provider_unavailable` with `details.treasuryAddress` and `details.token` — that is a faucet problem, not your bug.
+`maxCredit` is the live per-call ceiling for a bank deposit or a completed payin. The token faucet has its own ceiling of `5` ([Limits](#limits)). When the faucet account is empty or out of gas, credits answer `503 provider_unavailable` with `details.treasuryAddress` and `details.token` — that is a faucet problem, not your bug.
 
 ## Mint money
 
 `POST /dapi/v1/sandbox/deposits` has two arms, and `bankId` picks between them.
 
 - **With `bankId`** it is an unsolicited bank transfer into that rail's account details: `amount` is in the rail's currency, the emulator converts at the fixed rate and credits the client's account. `remitter` and `paymentReference` are the payer's name and message.
-- **Without `bankId`** it is a token transfer straight to the client's wallet. `token` is `USDC` (default) or `EURC`, and it is the fastest way to fund a client before a payout test.
+- **Without `bankId`** it is the token faucet: a transfer straight to the client's wallet. `token` is `USDC` (default) or `EURC`, and it is the fastest way to fund a client before a payout test. It sends at most `5` per call, and only while the wallet holds less than `1` of that token; a fuller wallet answers `409 sandbox_faucet_balance_too_high`.
 
 <CodeGroup>
 ```bash cURL
@@ -84,34 +84,34 @@ curl -s -X POST "$HEVN_API/sandbox/deposits" \
   -H "X-Hevn-Account: $HEVN_CLIENT_ID" \
   -H "Idempotency-Key: fund-northwind-001" \
   -H "Content-Type: application/json" \
-  -d '{"amount":"6.00","token":"USDC"}'
+  -d '{"amount":"5.00","token":"USDC"}'
 ```
 
 ```python Python
 northwind = hevn.acting_as(CLIENT_ID)
-credit = northwind.post("/sandbox/deposits", {"amount": "6.00", "token": "USDC"},
+credit = northwind.post("/sandbox/deposits", {"amount": "5.00", "token": "USDC"},
                         idempotency_key="fund-northwind-001")
 ```
 
 ```javascript Node
 const northwind = hevn.actingAs(clientId);
 const credit = await northwind.post("/sandbox/deposits",
-  { amount: "6.00", token: "USDC" },
+  { amount: "5.00", token: "USDC" },
   { idempotencyKey: "fund-northwind-001" });
 ```
 
 ```go Go
 northwind := api.ActingAs(clientID)
-credit, err := northwind.Post("/sandbox/deposits", hevn.Body{"amount": "6.00", "token": "USDC"},
+credit, err := northwind.Post("/sandbox/deposits", hevn.Body{"amount": "5.00", "token": "USDC"},
 	hevn.IdempotencyKey("fund-northwind-001"))
 ```
 </CodeGroup>
 
 ```json Response — 200
 { "depositId": "sbx_cd_1b8e0f7a2c", "status": "settled",
-  "token": "USDC", "amount": "6.000000", "currency": "USDC",
+  "token": "USDC", "amount": "5.000000", "currency": "USDC",
   "idempotencyKey": "fund-northwind-001",
-  "credited": "6.000000", "txHash": "0x08fa…", "transactionId": "txn_9e4…" }
+  "credited": "5.000000", "txHash": "0x08fa…", "transactionId": "txn_9e4…" }
 ```
 
 A bank deposit answers the same shape with the fiat side filled in — `amount` and `currency` in the rail's currency, `credited` in the account it landed in, plus `fee`, `feeCurrency` and `rate`. When the credit settles a payin you quoted, `payinId` names it.
@@ -191,6 +191,35 @@ moved, err := northwind.Post("/sandbox/payouts/"+payout.Str("id")+"/status",
 `status` shares its type with a payout's own status, so the schema also admits `awaitingSignature` — the one value this route never accepts. Sending it answers `422 validation_failed` with `details.fields[0].code = "value_error"` and the four legal values in the message; the four above are the whole vocabulary.
 
 Keep two test payouts more than `0.20` apart in amount: returned money is attributed to a refunded payout by amount, within a `0.20` tolerance.
+
+## Limits
+
+The sandbox runs on shared testnet infrastructure — one faucet account, one gas budget — so every integrator gets a small, fixed share of it. Production has none of these limits.
+
+| Limit | Value | Refusal |
+| --- | --- | --- |
+| Clients per integrator | `5`. Requests that failed, were rejected or were canceled do not count. | `403 sandbox_client_limit_reached`, `details: {limit, clients}` |
+| One payout | at most `1` of the debited account (USDC or EURC) | `422 sandbox_amount_limit_exceeded` |
+| One escrow | `maxAmount` at most `1`; its actions cannot exceed it | `422 sandbox_amount_limit_exceeded` |
+| One payin credit — a bank deposit, or a completed payin | `0.10` to `1` of the credited token, live as `maxCredit` | `422 amount_below_minimum`, `422 sandbox_amount_limit_exceeded` |
+| One faucet credit — a deposit without `bankId` | `0.10` to `5`, only while the wallet holds less than `1` of that token | `422 sandbox_amount_limit_exceeded`, `409 sandbox_faucet_balance_too_high` |
+| Money calls | 60 per account per hour | `429 rate_limited` |
+
+Every refusal says which limit it hit and by how much, in the message and in `details`:
+
+```json Response — 422
+{ "error": { "code": "sandbox_amount_limit_exceeded",
+  "message": "The sandbox moves at most 1 USDC per payout; this request asks for 5.00 USDC.",
+  "details": { "operation": "payout", "maximum": "1", "amount": "5.00", "currency": "USDC" } } }
+```
+
+```json Response — 409
+{ "error": { "code": "sandbox_faucet_balance_too_high",
+  "message": "The sandbox faucet only tops up a wallet holding less than 1 USDC; this wallet holds 3.2 USDC",
+  "details": { "balance": "3.2", "threshold": "1", "token": "USDC" } } }
+```
+
+A client that holds `1` or more already has enough to test with: pay it out, or move it to another client, before asking the faucet again.
 
 ## What the sandbox does for you
 
