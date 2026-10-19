@@ -190,29 +190,30 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
       -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
       -H "X-Hevn-Account: $HEVN_CLIENT_ID" \
       -H "Idempotency-Key: quickstart-deposit-1" \
-      -H "Content-Type: application/json" -d '{"amount":"6.00","token":"USDC"}'
+      -H "Content-Type: application/json" -d '{"amount":"5.00","token":"USDC"}'
     ```
 
     ```python Python
-    credit = northwind.post("/sandbox/deposits", {"amount": "6.00", "token": "USDC"},
+    credit = northwind.post("/sandbox/deposits", {"amount": "5.00", "token": "USDC"},
                             idempotency_key="quickstart-deposit-1")
     ```
 
     ```javascript Node
     const credit = await northwind.post("/sandbox/deposits",
-      { amount: "6.00", token: "USDC" },
+      { amount: "5.00", token: "USDC" },
       { idempotencyKey: "quickstart-deposit-1" });
     ```
 
     ```go Go
-    credit, err := northwind.Post("/sandbox/deposits", hevn.Body{"amount": "6.00", "token": "USDC"},
+    credit, err := northwind.Post("/sandbox/deposits", hevn.Body{"amount": "5.00", "token": "USDC"},
     	hevn.IdempotencyKey("quickstart-deposit-1"))
     ```
 
     </CodeGroup>
 
     A `200` means the tokens landed; a `202` means they are on their way and the same request,
-    with the same key, is safe to repeat.
+    with the same key, is safe to repeat. The faucet sends at most `5` per call, and only to a
+    wallet that holds less than `1` of that token ([Sandbox limits](/whitelabel/sandbox#limits)).
   </Step>
 
   <Step title="Read the balance you just created">
@@ -245,8 +246,8 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
     {
       "clientId": "cl_7YQ2Kf3mN8",
       "baseSmartWallet": "0x2f1c9d0b8a7e6532d41ac9f0b3e27d5581a4c6f9",
-      "accounts": [{ "account": "USDC", "balance": "6.000000", "usdValue": "6.00" }],
-      "totalUsd": "6.00"
+      "accounts": [{ "account": "USDC", "balance": "5.000000", "usdValue": "5.00" }],
+      "totalUsd": "5.00"
     }
     ```
 
@@ -314,24 +315,24 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
     curl -X POST "$HEVN_API/payouts" \
       -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" -H "X-Hevn-Account: $HEVN_CLIENT_ID" \
       -H "Idempotency-Key: quickstart-payout-1" -H "Content-Type: application/json" \
-      -d "{\"contactId\":\"$HEVN_CONTACT_ID\",\"amount\":\"5.00\",\"publicKey\":\"$HEVN_PUBLIC_KEY\"}"
+      -d "{\"contactId\":\"$HEVN_CONTACT_ID\",\"amount\":\"1.00\",\"publicKey\":\"$HEVN_PUBLIC_KEY\"}"
     ```
 
     ```python Python
     payout = northwind.post("/payouts", {
-        "contactId": contact["id"], "amount": "5.00", "publicKey": key.public_key,
+        "contactId": contact["id"], "amount": "1.00", "publicKey": key.public_key,
     }, idempotency_key="quickstart-payout-1")
     ```
 
     ```javascript Node
     const payout = await northwind.post("/payouts", {
-      contactId: contact.id, amount: "5.00", publicKey: key.publicKey,
+      contactId: contact.id, amount: "1.00", publicKey: key.publicKey,
     }, { idempotencyKey: "quickstart-payout-1" });
     ```
 
     ```go Go
     payout, err := northwind.Post("/payouts", hevn.Body{
-    	"contactId": contact.Str("id"), "amount": "5.00", "publicKey": key.PublicKey,
+    	"contactId": contact.Str("id"), "amount": "1.00", "publicKey": key.PublicKey,
     }, hevn.IdempotencyKey("quickstart-payout-1"))
     ```
 
@@ -343,8 +344,8 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
       "kind": "onchain",
       "status": "awaitingSignature",
       "approval": { "id": "…", "payload": "eyJib2R5Ijp…", "expiresAt": "2026-09-17T10:06:10Z" },
-      "debit": { "address": "0x8f3bd1c7a0e94f25b6d1c83a5e07f4b219ad6e80", "amount": "5.00",
-                 "amountAtomic": "5000000", "token": "USDC", "chainId": 84532 },
+      "debit": { "address": "0x8f3bd1c7a0e94f25b6d1c83a5e07f4b219ad6e80", "amount": "1.00",
+                 "amountAtomic": "1000000", "token": "USDC", "chainId": 84532 },
       "contact": { "contactId": "ct_3K9…", "name": "Treasury",
                    "address": "0x8f3bd1c7a0e94f25b6d1c83a5e07f4b219ad6e80",
                    "chainId": "base", "token": "USDC" },
@@ -372,7 +373,7 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
 
     ```python Python
     debit, expected = payout["debit"], own_wallet
-    if (debit["amount"], debit["token"], debit["address"].lower()) != ("5.00", "USDC", expected.lower()):
+    if (debit["amount"], debit["token"], debit["address"].lower()) != ("1.00", "USDC", expected.lower()):
         raise RuntimeError(f"refusing to sign {debit}")
 
     signature = key.sign_payload(payout["approval"]["payload"])
@@ -382,7 +383,7 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
     ```javascript Node
     const { amount, token, address } = payout.debit;
     const expected = ownWallet.toLowerCase();
-    if (amount !== "5.00" || token !== "USDC" || address.toLowerCase() !== expected) {
+    if (amount !== "1.00" || token !== "USDC" || address.toLowerCase() !== expected) {
       throw new Error(`refusing to sign ${amount} ${token} to ${address}`);
     }
 
@@ -392,7 +393,7 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
 
     ```go Go
     expected := strings.ToLower(ownWallet)
-    if payout.Str("debit.amount") != "5.00" || payout.Str("debit.token") != "USDC" ||
+    if payout.Str("debit.amount") != "1.00" || payout.Str("debit.token") != "USDC" ||
     	strings.ToLower(payout.Str("debit.address")) != expected {
     	return fmt.Errorf("refusing to sign %v", payout["debit"])
     }
@@ -434,7 +435,7 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
     </CodeGroup>
 
     A row carries its amounts as two sides — `from` is what left the source, `to` is what arrived —
-    rather than a single `amount`. On this payout both are `5.000000 USDC`.
+    rather than a single `amount`. On this payout both are `1.000000 USDC`.
 
     The 5 USDC that left in step 8 is there with its `txHash`, and the same 5 USDC are now in your
     own account's balance — read it with the balance call from step 5, with `$HEVN_USER_ID` in

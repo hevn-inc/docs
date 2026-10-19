@@ -552,7 +552,7 @@ Funding refusals arrive at `confirm`, and each has exactly one correct response:
 | `funding_attempt_expired` | 409 | The approval expired. Re-open with `POST /dapi/v1/payouts` and the same key, then sign the new payload. |
 | `payment_slot_consumed` | 409 | An operation for this payout already landed on chain, and a landed operation — settled or reverted — spends the slot for good. Read the payout: `settled` needs nothing, `failed` needs a new payout under a new key. |
 | `insufficient_funds` | 409 | The client's balance does not cover the debit. `details.available` and `details.required` are in atomic units. Fund the wallet and confirm again. |
-| `bundler_rejected`, `bundler_unavailable` | 502 | Chain infrastructure. Confirm again with backoff. |
+| `bundler_rejected`, `bundler_unavailable` | 503 | Chain infrastructure. Confirm again with backoff. |
 | anything else | — | Stop. Take it to support with the `X-Request-ID` of the response. |
 
 That policy is one function, shared by every payout and by escrow actions, and stated once under [Retrying a confirm](/whitelabel/signing#retrying-a-confirm):
