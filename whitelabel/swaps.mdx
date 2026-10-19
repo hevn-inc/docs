@@ -230,8 +230,8 @@ its wallet, and a payout when it wants a beneficiary paid.
 ## In the sandbox
 
 Swaps are the one money route the sandbox does not serve. The emulated chain has no exchange venue
-behind it and the emulator issues no custodial dollar balance, so `POST /dapi/v1/swaps` there answers
-a refusal rather than a quote. Build against the contract on this page and exercise it in production
+behind it and the emulator issues no custodial dollar balance, so `POST /dapi/v1/swaps` and its preview there
+answer `422 swap_route_unavailable`, with a message that says so, rather than a quote. Build against the contract on this page and exercise it in production
 ([Sandbox](/whitelabel/sandbox)).
 
 <Card title="Next: Balances and transactions" icon="arrow-right" href="/whitelabel/balances-and-transactions">

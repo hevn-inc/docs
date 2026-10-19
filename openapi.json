@@ -10448,7 +10448,6 @@
           "kyb_incomplete",
           "kyb_roster_conflict",
           "kyb_subject_conflict",
-          "document_fields_missing",
           "document_not_found",
           "document_type_unsupported",
           "invalid_enum_value",
