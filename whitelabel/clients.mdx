@@ -74,7 +74,7 @@ Examples use the client from [HTTP client](/whitelabel/reference/client). This p
 </ParamField>
 
 <ParamField body="phone" type="string">
-  E.164, for example `+13125550142`. Optional here and required later: every rail a company opens checks for a phone number on the account. Passing it at creation is the difference between opening a rail in one call and opening it in two. A phone belongs to one account across HEVN: one already on another account answers `409 phone_in_use`.
+  E.164, for example `+13125550142`. Optional here and required later: every rail a company opens checks for a phone number on the account. Passing it at creation is the difference between opening a rail in one call and opening it in two.
 </ParamField>
 
 ## Three statuses
@@ -218,7 +218,7 @@ The second is concurrency. Client creation is a queued operation; `ready` arrive
 
 ## Update the phone and the address
 
-`PATCH /dapi/v1/client` writes two things and nothing else — the phone number the rails check, and the postal address. The phone is unique across HEVN, so one held by another account answers `409 phone_in_use`; writing back the client's own number is fine. It is a client-scoped route, so the id travels in `X-Hevn-Account`:
+`PATCH /dapi/v1/client` writes two things and nothing else — the phone number the rails check, and the postal address. It is a client-scoped route, so the id travels in `X-Hevn-Account`:
 
 <CodeGroup>
 
