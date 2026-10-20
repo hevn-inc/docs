@@ -9887,6 +9887,17 @@
             "title": "Fromcurrency",
             "description": "Currency debited by the quote."
           },
+          "sourceAccount": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccountKey"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Account the payout is paid from. `USDC`, `EURC` and `USDC_ARB` debit the client's wallet; `FDIC_USD` debits the custodial USD balance, whose quote is priced in `USD`."
+          },
           "toAmount": {
             "type": "string",
             "title": "Toamount",

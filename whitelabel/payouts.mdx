@@ -202,7 +202,7 @@ Two optional reads price a payout before you book one. `GET /dapi/v1/contacts/{c
       "kind": "fiat",
       "status": "awaitingSignature",
       "idempotencyKey": "order-A-1187",
-      "quote": { "fromAmount": "500.00", "fromCurrency": "USD",
+      "quote": { "fromAmount": "500.00", "fromCurrency": "USD", "sourceAccount": "USDC",
                  "toAmount": "459.31", "toCurrency": "EUR",
                  "rate": "0.9247", "feeAmount": "1.00", "feeCurrency": "USD",
                  "expiresAt": "2026-09-17T10:06:11Z" },
@@ -223,6 +223,8 @@ Two optional reads price a payout before you book one. `GET /dapi/v1/contacts/{c
     | Which account pays for it | `sourceAccount`, `USDC` (the default), `EURC` or `FDIC_USD`. The first two debit the client's wallet; `FDIC_USD` spends the custodial dollar balance and is authorized differently (see below). A wallet contact must be able to receive what you name: asking to pay a USDC address from `EURC` is refused with `400`, and so is an account the rail cannot be funded with. |
 
     Amounts are decimal strings in the major unit — `"500.00"`, never `500` and never atomic units. More precision than the asset allows is refused, never rounded ([Conventions](/whitelabel/conventions#money)).
+
+    `quote.sourceAccount` is the account the payout is actually paid from. Read the account from it, not from `fromCurrency`: `fromCurrency` is the currency the partner prices the debit in, and a partner prices a `USDC` debit and an `FDIC_USD` debit alike in `USD`.
   </Step>
 
   <Step title="Check the debit, then sign">
@@ -282,7 +284,7 @@ Two optional reads price a payout before you book one. `GET /dapi/v1/contacts/{c
 
     ```json Response — 200
     { "id": "po_4c8a…", "kind": "fiat", "status": "settled",
-      "quote": { "fromAmount": "500.00", "fromCurrency": "USD",
+      "quote": { "fromAmount": "500.00", "fromCurrency": "USD", "sourceAccount": "USDC",
                  "toAmount": "459.31", "toCurrency": "EUR", "rate": "0.9247" },
       "transactionHash": "0x4f1c…", "transactionId": "txn_9e4…",
       "contact": { "contactId": "ct_3K9…", "name": "Ardenne Fabrication SARL" },
@@ -386,7 +388,7 @@ A wallet contact needs no postal address on file — the chain is the address. *
   "kind": "onchain",
   "status": "awaitingSignature",
   "idempotencyKey": "payout-A-1187-onchain",
-  "quote": { "fromAmount": "1.50", "fromCurrency": "USDC",
+  "quote": { "fromAmount": "1.50", "fromCurrency": "USDC", "sourceAccount": "USDC",
              "toAmount": "1.50", "toCurrency": "USDC" },
   "approval": { "id": "…", "payload": "eyJ…", "expiresAt": "2026-09-17T10:06:10Z" },
   "debit": { "address": "0x7c1d…", "amount": "1.50", "amountAtomic": "1500000",
@@ -413,7 +415,7 @@ When the contact is on another chain, or expects another token, the balance cann
   "id": "po_6d21…",
   "kind": "onchain",
   "status": "awaitingSignature",
-  "quote": { "fromAmount": "1.50", "fromCurrency": "USDC",
+  "quote": { "fromAmount": "1.50", "fromCurrency": "USDC", "sourceAccount": "USDC",
              "toAmount": "1.4923", "toCurrency": "USDC",
              "feeAmount": "0.0077", "feeCurrency": "USD",
              "expiresAt": "2026-09-17T10:06:11Z",
@@ -500,13 +502,15 @@ there is no on-chain debit to check:
   "kind": "fiat",
   "status": "awaitingSignature",
   "authorization": "intent",
-  "quote": { "fromAmount": "500.00", "fromCurrency": "USD", "toAmount": "462.14", "toCurrency": "EUR" },
+  "quote": { "fromAmount": "500.00", "fromCurrency": "USD", "sourceAccount": "FDIC_USD",
+             "toAmount": "462.14", "toCurrency": "EUR" },
   "approval": { "id": "b1e7…", "payload": "eyJib2R5Ijp7…", "expiresAt": "2026-09-20T18:10:59Z" },
   "intent": { "digest": "0x9c1f…", "settles": "message_signature" } }
 ```
 
-What you check is the `quote`, and everything after it is unchanged: sign `approval.payload`, post it
-to the same confirm route, poll the same read. Two rules are specific to this source:
+What you check is the `quote` — `sourceAccount` is `FDIC_USD`, and `fromCurrency` is `USD` because
+that is the balance's own currency — and everything after it is unchanged: sign `approval.payload`,
+post it to the same confirm route, poll the same read. Two rules are specific to this source:
 
 - The client has to hold the account. Without one, the call answers `422 account_unavailable`.
 - The beneficiary has to be reachable from the rail that holds the balance. A `bankId` on another
