@@ -184,7 +184,7 @@ Booking a payout — to a bank account or to a wallet — and the contacts it pa
 | `payout_not_fundable` | 409 | This payout can no longer be funded. Book a new one. |
 | `quote_expired` | 409 | The price expired. Book again with the same `Idempotency-Key` to get a fresh one. |
 | `swap_not_found` | 404 | Unknown swap id for this client. |
-| `swap_route_unavailable` | 422 | Nothing can move money between these two accounts right now. |
+| `swap_route_unavailable` | 422 | Nothing can move money between these two accounts right now. The sandbox answers it for every swap: it has no exchange venue. |
 | `swap_not_confirmable` | 409 | The swap is not waiting for a signature. Read it before confirming again. |
 | `intent_not_signable` | 409 | This quote is no longer authorized by a signature — it was already spent, or it is funded by a debit. |
 | `bundler_rejected` | 503 | The chain rejected the operation. Confirm again with backoff. |
@@ -235,7 +235,7 @@ These arrive at `POST /dapi/v1/payouts/{payoutId}/confirm`; two of them — `quo
 | `funding_in_progress` | 409 | An attempt is still in flight. Wait, then confirm again. |
 | `funding_attempt_expired` | 409 | The approval expired unsigned. Re-open with the same `Idempotency-Key` and sign the new payload. |
 | `payment_slot_consumed` | 409 | This payout's on-chain slot is spent — an operation for it landed, including one that reverted. Nothing you sign for it can move money. Book a new payout with a new key. |
-| `insufficient_funds` | 409 | The client's balance does not cover the debit. `details.available` and `details.required` are atomic units. |
+| `insufficient_funds` | 409 | The client's balance does not cover the debit. `details.available` and `details.required` are atomic units. On an escrow action, `details.party` says whose wallet is short — `payer` for `authorize` and `charge`, `operator` (yours) for `refund` — with `token`, `balanceAtomic` and `amountAtomic`. |
 | `contact_changed` | 409 | The contact was edited after the payout was booked. Book again. |
 | `contact_not_found` | 404 | The contact was deleted. |
 | `quote_not_submitted` | 409 | The payout was never booked with the partner. Book it again. |
@@ -254,7 +254,6 @@ These arrive at `POST /dapi/v1/payouts/{payoutId}/confirm`; two of them — `quo
 | `kyb_incomplete` | 422 | The submission was completed with gaps. `GET /dapi/v1/client/kyb` lists `missing[]`. |
 | `kyb_roster_conflict` | 409 | The people on file conflict with this write — usually a person removed while still owning shares. |
 | `kyb_subject_conflict` | 409 | The subject conflicts with the verification data already on file. |
-| `document_fields_missing` | 422 | A document carries none of the values a reviewer needs. `details.documents` names each `<slot>.<key>`; write them with `PUT /dapi/v1/documents/{documentId}/content`. |
 | `document_not_found` | 404 | Unknown `doc_…` id for this client. |
 | `document_type_unsupported` | 422 | That slot does not accept this document type. |
 | `invalid_enum_value` | 422 | The value is not one of the accepted ones. See [KYB fields](/whitelabel/reference/kyb-fields). |

@@ -102,7 +102,7 @@ many countries out of it. Nothing here needs escrow, and the contractors are nev
   </Step>
   <Step title="Pay, one payout at a time">
     `POST /dapi/v1/payouts` with an `Idempotency-Key` derived from your own payroll-run id and the
-    contractor id — `run-2026-09/contractor-441` — then sign and confirm. That key is what makes the
+    contractor id — `run-2026-09:contractor-441` — then sign and confirm. That key is what makes the
     whole run safe to re-drive after a crash: a repeat is the same payment, never a second one.
   </Step>
   <Step title="Reconcile from the client's ledger">

@@ -83,7 +83,8 @@ curl -s -X POST "$HEVN_API/contacts" \
   -d '{"name":"Ardenne Fabrication SARL",
        "bank":{"method":"sepa","currency":"EUR",
                "fields":{"iban":"FR7630006000011234567890189"},
-               "holder":{"type":"business","businessName":"Ardenne Fabrication SARL"}},
+               "holder":{"type":"business","businessName":"Ardenne Fabrication SARL"},
+               "bankName":"BNP Paribas"},
        "address":{"country":"FR","city":"Lyon","streetAddress":"12 Rue Garibaldi","zip":"69006"}}'
 ```
 
@@ -95,6 +96,7 @@ contact = northwind.post("/contacts", {
         "currency": "EUR",
         "fields": {"iban": "FR7630006000011234567890189"},
         "holder": {"type": "business", "businessName": "Ardenne Fabrication SARL"},
+        "bankName": "BNP Paribas",
     },
     "address": {"country": "FR", "city": "Lyon", "streetAddress": "12 Rue Garibaldi", "zip": "69006"},
 })
@@ -108,6 +110,7 @@ const contact = await northwind.post("/contacts", {
     currency: "EUR",
     fields: { iban: "FR7630006000011234567890189" },
     holder: { type: "business", businessName: "Ardenne Fabrication SARL" },
+    bankName: "BNP Paribas",
   },
   address: { country: "FR", city: "Lyon", streetAddress: "12 Rue Garibaldi", zip: "69006" },
 });
@@ -121,6 +124,7 @@ contact, err := northwind.Post("/contacts", hevn.Body{
 		"currency": "EUR",
 		"fields":   hevn.Body{"iban": "FR7630006000011234567890189"},
 		"holder":   hevn.Body{"type": "business", "businessName": "Ardenne Fabrication SARL"},
+		"bankName": "BNP Paribas",
 	},
 	"address": hevn.Body{"country": "FR", "city": "Lyon", "streetAddress": "12 Rue Garibaldi", "zip": "69006"},
 })
@@ -133,12 +137,13 @@ contact, err := northwind.Post("/contacts", hevn.Body{
   "bank": { "method": "sepa", "currency": "EUR",
             "fields": { "iban": "FR7630006000011234567890189" },
             "holder": { "type": "business", "businessName": "Ardenne Fabrication SARL" },
-            "state": "active" },
+            "bankName": "BNP Paribas", "state": "active" },
   "address": { "country": "FR", "city": "Lyon", "streetAddress": "12 Rue Garibaldi", "zip": "69006" } }
 ```
 
-Four decisions live here:
+Five decisions live here:
 
+- **A bank contact names the beneficiary's bank.** `bank.bankName` is required for SEPA — a contact without it answers `422 validation_failed` — and is what the partner prints on the payment.
 - **A bank contact needs a complete beneficiary address.** Without `country`, `city`, `streetAddress` and `zip` the call answers `422 contact_details_invalid`, listing them in `details.fields`. Which identifiers `fields` must carry depends on the method — see [Rails](/whitelabel/reference/rails).
 - **The same account details create one contact.** A second `POST` answers `200` with `Idempotency-Replayed: true` and the original `ct_…`, so a retried create never forks a contact.
 - **Correct a contact with `PATCH /dapi/v1/contacts/{contactId}`, never by re-creating it.** Name, address and holder are editable, the account identifiers are not; a misspelled beneficiary name is refused by the partner, not by the contact, so this is the repair path.

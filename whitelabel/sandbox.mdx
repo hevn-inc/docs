@@ -7,7 +7,7 @@ import ActingAsSnippet from "/snippets/acting-as.mdx";
 import EnvSnippet from "/snippets/env.mdx";
 import SandboxCapsSnippet from "/snippets/sandbox-caps.mdx";
 
-The sandbox is the same API against one emulated partner on Base Sepolia. Same paths, same bodies, same slugs, same signatures — only the counterparty is fake, and four extra routes let you play it: the 41 operations production serves, plus these four.
+The sandbox is the same API against one emulated partner on Base Sepolia. Same paths, same bodies, same slugs, same signatures — only the counterparty is fake, and five extra routes let you play it: the 41 operations production serves, plus these five.
 
 <EnvSnippet />
 
@@ -19,15 +19,15 @@ The sandbox is the same API against one emulated partner on Base Sepolia. Same p
 | Fiat partner | One emulator answers for every rail. It issues checksum-valid account details — `SBOX…` BICs, DE/AE/GB IBANs, ABA routing numbers, a PIX key, an 18-digit SPEI number. |
 | Money in and out | Paid by a shared testnet faucet account on demand, through the routes below. Nothing arrives on its own. |
 | FX | A fixed table: USD 1, EUR 1.08, GBP 1.27, AED 0.2723, and so on, with USDC pegged to USD and EURC to EUR. |
-| Verification | A submitted KYB application is approved immediately. Rails open without a compliance queue. |
+| Verification | Nothing is checked against a registry or the papers' contents. A submitted KYB application waits for a reviewer as in production, and you are the reviewer: [decide it](#decide-a-kyb-application) yourself. Rails open without a compliance queue. |
 | Background work | Off. Every call projects its own rows before it returns, so there is nothing to wait for that you did not ask for. |
-| Swaps | Not served. The emulated chain has no exchange venue behind it and no custodial dollar balance is issued, so `POST /dapi/v1/swaps` answers a refusal rather than a quote ([Swaps](/whitelabel/swaps)). |
+| Swaps | Not served. The emulated chain has no exchange venue behind it and no custodial dollar balance is issued, so `POST /dapi/v1/swaps` and `POST /dapi/v1/swaps/preview` answer `422 swap_route_unavailable` rather than a quote ([Swaps](/whitelabel/swaps)). |
 | Cards, cross-chain routing | Disabled. They are not part of the whitelabel API. |
 | Your source IP | As real as in production. Every call is checked against the allowlist you registered with the developer key, so a sandbox host on a new egress IP answers `403` on every route. |
 
 <SandboxCapsSnippet />
 
-Three of these four routes move a client's money, and the header is how you pick which client. `GET /dapi/v1/sandbox/treasury` accepts it and reports the same shared faucet account either way.
+Three of these five routes move a client's money, one decides its verification, and the header is how you pick which client. `GET /dapi/v1/sandbox/treasury` accepts it and reports the same shared faucet account either way.
 
 <ActingAsSnippet />
 
@@ -120,6 +120,42 @@ The key is optional here, as everywhere. Send one and a retry replays it (`200` 
 
 `202` means the faucet account's transfer has not confirmed yet. Repeat the same request until it is `settled`; nothing is ever credited twice.
 
+## Decide a KYB application
+
+A completed KYB submission waits for a reviewer, and in the sandbox there is none but you. This route takes the reviewer's decision on the client's latest application, through the same transition HEVN compliance uses in production.
+
+<CodeGroup>
+
+```bash cURL
+curl -s -X POST "$HEVN_API/sandbox/kyb/status" \
+  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+  -H "X-Hevn-Account: $HEVN_CLIENT_ID" \
+  -H "Content-Type: application/json" \
+  -d '{"status":"rfi","comment":"The proof of address for Jane Doe is older than three months."}'
+```
+
+```python Python
+kyb = northwind.post("/sandbox/kyb/status", {"status": "approved"})
+```
+
+```javascript Node
+const kyb = await northwind.post("/sandbox/kyb/status", { status: "approved" });
+```
+
+```go Go
+kyb, err := northwind.Post("/sandbox/kyb/status", hevn.Body{"status": "approved"})
+```
+
+</CodeGroup>
+
+| `status` | Needs | What the client sees |
+| --- | --- | --- |
+| `approved` | a `pending` application | `GET /dapi/v1/client/kyb` reads `approved`. |
+| `rfi` | a `pending` or `approved` application, and a `comment` | `rfi`, with your `comment` in `application.comment`. Answer it as in production: fix the document, complete again, and decide the next attempt. |
+| `rejected` | a `pending` or `approved` application, and a `comment` | `rejected`. A new attempt needs a new submission. |
+
+The response is the same body `GET /dapi/v1/client/kyb` returns. Asking for the status the application already has replays it. A client with no application answers `409 conflict` with `details.status: "notStarted"`; deciding a `rfi` or `rejected` one answers `409 conflict` with `details.current` and `details.target` — complete the submission again first. `rfi` and `rejected` without a `comment` answer `422 validation_failed`.
+
 ## Settle a payin
 
 A quoted payin waits for a bank transfer that will never arrive on its own. This route is that transfer.
@@ -199,7 +235,7 @@ The sandbox runs on shared testnet infrastructure — one faucet account, one ga
 | Limit | Value | Refusal |
 | --- | --- | --- |
 | Clients per integrator | `5`. Requests that failed, were rejected or were canceled do not count. | `403 sandbox_client_limit_reached`, `details: {limit, clients}` |
-| One payout | at most `1` of the debited account (USDC or EURC) | `422 sandbox_amount_limit_exceeded` |
+| One payout | at most `1` of the debited account (USDC or EURC). A bank payout starts at `0.10` and carries no fixed fee here, only the rail's `feeBps` | `422 sandbox_amount_limit_exceeded`, `400 invalid_request` below the minimum |
 | One escrow | `maxAmount` at most `1`; its actions cannot exceed it | `422 sandbox_amount_limit_exceeded` |
 | One payin credit — a bank deposit, or a completed payin | `0.10` to `1` of the credited token, live as `maxCredit` | `422 amount_below_minimum`, `422 sandbox_amount_limit_exceeded` |
 | One faucet credit — a deposit without `bankId` | `0.10` to `5`, only while the wallet holds less than `1` of that token | `422 sandbox_amount_limit_exceeded`, `409 sandbox_faucet_balance_too_high` |
@@ -223,7 +259,7 @@ A client that holds `1` or more already has enough to test with: pay it out, or 
 
 ## What the sandbox does for you
 
-Three things the production path makes you wait for happen here without a call: a submitted KYB application is approved immediately, a rail you open becomes `active` with account details as soon as the partner is asked, and every row exists by the time the call returns. That is the difference that will bite when you switch hosts — [Going live](/whitelabel/going-live) is the list.
+Two things the production path makes you wait for happen here without a call: a rail you open becomes `active` with account details as soon as the partner is asked, and every row exists by the time the call returns. A third, the KYB review, is one call of yours instead of a reviewer's. That is the difference that will bite when you switch hosts — [Going live](/whitelabel/going-live) is the list.
 
 <Card title="Next: Going live" icon="rocket" href="/whitelabel/going-live">
   What HEVN must enable, what you re-create per environment, and what production starts refusing.
