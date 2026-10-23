@@ -49,7 +49,7 @@ that asserts the suffix at start-up turns a whole run of mystery `404`s into one
 | --- | --- |
 | `/banks*`, `/payins*`, `/payouts*`, `/contacts*`, `/transactions*`, `/documents*`, `/sandbox/*` | optional — bound client, or your own account when unbound |
 | `/client`, `/client/balance`, `/client/kyb`, `/client/kyb/complete` | **required** — the header is the only selector |
-| `POST /clients`, `GET /clients`, every `/escrow*` | refused — `400 account_scope_conflict` |
+| `POST /clients/link`, `GET /clients`, `POST /connect/sessions`, every `/escrow*` | refused — `400 account_scope_conflict` |
 
 The middle row is the one that changes how you use the client. There is no client id in any path any more, so reading
 **your own** account means binding your own `cl_…` too — the `userId` the login answered:
@@ -75,7 +75,7 @@ mine, err := me.Get("/client/balance")
 
 An unbound client calling `/client*` sends no header at all, which is a `422 validation_failed` with
 `details.location: "header"` and `X-Hevn-Account` in `details.fields` — not a read of your own account. A bound client
-calling `POST /clients` or any escrow route is the mirror image, `400 account_scope_conflict` with
+calling `POST /clients/link`, `POST /connect/sessions` or any escrow route is the mirror image, `400 account_scope_conflict` with
 `details.reason: "selfScopedRoute"`, so keep the unbound client for those.
 
 ## Install
@@ -477,5 +477,5 @@ me := api.ActingAs(os.Getenv("HEVN_USER_ID"))
 </CodeGroup>
 
 <Card title="Back to the Quickstart" icon="rocket" href="/whitelabel/quickstart">
-  Nine steps in the sandbox, from an empty account to money that moved on chain.
+  Ten steps in the sandbox, from an empty account to money that moved on chain.
 </Card>

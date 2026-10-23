@@ -133,7 +133,7 @@ it is refused.
 Send `X-Hevn-Account: cl_…` alongside your own access token, and the call reads and writes that
 client. On most routes you may omit it, and the same call acts on your integrator account; on the
 singular `/client*` routes the header is required, so reading your *own* account there means sending
-your own `cl_…`. One token covers every client you control, so there is nothing to cache per client.
+your own `cl_…`. One token covers every client linked to you, so there is nothing to cache per client.
 
 <CodeGroup>
 
@@ -164,7 +164,7 @@ is the only thing that selects an account, and each route treats it one of four 
 | --- | --- |
 | `/banks*`, `/payins*`, `/payouts*`, `/contacts*`, `/transactions*`, `/documents*`, and the `/sandbox/*` routes | **Accepted, optional.** Without it the call acts on your account |
 | `GET /client`, `PATCH /client`, `GET /client/balance`, `GET /client/kyb`, `PUT /client/kyb`, `POST /client/kyb/complete` | **Required.** These are the singular, acting client; the header is the selector, including when the account you want is your own |
-| `POST /clients`, `GET /clients` | **Refused.** The collection is yours by definition |
+| `POST /clients/link`, `GET /clients`, `POST /connect/sessions` | **Refused.** Linking, the list of clients and the sign-in window are about your own account by definition |
 | All of `/escrow*` | **Refused.** A deal names `senderClientId` and `receiverClientId` in the body; the operator is always you |
 | `/auth/*` | **Ignored.** A login has no account to act for yet, so the header is neither read nor refused |
 
@@ -174,9 +174,10 @@ development:
 | Status | `code` | Cause |
 | --- | --- | --- |
 | 400 | `account_header_invalid` | The value is not a `cl_…` client id |
-| 400 | `account_scope_conflict` | The route is self-scoped: you sent the header to `/clients` or `/escrow*`, or you used a token that was already acting for another account there. `details.reason` is `selfScopedRoute` |
+| 400 | `account_scope_conflict` | The route is self-scoped: you sent the header to `/clients*`, `/connect/sessions` or `/escrow*`, or you used a token that was already acting for another account there. `details.reason` is `selfScopedRoute` |
 | 422 | `validation_failed` | The header is missing on a `/client*` route, where it is required. `details.fields` names it |
 | 404 | `account_not_found` | Not one of your clients — unknown and foreign are indistinguishable on purpose |
+| 403 | `account_not_controlled` | The call would sign for the client's wallet — confirming a client's payout or swap. The holder signs those in the [sign-in window](/whitelabel/sign-in-with-hevn#approve-a-payout) |
 | 403 | `account_forbidden` | The client exists and is yours, but your integrator standing or the relationship is not current |
 
 <Note>
@@ -195,11 +196,9 @@ development:
   [Developer key](/whitelabel/developer-key#rotate-a-key).
 - **A set of source addresses.** A deploy from a new egress IP fails every call with `403` even
   though the key, the signature and the token are all correct.
-- **The key's scopes.** A session may call the confirm routes and the contact writes its key was
-  given, and no others: a route the key lacks the scope for is `403 forbidden` with
-  `details.requiredScope` and `details.scope`. Scopes are fixed when the key is created and they
-  limit *which* routes, not *how much* money those routes may move. The four values and the routes
-  each one opens are on [Developer key](/whitelabel/developer-key#scopes).
+- **Your own wallet, for signing.** A session reads and configures any client linked to you, but the
+  approvals it can confirm are only the ones for your own integrator wallet. See
+  [Developer key](/whitelabel/developer-key#what-a-session-from-the-key-may-do).
 - **A budget.** Reads and writes are limited per credential, and login has its own per-IP and
   per-email windows — over them is `429` with `Retry-After`. The numbers are in
   [Limits](/whitelabel/reference/limits#rate-limits). Logging in on a loop is the fastest way to lock

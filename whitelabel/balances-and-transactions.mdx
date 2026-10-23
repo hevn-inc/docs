@@ -62,7 +62,7 @@ there is read from the partner bank at the moment you ask.
 
 Every number is a decimal string in the major unit — no atomic units, no floats. `balance` carries the account's own precision, `usdValue` and `totalUsd` are rounded to cents. `baseSmartWallet` is the address funds live at and the address a crypto payer sends to; it is the only address on this surface.
 
-The read hits the chain, so it is the truth about spendable funds — and it is what `POST /dapi/v1/payouts` checks before it lets you sign. A payout refused with `insufficient_funds` and a balance that looks sufficient means the difference is an in-flight debit, not a stale cache.
+The read hits the chain, so it is the truth about spendable funds — and it is what `POST /dapi/v1/payouts` checks before anything is signed. A payout refused with `insufficient_funds` and a balance that looks sufficient means the difference is an in-flight debit, not a stale cache.
 
 ## Walk the ledger
 

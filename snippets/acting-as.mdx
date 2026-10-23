@@ -1,7 +1,7 @@
 Send `X-Hevn-Account: cl_…` with your own access token to act for one client. On a resource route
 like `GET /banks` the header is optional: omit it and the call acts on your integrator account
 instead. The singular `/client*` routes **require** it — the header is the only thing that names the
-account — and `/clients` and `/escrow*` refuse it.
+account — and `/clients*`, `/connect/sessions` and `/escrow*` refuse it.
 
 <CodeGroup>
 

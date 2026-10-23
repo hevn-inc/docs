@@ -20,14 +20,15 @@ flowchart LR
     end
     R -->|"partner converts — POST /dapi/v1/payins"| W
     S -->|"USDC or EURC"| W
-    W -->|"POST /dapi/v1/payouts then /confirm"| D
+    W -->|"POST /dapi/v1/payouts, approved by the holder"| D
     B["GET /dapi/v1/client/balance"] -.->|"reads this address"| W
 ```
 
 ## A balance is a stablecoin on one address
 
-`POST /dapi/v1/clients` deploys a Base smart wallet for the client and returns its address as
-`baseSmartWallet`. That address is the balance: `GET /dapi/v1/client/balance`, with the client's id
+Every client has a Base smart wallet of its own, created with the account when its holder signs up in
+the [sign-in window](/whitelabel/sign-in-with-hevn), and reported as `baseSmartWallet`. That address is
+the balance: `GET /dapi/v1/client/balance`, with the client's id
 in `X-Hevn-Account`, reads it on chain, one row per account the client holds, and no HEVN database holds an
 authoritative copy.
 
@@ -74,34 +75,36 @@ already works for the next, and the only thing that varies is what `quote` conta
 
 What follows from that is worth keeping in mind while you read the rest of this page: there is no
 "simple transfer" shortcut to learn, no second idempotency story, and no second refusal vocabulary.
-One resource, one approval to sign, one `GET /dapi/v1/payouts/{payoutId}` to watch.
+One resource, one approval by the holder, one `GET /dapi/v1/payouts/{payoutId}` to watch.
 
 ## Fiat out is funded from the wallet
 
-`POST /dapi/v1/payouts` does the whole opening move: it prices the payment, books it with the
-partner, and builds the on-chain operation that funds it. The response carries three things you act
-on — the `quote` (what the beneficiary gets and what it costs), the `approval` (the bytes to sign)
-and the `debit` (exactly what leaves the client's wallet: an amount of USDC to the funding address
-for this payout — a single-purpose address that the partner's fiat leg consumes, not a balance HEVN
-keeps). `POST /dapi/v1/payouts/{payoutId}/confirm` with your signature executes that debit, and the
-partner pays the beneficiary's bank.
+`POST /dapi/v1/payouts` does the whole opening move: it prices the payment and books it with the
+partner. The response carries the `quote` — what the beneficiary gets and what it costs — and
+`authorization: "client"`, because the money is the client's and its holder signs. You open the
+sign-in window for the payout; the holder sees the terms and their wallet signs the debit: an amount
+of USDC to the funding address for this payout, a single-purpose address that the partner's fiat leg
+consumes, not a balance HEVN keeps. The partner then pays the beneficiary's bank.
+
+A payout from your own integrator account runs the same way, except that the response also carries
+the `approval` and the `debit`, and your developer key signs them through
+`POST /dapi/v1/payouts/{payoutId}/confirm` — see [Signing](/whitelabel/signing).
 
 You pin one side of the payment and HEVN derives the other. Send `amount` to pin what leaves the
 balance, or `amountTo` to pin what the beneficiary receives — never both, and never re-derive the
 other side yourself.
 
 A wallet contact is the same envelope with no fiat leg. `POST /dapi/v1/payouts` with a contact that
-is an address, then the same confirm route, pays from an account — `USDC` or `EURC`,
+is an address, then the same approval, pays from an account — `USDC` or `EURC`,
 whichever you name in `sourceAccount` — from the client's wallet straight to it. It is still quoted, and the quote's
-deposit address is the contact's own address, so `debit.address` is where the money actually lands. No
+deposit address is the contact's own address, so the debit lands where the contact says. No
 conversion, no partner, no second resource to learn.
 
 ## Progress is read, not pushed
 
-Only the chain leg is fast, and even it is not synchronous: a confirm answers `200` with a
-`transactionHash` when the receipt lands inside the request, and `202 submitted` when it does not —
-in which case you confirm again, which is always safe. Every fiat leg is slower than that by a
-partner's business hours, so the state you act on comes from a read:
+Only the chain leg is fast, and even it is not synchronous: the sign-in window returns `submitted` as
+soon as the holder's wallet has sent the debit, before its receipt. Every fiat leg is slower than that
+by a partner's business hours, so the state you act on comes from a read:
 `GET /dapi/v1/payouts/{payoutId}`, `GET /dapi/v1/payins/{payinId}`, `GET /dapi/v1/banks`,
 `GET /dapi/v1/client/balance`.
 

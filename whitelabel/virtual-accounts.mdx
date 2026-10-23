@@ -204,7 +204,7 @@ The list is the client's own catalogue: rails closed to its residency are not in
 
 | `code` | Cleared by |
 | --- | --- |
-| `phone_required` | A phone number on the account — `POST /dapi/v1/clients`, or `PATCH /dapi/v1/client` with the id in `X-Hevn-Account`. The phone inside the KYB document does not clear it. |
+| `phone_required` | A phone number on the account — `PATCH /dapi/v1/client` with the id in `X-Hevn-Account`. The phone inside the KYB document does not clear it. |
 | `address_required` | A complete `company.address` in the [KYB document](/whitelabel/onboarding). Only some rails ask for it. |
 | `kyb_required` | A KYB document that reads `ready: true`. Approval is not required to open the rail; it is required for the rail to go `active`. |
 

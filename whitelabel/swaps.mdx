@@ -1,23 +1,25 @@
 ---
 title: "Swaps"
-description: "Move a client's money between its own accounts: dollars to euros on the wallet, or the custodial balance to the wallet and back."
+description: "Move money between two accounts you own: dollars to euros on the wallet, or the custodial balance to the wallet and back."
 ---
 
-import ActingAsSnippet from "/snippets/acting-as.mdx";
 import ConfirmLoopSnippet from "/snippets/confirm-loop.mdx";
 import IdempotencySnippet from "/snippets/idempotency.mdx";
 import SignPayloadSnippet from "/snippets/sign-payload.mdx";
 
-A swap moves money between two accounts the **same client** owns. Nobody else is paid, so there is no
+A swap moves money between two accounts the **same owner** holds. Nobody else is paid, so there is no
 contact and no beneficiary: `POST /dapi/v1/swaps` prices and reserves the move,
-`POST /dapi/v1/swaps/{swapId}/confirm` authorizes it. A client holding euros that owes dollars swaps
+`POST /dapi/v1/swaps/{swapId}/confirm` authorizes it. An account holding euros that owes dollars swaps
 before it pays out, and the money never leaves its own name.
+
+Swaps run on your own integrator account, signed by your developer key. A client's holder cannot
+approve a swap in the [sign-in window](/whitelabel/sign-in-with-hevn) yet, so `POST /dapi/v1/swaps`
+with a client in `X-Hevn-Account` answers `403 account_not_controlled`. `POST /dapi/v1/swaps/preview`
+still prices a pair for a client, so you can show a rate.
 
 <CodeGroup>
 ```python Python
-northwind = hevn.acting_as(CLIENT_ID)
-
-swap = northwind.post("/swaps", {
+swap = hevn.post("/swaps", {
     "sourceAccount": "USDC",
     "destinationAccount": "EURC",
     "amount": "500.00",
@@ -25,13 +27,11 @@ swap = northwind.post("/swaps", {
 }, idempotency_key="swap-A-1187")
 
 signature = key.sign_payload(swap["approval"]["payload"])
-receipt = northwind.confirm_until_settled(f"/swaps/{swap['id']}/confirm", signature)
+receipt = hevn.confirm_until_settled(f"/swaps/{swap['id']}/confirm", signature)
 ```
 
 ```javascript Node
-const northwind = hevn.actingAs(clientId);
-
-const swap = await northwind.post("/swaps", {
+const swap = await hevn.post("/swaps", {
   sourceAccount: "USDC",
   destinationAccount: "EURC",
   amount: "500.00",
@@ -39,13 +39,11 @@ const swap = await northwind.post("/swaps", {
 }, { idempotencyKey: "swap-A-1187" });
 
 const signature = key.signPayload(swap.approval.payload);
-const receipt = await northwind.confirmUntilSettled(`/swaps/${swap.id}/confirm`, signature);
+const receipt = await hevn.confirmUntilSettled(`/swaps/${swap.id}/confirm`, signature);
 ```
 
 ```go Go
-northwind := api.ActingAs(clientID)
-
-swap, err := northwind.Post("/swaps", hevn.Body{
+swap, err := api.Post("/swaps", hevn.Body{
 	"sourceAccount":      "USDC",
 	"destinationAccount": "EURC",
 	"amount":             "500.00",
@@ -53,29 +51,27 @@ swap, err := northwind.Post("/swaps", hevn.Body{
 }, hevn.IdempotencyKey("swap-A-1187"))
 
 signature, err := key.SignPayload(swap.Str("approval.payload"))
-receipt, err := northwind.ConfirmUntilSettled("/swaps/"+swap.Str("id")+"/confirm", signature)
+receipt, err := api.ConfirmUntilSettled("/swaps/"+swap.Str("id")+"/confirm", signature)
 ```
 </CodeGroup>
 
-Examples use the client from [HTTP client](/whitelabel/reference/client). `acting_as` sets the header
-that picks whose money moves:
-
-<ActingAsSnippet />
+Examples use the client from [HTTP client](/whitelabel/reference/client), unbound, so every call acts
+on your own account.
 
 ## The accounts
 
 Both sides are named from one vocabulary, the same one the balance reads back and a payout's
-`sourceAccount` takes. `USDC` and `EURC` are the stablecoins on the client's wallet; `FDIC_USD` is
-dollars a partner bank holds for it:
+`sourceAccount` takes. `USDC` and `EURC` are the stablecoins on the wallet; `FDIC_USD` is dollars a
+partner bank holds for the account:
 
 | Account | Where the money is | Currency |
 | --- | --- | --- |
-| `USDC` | the client's Base smart wallet | USD |
+| `USDC` | the account's Base smart wallet | USD |
 | `EURC` | the same smart wallet | EUR |
-| `FDIC_USD` | a virtual account a partner bank holds for the client | USD |
+| `FDIC_USD` | a virtual account a partner bank holds for the account | USD |
 
-The two sides must differ, and both must be accounts that client actually holds. An account it does
-not hold is `422 account_unavailable` — a client with no custodial virtual account cannot name
+The two sides must differ, and both must be accounts the owner actually holds. An account it does
+not hold is `422 account_unavailable` — an account with no custodial virtual account cannot name
 `FDIC_USD`. A pair nothing can serve right now is `422 swap_route_unavailable`.
 
 ```mermaid
@@ -96,13 +92,12 @@ returns no `swapId`, so it is safe to call on every keystroke of a form.
 ```bash cURL
 curl -s -X POST "$HEVN_API/swaps/preview" \
   -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
-  -H "X-Hevn-Account: $HEVN_CLIENT_ID" \
   -H "Content-Type: application/json" \
   -d '{"sourceAccount":"USDC","destinationAccount":"EURC","amount":"500.00"}'
 ```
 
 ```python Python
-priced = northwind.post("/swaps/preview", {
+priced = hevn.post("/swaps/preview", {
     "sourceAccount": "USDC",
     "destinationAccount": "EURC",
     "amount": "500.00",
@@ -110,7 +105,7 @@ priced = northwind.post("/swaps/preview", {
 ```
 
 ```javascript Node
-const priced = await northwind.post("/swaps/preview", {
+const priced = await hevn.post("/swaps/preview", {
   sourceAccount: "USDC",
   destinationAccount: "EURC",
   amount: "500.00",
@@ -118,7 +113,7 @@ const priced = await northwind.post("/swaps/preview", {
 ```
 
 ```go Go
-priced, err := northwind.Post("/swaps/preview", hevn.Body{
+priced, err := api.Post("/swaps/preview", hevn.Body{
 	"sourceAccount":      "USDC",
 	"destinationAccount": "EURC",
 	"amount":             "500.00",
@@ -150,8 +145,8 @@ tells you what that approval authorizes:
 
 | `authorization` | What it means | What else is on the response |
 | --- | --- | --- |
-| `debit` | the move is funded by sending tokens out of the client's wallet | `debit` — the exact address, amount and token that will leave |
-| `intent` | the move is settled by HEVN against the client's own signature, with nothing leaving the wallet | `intent` — the EIP-712 `digest` of the terms being authorized |
+| `debit` | the move is funded by sending tokens out of your wallet | `debit` — the exact address, amount and token that will leave |
+| `intent` | the move is settled by HEVN against your account's own signature, with nothing leaving the wallet | `intent` — the EIP-712 `digest` of the terms being authorized |
 
 Either way you sign `approval.payload` and post it to the same confirm route. The difference is what
 HEVN does with the co-signature, not what your code does with the approval.
@@ -190,7 +185,7 @@ second time is `409 funding_attempt_expired` on a `debit` swap and `410 approval
 ## Read it back
 
 `GET /dapi/v1/swaps/{swapId}` carries the lifecycle, the accounts it ran between, the terms it was
-fixed at, and `transactionId` once the move is on the client's ledger.
+fixed at, and `transactionId` once the move is on your ledger.
 
 ```json Response — 200
 { "id": "swp_9f2c1ab84d",
@@ -221,11 +216,11 @@ conversion.
 
 ## Paying straight out of the custodial balance
 
-A client that holds `FDIC_USD` does not have to swap before it pays. `POST /dapi/v1/payouts` with
+An account that holds `FDIC_USD` does not have to swap before it pays. `POST /dapi/v1/payouts` with
 `"sourceAccount": "FDIC_USD"` spends that balance directly: the payout is authorized by an intent
 signature instead of a debit, so the response carries `authorization: "intent"` and no `debit`, and
-confirm is unchanged ([Payouts](/whitelabel/payouts)). Use a swap when the client wants the money on
-its wallet, and a payout when it wants a beneficiary paid.
+confirm is unchanged ([Payouts](/whitelabel/payouts#pay-out-of-the-custodial-balance)). Use a swap when you want
+the money on your wallet, and a payout when you want a beneficiary paid.
 
 ## In the sandbox
 

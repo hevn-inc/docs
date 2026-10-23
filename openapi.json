@@ -14,38 +14,15 @@
         "summary": "Start a developer-key login and receive the payload to sign",
         "description": "Start developer-key authentication. Sign the returned payload with the registered key and exchange it once through `POST /auth/token` before it expires.",
         "operationId": "start_challenge_auth_challenge_post",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
-          }
-        ],
         "requestBody": {
-          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ChallengeRequest"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -68,7 +45,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/auth/token": {
@@ -99,22 +81,6 @@
                 }
               ],
               "title": "Device-Id"
-            }
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
             }
           },
           {
@@ -191,22 +157,6 @@
         ],
         "parameters": [
           {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
-          },
-          {
             "name": "user-agent",
             "in": "header",
             "required": false,
@@ -257,14 +207,14 @@
         }
       }
     },
-    "/clients": {
+    "/clients/link": {
       "post": {
         "tags": [
           "accounts"
         ],
-        "summary": "Create a client",
-        "description": "Provision a company account for one of your clients. The id is knowable at once, so poll `pollUrl` with the returned `id` in `X-Hevn-Account` until `status` is `ready` — about 30 seconds. An identical resubmit answers 200 with `Idempotency-Replayed: true` and the same id. Developer-role callers may set `transferPolicy`; otherwise all allow flags default to true and both security-state flags default to false.",
-        "operationId": "create_client_clients_post",
+        "summary": "Connect an existing account",
+        "description": "Exchange the short-lived code the account holder approved in the HEVN sign-in window for access to their account. The account holder keeps signing their own transfers: a payout for this client answers with `authorization: client` and no approval, and the holder approves it in the HEVN sign-in window. Linking the same account again returns it.",
+        "operationId": "link_client_clients_link_post",
         "security": [
           {
             "HTTPBearer": []
@@ -312,22 +262,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "requestBody": {
@@ -335,13 +269,13 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ClientCreateRequest"
+                "$ref": "#/components/schemas/ClientLinkRequest"
               }
             }
           }
         },
         "responses": {
-          "201": {
+          "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
@@ -362,13 +296,15 @@
             }
           }
         }
-      },
+      }
+    },
+    "/clients": {
       "get": {
         "tags": [
           "accounts"
         ],
         "summary": "List clients",
-        "description": "Every client you have asked for, provisioning and ready, newest first.",
+        "description": "Every account connected to you, newest first.",
         "operationId": "list_clients_clients_get",
         "security": [
           {
@@ -460,22 +396,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "responses": {
@@ -508,7 +428,7 @@
           "accounts"
         ],
         "summary": "Retrieve one account",
-        "description": "Retrieve the client selected by `X-Hevn-Account`, from the moment `POST /clients` returns its id — a client still provisioning answers here too. Unknown, malformed and foreign account ids share the same not-found response.",
+        "description": "Retrieve the client selected by `X-Hevn-Account`. Unknown, malformed and foreign account ids share the same not-found response.",
         "operationId": "read_client_client_get",
         "security": [
           {
@@ -529,22 +449,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The selected client account, as a `cl_…` id."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "responses": {
@@ -617,22 +521,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The selected client account, as a `cl_…` id."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "requestBody": {
@@ -652,6 +540,76 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ClientResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/connect/sessions": {
+      "post": {
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Create a sign-in window session",
+        "description": "Issue a short-lived URL for the HEVN sign-in window. Open it in a popup from your page: `link` lets the account holder connect their account and returns a code for `POST /clients/link`, `sign` lets the holder of a connected account approve one payout that waits for their signature. The result comes back on `redirectUri` with `state`.",
+        "operationId": "create_connect_session_connect_sessions_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Hevn-Account",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself.",
+              "examples": [
+                "cl_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+              ],
+              "title": "X-Hevn-Account"
+            },
+            "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectSessionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectSessionResponse"
                 }
               }
             }
@@ -717,22 +675,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The selected client account, as a `cl_…` id."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "requestBody": {
@@ -794,22 +736,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The selected client account, as a `cl_…` id."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "responses": {
@@ -863,22 +789,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The selected client account, as a `cl_…` id."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           },
           {
             "name": "Idempotency-Key",
@@ -981,22 +891,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "requestBody": {
@@ -1099,22 +993,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "requestBody": {
@@ -1185,22 +1063,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           },
           {
             "name": "Idempotency-Key",
@@ -1380,22 +1242,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "responses": {
@@ -1466,22 +1312,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "responses": {
@@ -1552,22 +1382,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "responses": {
@@ -1638,22 +1452,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           },
           {
             "name": "Idempotency-Key",
@@ -1776,22 +1574,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "requestBody": {
@@ -1862,22 +1644,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           },
           {
             "name": "Idempotency-Key",
@@ -1969,22 +1735,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "requestBody": {
@@ -2064,22 +1814,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "requestBody": {
@@ -2169,22 +1903,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "responses": {
@@ -2245,22 +1963,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           },
           {
             "name": "Idempotency-Key",
@@ -2352,22 +2054,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "requestBody": {
@@ -2447,22 +2133,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "requestBody": {
@@ -2552,22 +2222,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "responses": {
@@ -2628,22 +2282,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           },
           {
             "name": "Idempotency-Key",
@@ -2762,22 +2400,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "responses": {
@@ -2847,22 +2469,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "responses": {
@@ -2930,22 +2536,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           },
           {
             "name": "Idempotency-Key",
@@ -3044,22 +2634,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           },
           {
             "name": "Idempotency-Key",
@@ -3176,22 +2750,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "responses": {
@@ -3252,22 +2810,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "responses": {
@@ -3347,22 +2889,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "requestBody": {
@@ -3447,22 +2973,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "responses": {
@@ -3537,22 +3047,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "responses": {
@@ -3627,22 +3121,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "responses": {
@@ -3684,27 +3162,6 @@
         ],
         "parameters": [
           {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Your own key for this write, `^[A-Za-z0-9._:-]{1,128}$`. A retry with the same key replays the first answer; the same key with a different request is refused.",
-              "examples": [
-                "po-inv-2026-114"
-              ],
-              "title": "Idempotency-Key"
-            },
-            "description": "Your own key for this write, `^[A-Za-z0-9._:-]{1,128}$`. A retry with the same key replays the first answer; the same key with a different request is refused."
-          },
-          {
             "name": "X-Hevn-Account",
             "in": "header",
             "required": false,
@@ -3726,7 +3183,7 @@
             "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
           },
           {
-            "name": "x-api-key",
+            "name": "Idempotency-Key",
             "in": "header",
             "required": false,
             "schema": {
@@ -3738,8 +3195,13 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Api-Key"
-            }
+              "description": "Your own key for this write, `^[A-Za-z0-9._:-]{1,128}$`. A retry with the same key replays the first answer; the same key with a different request is refused.",
+              "examples": [
+                "po-inv-2026-114"
+              ],
+              "title": "Idempotency-Key"
+            },
+            "description": "Your own key for this write, `^[A-Za-z0-9._:-]{1,128}$`. A retry with the same key replays the first answer; the same key with a different request is refused."
           }
         ],
         "requestBody": {
@@ -3842,22 +3304,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "requestBody": {
@@ -3939,22 +3385,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "responses": {
@@ -3987,7 +3417,7 @@
           "accounts"
         ],
         "summary": "Read a client's balances",
-        "description": "One row per account the client holds: the tokens on the Base smart wallet of the client selected by `X-Hevn-Account`, plus any custodial balance. A custodial row is read live from the provider that holds it and is left out when that provider cannot be reached.",
+        "description": "One row per account the client holds: the tokens on the smart wallet of the client selected by `X-Hevn-Account`, plus any custodial balance. `USDC_ARB` is USDC on Arbitrum at the same wallet address; it is turned on with the client's first balance read. A custodial row is read live from the provider that holds it and is left out when that provider cannot be reached.",
         "operationId": "read_balance_client_balance_get",
         "security": [
           {
@@ -4008,22 +3438,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The selected client account, as a `cl_…` id."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "responses": {
@@ -4084,22 +3498,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "responses": {
@@ -4342,22 +3740,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "responses": {
@@ -4571,22 +3953,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "responses": {
@@ -4841,22 +4207,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "responses": {
@@ -4941,22 +4291,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "responses": {
@@ -4991,29 +4325,6 @@
         "summary": "List supported chains and tokens",
         "description": "Every chain and token this API names, with the contract address and decimals of each token. `settlement` marks the chain accounts hold their balance on and the tokens a payout can be funded with.",
         "operationId": "list_chains_chains_get",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -5035,7 +4346,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/rates": {
@@ -5083,22 +4399,6 @@
               "title": "To"
             },
             "description": "ISO 4217 currency code or a token symbol."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "responses": {
@@ -5158,22 +4458,6 @@
               "title": "X-Hevn-Account"
             },
             "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
           }
         ],
         "responses": {
@@ -5213,22 +4497,6 @@
           }
         ],
         "parameters": [
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
-          },
           {
             "name": "X-Hevn-Account",
             "in": "header",
@@ -5336,22 +4604,6 @@
             "schema": {
               "type": "string",
               "title": "Payinid"
-            }
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
             }
           },
           {
@@ -5471,22 +4723,6 @@
             }
           },
           {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
-          },
-          {
             "name": "X-Hevn-Account",
             "in": "header",
             "required": false,
@@ -5572,6 +4808,76 @@
           }
         }
       }
+    },
+    "/sandbox/kyb/status": {
+      "post": {
+        "tags": [
+          "sandbox"
+        ],
+        "summary": "Decide the client's latest KYB application, as the compliance reviewer would",
+        "description": "Moves the latest application to `approved`, `rfi` or `rejected` (the last two need a `comment`). Asking for the status it already has replays it. An `rfi` or `rejected` application is answered as in production: write the document and complete the submission again, then decide the new attempt.",
+        "operationId": "set_kyb_status_sandbox_kyb_status_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Hevn-Account",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself.",
+              "examples": [
+                "cl_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+              ],
+              "title": "X-Hevn-Account"
+            },
+            "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SandboxKybStatusRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformKybResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -5608,7 +4914,10 @@
         "enum": [
           "USDC",
           "EURC",
-          "FDIC_USD"
+          "RD",
+          "USDC_ARB",
+          "FDIC_USD",
+          "KYC_CARDS"
         ],
         "title": "AccountKey"
       },
@@ -5643,17 +4952,10 @@
         "type": "string",
         "enum": [
           "debit",
-          "intent"
+          "intent",
+          "client"
         ],
         "title": "AuthorizationKind"
-      },
-      "BalanceAccount": {
-        "type": "string",
-        "enum": [
-          "USDC",
-          "EURC"
-        ],
-        "title": "BalanceAccount"
       },
       "BankAccountInput": {
         "properties": {
@@ -6130,6 +5432,18 @@
         ],
         "title": "BankAddressInput"
       },
+      "BankDepositCurrency": {
+        "type": "string",
+        "enum": [
+          "USD",
+          "USDC",
+          "EURC",
+          "RD",
+          "USDC_ARB"
+        ],
+        "title": "BankDepositCurrency",
+        "description": "The asset credited when money arrives through a bank rail."
+      },
       "ChainCode": {
         "type": "string",
         "enum": [
@@ -6210,7 +5524,7 @@
           "settlement": {
             "type": "boolean",
             "title": "Settlement",
-            "description": "Whether clients hold their balances on this chain."
+            "description": "Whether payouts, payins and swaps settle on this chain. A token elsewhere may still name an account."
           },
           "tokens": {
             "items": {
@@ -6454,54 +5768,6 @@
         ],
         "title": "ClientBalanceView"
       },
-      "ClientCreateRequest": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "maxLength": 500,
-            "minLength": 1,
-            "title": "Name",
-            "description": "Legal or trading name used to identify the account."
-          },
-          "email": {
-            "type": "string",
-            "format": "email",
-            "title": "Email",
-            "description": "Unique account email used for verification correspondence."
-          },
-          "phone": {
-            "anyOf": [
-              {
-                "type": "string",
-                "pattern": "^\\+[1-9]\\d{6,14}$"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Phone",
-            "description": "Phone number in international E.164 format."
-          },
-          "transferPolicy": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/InitialTransferPolicy"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Initial account transfer controls, available only to developer-role callers. When omitted, every allow flag is true while isFrozen and recoveryModeActivated are false."
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "name",
-          "email"
-        ],
-        "title": "ClientCreateRequest"
-      },
       "ClientFailureResponse": {
         "properties": {
           "code": {
@@ -6526,6 +5792,23 @@
           "message"
         ],
         "title": "ClientFailureResponse"
+      },
+      "ClientLinkRequest": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 4096,
+            "minLength": 1,
+            "title": "Code",
+            "description": "Short-lived code the account holder approved in the HEVN sign-in window."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "title": "ClientLinkRequest"
       },
       "ClientProfileRequest": {
         "properties": {
@@ -6721,6 +6004,79 @@
           "signature"
         ],
         "title": "ConfirmRequest"
+      },
+      "ConnectAction": {
+        "type": "string",
+        "enum": [
+          "link",
+          "sign"
+        ],
+        "title": "ConnectAction"
+      },
+      "ConnectSessionRequest": {
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/ConnectAction",
+            "description": "`link` asks the account holder to connect their account, `sign` to approve one payout."
+          },
+          "payoutId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?:po_)?[A-Za-z0-9._:\\-]{1,216}$",
+                "examples": [
+                  "po_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payoutid",
+            "description": "The payout the account holder approves. Required for `sign`, not accepted for `link`."
+          },
+          "redirectUri": {
+            "type": "string",
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Redirecturi",
+            "description": "Page the sign-in window returns to with the result and `state`. Its origin must be one of the allowed origins in the sign-in window settings."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "action",
+          "redirectUri"
+        ],
+        "title": "ConnectSessionRequest"
+      },
+      "ConnectSessionResponse": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "description": "Open this URL in the sign-in window. It works once per result and expires."
+          },
+          "state": {
+            "type": "string",
+            "title": "State",
+            "description": "Comes back as `state` on the redirect URI; match it before trusting the result."
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expiresat",
+            "description": "When the session URL stops working."
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "state",
+          "expiresAt"
+        ],
+        "title": "ConnectSessionResponse"
       },
       "ContactBlockerCode": {
         "type": "string",
@@ -6932,6 +6288,18 @@
             "title": "Name",
             "description": "Human-readable contact name.",
             "default": ""
+          },
+          "icon": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icon",
+            "description": "HTTPS image URL or emoji://<emoji> reference displayed for this contact."
           },
           "currency": {
             "anyOf": [
@@ -7379,6 +6747,18 @@
             "title": "Name",
             "description": "Human-readable contact name."
           },
+          "icon": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icon",
+            "description": "HTTPS image URL or emoji://<emoji> contact icon reference."
+          },
           "isExternal": {
             "type": "boolean",
             "title": "Isexternal",
@@ -7389,6 +6769,19 @@
             "format": "date-time",
             "title": "Createdat",
             "description": "UTC timestamp when the contact was created."
+          },
+          "lastUsedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastusedat",
+            "description": "UTC timestamp when this contact was last used for a transfer."
           },
           "email": {
             "anyOf": [
@@ -7484,6 +6877,18 @@
             ],
             "title": "Name",
             "description": "Updated contact name."
+          },
+          "icon": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icon",
+            "description": "Updated HTTPS image URL or emoji://<emoji> reference; null removes it."
           },
           "address": {
             "anyOf": [
@@ -7924,13 +7329,17 @@
         "type": "string",
         "enum": [
           "certificate_of_incorporation",
+          "certificate_of_registration",
           "formation_document",
           "articles_of_incorporation",
           "power_of_attorney",
           "corporate_structure",
+          "org_structure_chart",
           "company_registry_extract",
           "corporate_registry_extract",
           "shareholder_registry",
+          "directors_registry",
+          "cap_table",
           "director_structure",
           "proof_of_address",
           "utility_bill",
@@ -7938,13 +7347,22 @@
           "annual_financial_statements",
           "articles_of_association",
           "audit_report",
+          "independent_aml_audit_report",
+          "identity_verification_attestation",
+          "institutional_investor_documentation",
+          "audited_financial_statement",
           "bank_reference_letter",
+          "bank_verification_letter",
           "bank_statement",
           "banking_details",
           "birth_certificate",
           "business_license",
+          "operating_license",
           "business_plan",
           "certificate_of_good_standing",
+          "corporate_resolution",
+          "proof_of_registered_address",
+          "proof_of_operating_address",
           "crypto_statement",
           "credit_report",
           "criminal_record_check",
@@ -7958,6 +7376,8 @@
           "list_of_authorized_signatories",
           "marriage_certificate",
           "national_id",
+          "national_id_front",
+          "national_id_back",
           "operating_agreement",
           "partnership_agreement",
           "professional_license",
@@ -7970,6 +7390,8 @@
           "social_security_document",
           "source_of_funds_declaration",
           "tax_identification_document",
+          "ein_letter",
+          "tax_certificate",
           "tax_compliance_form",
           "tax_returns",
           "payslip",
@@ -7994,6 +7416,9 @@
           "ubo_declaration",
           "income_verification_letter",
           "source_of_funds",
+          "flow_of_funds",
+          "payroll_register",
+          "investment_agreement",
           "source_of_wealth",
           "supporting_document",
           "memorandum",
@@ -8373,6 +7798,32 @@
             "type": "object",
             "title": "Reference",
             "description": "Caller reference stored with the escrow."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Off-chain escrow description."
+          },
+          "completionConditions": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 10000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completionconditions",
+            "description": "Off-chain conditions reviewed before capture."
           }
         },
         "additionalProperties": false,
@@ -8445,8 +7896,7 @@
           "charge",
           "capture",
           "void",
-          "refund",
-          "reclaim"
+          "refund"
         ],
         "title": "EscrowVerb"
       },
@@ -8476,6 +7926,35 @@
           "receiver": {
             "$ref": "#/components/schemas/EscrowPartyView",
             "description": "Account entitled to captured escrow funds."
+          },
+          "onchainEscrowUrl": {
+            "type": "string",
+            "title": "Onchainescrowurl",
+            "description": "Block explorer URL for the shared escrow contract."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Off-chain escrow description."
+          },
+          "completionConditions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completionconditions",
+            "description": "Off-chain conditions reviewed before capture."
           },
           "token": {
             "type": "string",
@@ -8553,6 +8032,7 @@
           "availableActions",
           "sender",
           "receiver",
+          "onchainEscrowUrl",
           "token",
           "maxAmount",
           "authorizedAmount",
@@ -8827,62 +8307,6 @@
           "GAMBLING"
         ],
         "title": "HighRiskActivity"
-      },
-      "InitialTransferPolicy": {
-        "properties": {
-          "allowFiat": {
-            "type": "boolean",
-            "title": "Allowfiat",
-            "description": "Allow account-initiated fiat payouts, subject to freeze and recovery controls.",
-            "default": true
-          },
-          "allowCrypto": {
-            "type": "boolean",
-            "title": "Allowcrypto",
-            "description": "Allow account-initiated on-chain transfers, including transfers to another platform account, subject to freeze and recovery controls.",
-            "default": true
-          },
-          "allowThirdParty": {
-            "type": "boolean",
-            "title": "Allowthirdparty",
-            "description": "Allow fiat or on-chain payouts to an external contact. Email and escrow payments within the same platform group use narrower controls.",
-            "default": true
-          },
-          "allowEscrowThirdParty": {
-            "type": "boolean",
-            "title": "Allowescrowthirdparty",
-            "description": "Allow escrow to another platform account. This control is independent from allowThirdParty; same-group escrow also requires allowPartnerGroupPayments.",
-            "default": true
-          },
-          "allowSwap": {
-            "type": "boolean",
-            "title": "Allowswap",
-            "description": "Allow balance swaps, subject to freeze and recovery controls.",
-            "default": true
-          },
-          "allowPartnerGroupPayments": {
-            "type": "boolean",
-            "title": "Allowpartnergrouppayments",
-            "description": "Allow email and escrow payments between accounts in the same platform group. Email payments also require allowCrypto; escrow also requires allowEscrowThirdParty.",
-            "default": true
-          },
-          "isFrozen": {
-            "type": "boolean",
-            "title": "Isfrozen",
-            "description": "Block every new account-initiated money movement, overriding every allow flag.",
-            "default": false
-          },
-          "recoveryModeActivated": {
-            "type": "boolean",
-            "title": "Recoverymodeactivated",
-            "description": "Restrict money movement to first-party fiat payouts whose Contact belongs to this account and whose account-holder name matches the account name.",
-            "default": false
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "title": "InitialTransferPolicy",
-        "description": "Initial money-movement controls accepted only from a developer-role client creator.\n\n``isFrozen`` overrides every permission. When the account is not frozen,\n``recoveryModeActivated`` restricts it to first-party fiat withdrawals.\nThe remaining flags are then evaluated for the requested operation."
       },
       "IntentView": {
         "properties": {
@@ -9690,11 +9114,18 @@
             "description": "Exact amount the contact should receive."
           },
           "publicKey": {
-            "type": "string",
-            "maxLength": 512,
-            "minLength": 1,
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 512,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Publickey",
-            "description": "Base64 DER SubjectPublicKeyInfo for the registered P-256 developer key."
+            "description": "Base64 DER SubjectPublicKeyInfo for the registered P-256 developer key. Required unless the account holder signs their own transfers."
           },
           "paymentReference": {
             "anyOf": [
@@ -9760,8 +9191,7 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "contactId",
-          "publicKey"
+          "contactId"
         ],
         "title": "PayoutCreateRequest"
       },
@@ -10234,7 +9664,7 @@
           },
           "authorization": {
             "$ref": "#/components/schemas/AuthorizationKind",
-            "description": "Whether the approval authorizes a balance debit or a signature over the transfer's terms.",
+            "description": "Whether the approval authorizes a balance debit or a signature over the transfer's terms, or whether the account holder signs it themselves in the HEVN sign-in window.",
             "default": "debit"
           },
           "approval": {
@@ -10434,13 +9864,13 @@
           "user_operation_rejected",
           "user_operation_unavailable",
           "transfer_policy_denied",
-          "integrator_inactive",
           "client_creation_not_enabled",
-          "client_policy_not_enabled",
-          "email_in_use",
-          "name_in_use",
-          "client_request_conflict",
           "client_not_found",
+          "link_code_invalid",
+          "link_code_expired",
+          "client_already_linked",
+          "redirect_uri_not_allowed",
+          "payout_not_awaiting_signature",
           "profile_locked",
           "contact_not_payable",
           "contact_chain_unsupported",
@@ -10457,6 +9887,7 @@
           "contact_details_invalid",
           "contact_in_use",
           "kyb_incomplete",
+          "kyb_documents_processing",
           "kyb_roster_conflict",
           "kyb_subject_conflict",
           "document_not_found",
@@ -10488,7 +9919,9 @@
           "swap_not_found",
           "swap_route_unavailable",
           "swap_not_confirmable",
-          "intent_not_signable"
+          "intent_not_signable",
+          "sandbox_amount_limit_exceeded",
+          "sandbox_faucet_balance_too_high"
         ],
         "title": "PlatformErrorCode"
       },
@@ -13219,6 +12652,7 @@
           "incorporating",
           "pending",
           "underReview",
+          "rfi",
           "documentRequested",
           "approved",
           "rejected"
@@ -13458,6 +12892,10 @@
             "title": "Currency",
             "description": "ISO 4217 fiat currency code received through this payment method."
           },
+          "railCurrency": {
+            "$ref": "#/components/schemas/BankDepositCurrency",
+            "description": "Asset credited after funds arrive through this rail."
+          },
           "method": {
             "$ref": "#/components/schemas/FiatPaymentType",
             "description": "Payment network or method represented by this rail."
@@ -13547,6 +12985,7 @@
         "required": [
           "rail",
           "currency",
+          "railCurrency",
           "method",
           "opened",
           "feeBps",
@@ -14023,419 +13462,6 @@
         ],
         "title": "RevenueCoverage",
         "description": "Share of operating expenses covered by current business revenue."
-      },
-      "SandboxCreditResponse": {
-        "properties": {
-          "depositId": {
-            "type": "string",
-            "title": "Depositid",
-            "description": "Stable identifier for the emulated credit."
-          },
-          "status": {
-            "$ref": "#/components/schemas/PayoutStatus",
-            "description": "Current public lifecycle status of the emulated credit."
-          },
-          "token": {
-            "$ref": "#/components/schemas/BalanceAccount",
-            "description": "Digital asset credited after settlement."
-          },
-          "amount": {
-            "type": "string",
-            "title": "Amount",
-            "description": "Source amount supplied to the emulator.",
-            "example": "500.00"
-          },
-          "currency": {
-            "type": "string",
-            "title": "Currency",
-            "description": "Source currency or digital asset."
-          },
-          "idempotencyKey": {
-            "type": "string",
-            "title": "Idempotencykey",
-            "description": "Caller-supplied key that binds retries to this credit."
-          },
-          "payinId": {
-            "anyOf": [
-              {
-                "type": "string",
-                "pattern": "^(?:pi_)?[A-Za-z0-9._:\\-]{1,216}$",
-                "examples": [
-                  "pi_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Payinid",
-            "description": "Incoming-transfer identifier, when completing a pay-in."
-          },
-          "transactionId": {
-            "anyOf": [
-              {
-                "type": "string",
-                "pattern": "^(?:txn_)?[A-Za-z0-9._:\\-]{1,216}$",
-                "examples": [
-                  "txn_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Transactionid",
-            "description": "Ledger transaction identifier, when created."
-          },
-          "credited": {
-            "anyOf": [
-              {
-                "type": "string",
-                "example": "500.00"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Credited",
-            "description": "Amount delivered in the settlement asset."
-          },
-          "fee": {
-            "anyOf": [
-              {
-                "type": "string",
-                "example": "500.00"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Fee",
-            "description": "Fee charged by the emulated route."
-          },
-          "feeCurrency": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Feecurrency",
-            "description": "Currency in which the fee is charged."
-          },
-          "rate": {
-            "anyOf": [
-              {
-                "type": "string",
-                "example": "500.00"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Rate",
-            "description": "Conversion rate from source to settlement amount."
-          },
-          "txHash": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Txhash",
-            "description": "On-chain transaction hash, when applicable."
-          },
-          "pollUrl": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Pollurl",
-            "description": "Relative API URL to poll while processing continues."
-          }
-        },
-        "type": "object",
-        "required": [
-          "depositId",
-          "status",
-          "token",
-          "amount",
-          "currency",
-          "idempotencyKey"
-        ],
-        "title": "SandboxCreditResponse"
-      },
-      "SandboxDepositRequest": {
-        "properties": {
-          "amount": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
-              }
-            ],
-            "type": "string",
-            "title": "Amount",
-            "description": "Test amount to credit.",
-            "example": "500.00"
-          },
-          "bankId": {
-            "anyOf": [
-              {
-                "type": "string",
-                "pattern": "^(?:bnk_)?[A-Za-z0-9._:\\-]{1,216}$",
-                "examples": [
-                  "bnk_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Bankid",
-            "description": "Virtual-account identifier for an emulated account transfer."
-          },
-          "token": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BalanceAccount"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Digital asset for an emulated on-chain transfer."
-          },
-          "remitter": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 140
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Remitter",
-            "description": "Originator name reported with the credit."
-          },
-          "paymentReference": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 140
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Paymentreference",
-            "description": "Reference reported with the credit."
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "amount"
-        ],
-        "title": "SandboxDepositRequest"
-      },
-      "SandboxPayinCompletionRequest": {
-        "properties": {
-          "remitter": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 140
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Remitter",
-            "description": "Originator name reported with the credit."
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "title": "SandboxPayinCompletionRequest"
-      },
-      "SandboxPayoutResponse": {
-        "properties": {
-          "payoutId": {
-            "type": "string",
-            "pattern": "^(?:po_)?[A-Za-z0-9._:\\-]{1,216}$",
-            "title": "Payoutid",
-            "description": "Outgoing-transfer identifier updated by the emulator.",
-            "examples": [
-              "po_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
-            ]
-          },
-          "status": {
-            "$ref": "#/components/schemas/PayoutStatus",
-            "description": "Current public lifecycle status of the outgoing transfer."
-          },
-          "amount": {
-            "type": "string",
-            "title": "Amount",
-            "description": "Transfer amount.",
-            "example": "500.00"
-          },
-          "currency": {
-            "type": "string",
-            "title": "Currency",
-            "description": "Transfer currency or digital asset."
-          },
-          "idempotencyKey": {
-            "type": "string",
-            "title": "Idempotencykey",
-            "description": "Caller-supplied key that binds retries to this update."
-          },
-          "transactionId": {
-            "anyOf": [
-              {
-                "type": "string",
-                "pattern": "^(?:txn_)?[A-Za-z0-9._:\\-]{1,216}$",
-                "examples": [
-                  "txn_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Transactionid",
-            "description": "Ledger transaction identifier, when created."
-          },
-          "txHash": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Txhash",
-            "description": "Settlement transaction hash, when applicable."
-          },
-          "refundTxHash": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Refundtxhash",
-            "description": "Refund transaction hash, when applicable."
-          }
-        },
-        "type": "object",
-        "required": [
-          "payoutId",
-          "status",
-          "amount",
-          "currency",
-          "idempotencyKey"
-        ],
-        "title": "SandboxPayoutResponse"
-      },
-      "SandboxPayoutStatusRequest": {
-        "properties": {
-          "status": {
-            "$ref": "#/components/schemas/PayoutStatus",
-            "description": "Next externally reportable lifecycle status for the emulated transfer."
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "status"
-        ],
-        "title": "SandboxPayoutStatusRequest"
-      },
-      "SandboxTokenBalanceResponse": {
-        "properties": {
-          "token": {
-            "$ref": "#/components/schemas/BalanceAccount",
-            "description": "Supported sandbox digital asset."
-          },
-          "tokenAddress": {
-            "type": "string",
-            "title": "Tokenaddress",
-            "description": "Sandbox token contract address."
-          },
-          "balance": {
-            "type": "string",
-            "title": "Balance",
-            "description": "Amount available for emulated credits.",
-            "example": "500.00"
-          }
-        },
-        "type": "object",
-        "required": [
-          "token",
-          "tokenAddress",
-          "balance"
-        ],
-        "title": "SandboxTokenBalanceResponse"
-      },
-      "SandboxTreasuryResponse": {
-        "properties": {
-          "chainId": {
-            "type": "integer",
-            "title": "Chainid",
-            "description": "Numeric network identifier used by the sandbox treasury."
-          },
-          "address": {
-            "type": "string",
-            "title": "Address",
-            "description": "Sandbox treasury address."
-          },
-          "gasBalance": {
-            "type": "string",
-            "title": "Gasbalance",
-            "description": "Native-asset balance available for transaction fees.",
-            "example": "500.00"
-          },
-          "maxCredit": {
-            "type": "string",
-            "title": "Maxcredit",
-            "description": "Maximum test amount allowed in one credit.",
-            "example": "500.00"
-          },
-          "balances": {
-            "items": {
-              "$ref": "#/components/schemas/SandboxTokenBalanceResponse"
-            },
-            "type": "array",
-            "title": "Balances",
-            "description": "Settlement assets available to the emulator."
-          }
-        },
-        "type": "object",
-        "required": [
-          "chainId",
-          "address",
-          "gasBalance",
-          "maxCredit",
-          "balances"
-        ],
-        "title": "SandboxTreasuryResponse"
       },
       "SessionResponse": {
         "properties": {
@@ -15145,6 +14171,17 @@
             ],
             "description": "Fee side of the transaction, when charged."
           },
+          "account": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccountKey"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The client's account this transaction moved, e.g. `USDC_ARB` for USDC on Arbitrum."
+          },
           "counterparty": {
             "anyOf": [
               {
@@ -15441,6 +14478,17 @@
             ],
             "description": "Fee side of the transaction, when charged."
           },
+          "account": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccountKey"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The client's account this transaction moved, e.g. `USDC_ARB` for USDC on Arbitrum."
+          },
           "counterparty": {
             "anyOf": [
               {
@@ -15555,6 +14603,11 @@
             "title": "Allowpartnergrouppayments",
             "description": "Allow email and escrow payments between accounts in the same platform group. Email payments also require allowCrypto; escrow also requires allowEscrowThirdParty."
           },
+          "dualApproval": {
+            "type": "boolean",
+            "title": "Dualapproval",
+            "description": "Require a separately approved transfer request before payment co-signing."
+          },
           "isFrozen": {
             "type": "boolean",
             "title": "Isfrozen",
@@ -15574,6 +14627,7 @@
           "allowEscrowThirdParty",
           "allowSwap",
           "allowPartnerGroupPayments",
+          "dualApproval",
           "isFrozen",
           "recoveryModeActivated"
         ],
@@ -15657,6 +14711,468 @@
         "type": "object",
         "title": "UserAddress",
         "description": "Provider-neutral postal address used across domain and API schemas."
+      },
+      "SandboxTreasuryResponse": {
+        "properties": {
+          "chainId": {
+            "type": "integer",
+            "title": "Chainid",
+            "description": "Numeric network identifier used by the sandbox treasury."
+          },
+          "address": {
+            "type": "string",
+            "title": "Address",
+            "description": "Sandbox treasury address."
+          },
+          "gasBalance": {
+            "type": "string",
+            "title": "Gasbalance",
+            "description": "Native-asset balance available for transaction fees.",
+            "example": "500.00"
+          },
+          "maxCredit": {
+            "type": "string",
+            "title": "Maxcredit",
+            "description": "Maximum test amount allowed in one credit.",
+            "example": "500.00"
+          },
+          "balances": {
+            "items": {
+              "$ref": "#/components/schemas/SandboxTokenBalanceResponse"
+            },
+            "type": "array",
+            "title": "Balances",
+            "description": "Settlement assets available to the emulator."
+          }
+        },
+        "type": "object",
+        "required": [
+          "chainId",
+          "address",
+          "gasBalance",
+          "maxCredit",
+          "balances"
+        ],
+        "title": "SandboxTreasuryResponse"
+      },
+      "SandboxCreditResponse": {
+        "properties": {
+          "depositId": {
+            "type": "string",
+            "title": "Depositid",
+            "description": "Stable identifier for the emulated credit."
+          },
+          "status": {
+            "$ref": "#/components/schemas/PayoutStatus",
+            "description": "Current public lifecycle status of the emulated credit."
+          },
+          "token": {
+            "$ref": "#/components/schemas/BalanceAccount",
+            "description": "Digital asset credited after settlement."
+          },
+          "amount": {
+            "type": "string",
+            "title": "Amount",
+            "description": "Source amount supplied to the emulator.",
+            "example": "500.00"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency",
+            "description": "Source currency or digital asset."
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "title": "Idempotencykey",
+            "description": "Caller-supplied key that binds retries to this credit."
+          },
+          "payinId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?:pi_)?[A-Za-z0-9._:\\-]{1,216}$",
+                "examples": [
+                  "pi_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payinid",
+            "description": "Incoming-transfer identifier, when completing a pay-in."
+          },
+          "transactionId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?:txn_)?[A-Za-z0-9._:\\-]{1,216}$",
+                "examples": [
+                  "txn_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transactionid",
+            "description": "Ledger transaction identifier, when created."
+          },
+          "credited": {
+            "anyOf": [
+              {
+                "type": "string",
+                "example": "500.00"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credited",
+            "description": "Amount delivered in the settlement asset."
+          },
+          "fee": {
+            "anyOf": [
+              {
+                "type": "string",
+                "example": "500.00"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fee",
+            "description": "Fee charged by the emulated route."
+          },
+          "feeCurrency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feecurrency",
+            "description": "Currency in which the fee is charged."
+          },
+          "rate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "example": "500.00"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate",
+            "description": "Conversion rate from source to settlement amount."
+          },
+          "txHash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Txhash",
+            "description": "On-chain transaction hash, when applicable."
+          },
+          "pollUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pollurl",
+            "description": "Relative API URL to poll while processing continues."
+          }
+        },
+        "type": "object",
+        "required": [
+          "depositId",
+          "status",
+          "token",
+          "amount",
+          "currency",
+          "idempotencyKey"
+        ],
+        "title": "SandboxCreditResponse"
+      },
+      "SandboxDepositRequest": {
+        "properties": {
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "type": "string",
+            "title": "Amount",
+            "description": "Test amount to credit.",
+            "example": "500.00"
+          },
+          "bankId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?:bnk_)?[A-Za-z0-9._:\\-]{1,216}$",
+                "examples": [
+                  "bnk_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bankid",
+            "description": "Virtual-account identifier for an emulated account transfer."
+          },
+          "token": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BalanceAccount"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Digital asset for an emulated on-chain transfer, on Base."
+          },
+          "remitter": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 140
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remitter",
+            "description": "Originator name reported with the credit."
+          },
+          "paymentReference": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 140
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paymentreference",
+            "description": "Reference reported with the credit."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "amount"
+        ],
+        "title": "SandboxDepositRequest"
+      },
+      "BalanceAccount": {
+        "type": "string",
+        "enum": [
+          "USDC",
+          "EURC",
+          "RD",
+          "USDC_ARB"
+        ],
+        "title": "BalanceAccount"
+      },
+      "SandboxPayinCompletionRequest": {
+        "properties": {
+          "remitter": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 140
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remitter",
+            "description": "Originator name reported with the credit."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "SandboxPayinCompletionRequest"
+      },
+      "SandboxPayoutStatusRequest": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/PayoutStatus",
+            "description": "Next externally reportable lifecycle status for the emulated transfer."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "SandboxPayoutStatusRequest"
+      },
+      "SandboxTokenBalanceResponse": {
+        "properties": {
+          "token": {
+            "$ref": "#/components/schemas/BalanceAccount",
+            "description": "Supported sandbox digital asset."
+          },
+          "tokenAddress": {
+            "type": "string",
+            "title": "Tokenaddress",
+            "description": "Sandbox token contract address."
+          },
+          "balance": {
+            "type": "string",
+            "title": "Balance",
+            "description": "Amount available for emulated credits.",
+            "example": "500.00"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token",
+          "tokenAddress",
+          "balance"
+        ],
+        "title": "SandboxTokenBalanceResponse"
+      },
+      "SandboxKybStatusRequest": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/KybApplicationStatus",
+            "description": "The reviewer's decision: `approved`, `rfi` or `rejected`."
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment",
+            "description": "What the reviewer tells the client. Required for `rfi` and `rejected`."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "SandboxKybStatusRequest"
+      },
+      "SandboxPayoutResponse": {
+        "properties": {
+          "payoutId": {
+            "type": "string",
+            "pattern": "^(?:po_)?[A-Za-z0-9._:\\-]{1,216}$",
+            "title": "Payoutid",
+            "description": "Outgoing-transfer identifier updated by the emulator.",
+            "examples": [
+              "po_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/PayoutStatus",
+            "description": "Current public lifecycle status of the outgoing transfer."
+          },
+          "amount": {
+            "type": "string",
+            "title": "Amount",
+            "description": "Transfer amount.",
+            "example": "500.00"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency",
+            "description": "Transfer currency or digital asset."
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "title": "Idempotencykey",
+            "description": "Caller-supplied key that binds retries to this update."
+          },
+          "transactionId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?:txn_)?[A-Za-z0-9._:\\-]{1,216}$",
+                "examples": [
+                  "txn_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transactionid",
+            "description": "Ledger transaction identifier, when created."
+          },
+          "txHash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Txhash",
+            "description": "Settlement transaction hash, when applicable."
+          },
+          "refundTxHash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refundtxhash",
+            "description": "Refund transaction hash, when applicable."
+          }
+        },
+        "type": "object",
+        "required": [
+          "payoutId",
+          "status",
+          "amount",
+          "currency",
+          "idempotencyKey"
+        ],
+        "title": "SandboxPayoutResponse"
+      },
+      "KybApplicationStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "approved",
+          "rfi",
+          "rejected",
+          "superseded"
+        ],
+        "title": "KybApplicationStatus"
       }
     },
     "securitySchemes": {

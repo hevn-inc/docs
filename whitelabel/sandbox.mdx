@@ -7,7 +7,7 @@ import ActingAsSnippet from "/snippets/acting-as.mdx";
 import EnvSnippet from "/snippets/env.mdx";
 import SandboxCapsSnippet from "/snippets/sandbox-caps.mdx";
 
-The sandbox is the same API against one emulated partner on Base Sepolia. Same paths, same bodies, same slugs, same signatures — only the counterparty is fake, and five extra routes let you play it: the 41 operations production serves, plus these five.
+The sandbox is the same API against one emulated partner on Base Sepolia. Same paths, same bodies, same slugs, same signatures — only the counterparty is fake, and five extra routes let you play it: every operation production serves, plus these five.
 
 <EnvSnippet />
 
@@ -35,7 +35,9 @@ None of these routes exist in production; there they answer `404`.
 
 ## What the sandbox does not grant
 
-Being an integrator, being allowed to create clients, and being allowed to operate escrow are flags on your account, and nothing in the API sets them — in the sandbox as in production, HEVN does. There is no self-enrolment call. Until the flags are on, `POST /dapi/v1/clients` answers `403 integrator_inactive` or `403 client_creation_not_enabled`; `GET /dapi/v1/clients` answering an empty page is the cheapest confirmation that they are.
+Being an integrator that may link clients, and being allowed to operate escrow, are flags on your account, and nothing in the API sets them — in the sandbox as in production, HEVN does. There is no self-enrolment call. Until the first is on, `POST /dapi/v1/connect/sessions` answers `403 client_creation_not_enabled`; a session that comes back with a `url` is the cheapest confirmation that it is.
+
+Clients are linked through [Sign in with HEVN](/whitelabel/sign-in-with-hevn) here too, with real Google sign-ins. Each test client needs a Google account that has no HEVN sandbox account of its own, and your test page's origin — `http://localhost:<port>` works — under **Allowed sites** in the sandbox app.
 
 ## Read the faucet account
 
@@ -222,7 +224,7 @@ moved, err := northwind.Post("/sandbox/payouts/"+payout.Str("id")+"/status",
 | `failed` | no | Allowed at any point. The money does **not** come back. |
 | `refunded` | yes | The status flips, then the faucet account returns the source token to the client's wallet. |
 
-"Funded" means the on-chain debit you signed has landed. Asking for anything but `failed` before that answers `409 payout_not_fundable`. An illegal move — `settled` back to `submitted` — answers `409 conflict`. `refunded` answers `202` until the return lands; call it again until `refundTxHash` is set, and the same send is resumed, never duplicated.
+"Funded" means the on-chain debit has landed — signed by the client's holder in the sign-in window, or by your key on your own account. Asking for anything but `failed` before that answers `409 payout_not_fundable`. An illegal move — `settled` back to `submitted` — answers `409 conflict`. `refunded` answers `202` until the return lands; call it again until `refundTxHash` is set, and the same send is resumed, never duplicated.
 
 `status` shares its type with a payout's own status, so the schema also admits `awaitingSignature` — the one value this route never accepts. Sending it answers `422 validation_failed` with `details.fields[0].code = "value_error"` and the four legal values in the message; the four above are the whole vocabulary.
 
@@ -234,7 +236,6 @@ The sandbox runs on shared testnet infrastructure — one faucet account, one ga
 
 | Limit | Value | Refusal |
 | --- | --- | --- |
-| Clients per integrator | `5`. Requests that failed, were rejected or were canceled do not count. | `403 sandbox_client_limit_reached`, `details: {limit, clients}` |
 | One payout | at most `1` of the debited account (USDC or EURC). A bank payout starts at `0.10` and carries no fixed fee here, only the rail's `feeBps` | `422 sandbox_amount_limit_exceeded`, `400 invalid_request` below the minimum |
 | One escrow | `maxAmount` at most `1`; its actions cannot exceed it | `422 sandbox_amount_limit_exceeded` |
 | One payin credit — a bank deposit, or a completed payin | `0.10` to `1` of the credited token, live as `maxCredit` | `422 amount_below_minimum`, `422 sandbox_amount_limit_exceeded` |

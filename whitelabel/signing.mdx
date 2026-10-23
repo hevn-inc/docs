@@ -6,6 +6,11 @@ description: "Prepare, check, sign, confirm: what you sign, what HEVN verifies, 
 Nothing you sign is constructed by you. HEVN builds the operation, echoes its terms, and verifies the
 same terms again at confirm — your job is to check the echo and sign, not to assemble a transaction.
 
+Your developer key signs for one wallet: your own integrator account's. Payouts and swaps from that
+account and the operator actions on your escrow deals go through the four steps below. A payout for a
+client never does — it answers `authorization: "client"`, and its holder signs it in the
+[sign-in window](/whitelabel/sign-in-with-hevn#approve-a-payout).
+
 <Steps>
   <Step title="Prepare" icon="file-text">
     You call the opening route — `POST /dapi/v1/payouts` or
@@ -48,26 +53,29 @@ sequenceDiagram
 
 | What moves | Prepare | Confirm | Approval window |
 | --- | --- | --- | --- |
-| Fiat out over a bank rail | `POST /dapi/v1/payouts` | `POST /dapi/v1/payouts/{payoutId}/confirm` | 120 s |
-| USDC out on Base | `POST /dapi/v1/payouts` with a wallet contact | `POST /dapi/v1/payouts/{payoutId}/confirm` | 120 s |
-| Money between two accounts one client owns | `POST /dapi/v1/swaps` | `POST /dapi/v1/swaps/{swapId}/confirm` | 120 s |
-| An escrow deal, and every escrow action | `POST /dapi/v1/escrow`, `POST /dapi/v1/escrow/{escrowId}/actions` | `POST /dapi/v1/escrow/{escrowId}/actions/{idempotencyKey}/confirm` | 60 s |
+| Fiat out of your account over a bank rail | `POST /dapi/v1/payouts` | `POST /dapi/v1/payouts/{payoutId}/confirm` | 120 s |
+| USDC out of your account on Base | `POST /dapi/v1/payouts` with a wallet contact | `POST /dapi/v1/payouts/{payoutId}/confirm` | 120 s |
+| Money between two of your own accounts | `POST /dapi/v1/swaps` | `POST /dapi/v1/swaps/{swapId}/confirm` | 120 s |
+| An escrow action you operate | `POST /dapi/v1/escrow/{escrowId}/actions` | `POST /dapi/v1/escrow/{escrowId}/actions/{idempotencyKey}/confirm` | 60 s |
+| A payout for a client | `POST /dapi/v1/payouts` with `X-Hevn-Account` | none — the holder signs in the [sign-in window](/whitelabel/sign-in-with-hevn#approve-a-payout) | about 10 min, the window session |
 
 ## What the approval authorizes
 
-`authorization` on a payout or a swap says which of two things the one signature covers.
+`authorization` on a payout or a swap says what the one signature covers, and whose it is.
 
 | `authorization` | What HEVN does with your co-signature | What to check before signing |
 | --- | --- | --- |
-| `debit` | funds the payment by moving tokens out of the client's Base smart wallet | `debit.amount`, `debit.token` and `debit.address` |
-| `intent` | signs the payment's own terms with the client's smart wallet, and settles it with the partner — nothing leaves the wallet | `quote`, and `intent.digest` if you reproduce the terms yourself |
+| `debit` | funds the payment by moving tokens out of your Base smart wallet | `debit.amount`, `debit.token` and `debit.address` |
+| `intent` | signs the payment's own terms with your smart wallet, and settles it with the partner — nothing leaves the wallet | `quote`, and `intent.digest` if you reproduce the terms yourself |
+| `client` | nothing — there is no `approval` for you. The client's holder signs the debit themselves | `quote` and `contact`, before you open the sign-in window for it |
 
 A payout from a wallet account is `debit`; one with `"sourceAccount": "FDIC_USD"` is `intent`, because
 the money is spent where the partner bank already holds it. A swap is whichever its route needs. The
 bytes you sign, the confirm route and the retry rules are identical either way — only `debit` versus
 `intent` on the response differs.
 
-Payouts act on a client — send `X-Hevn-Account`. Escrow is always operated by you, so it
+The signed routes act on your own account: send no `X-Hevn-Account`, or your own `cl_…`. Confirming
+a client's payout or swap answers `403 account_not_controlled`. Escrow is always operated by you, so it
 refuses that header. Every confirm body is the same two fields:
 
 ```json
@@ -133,8 +141,8 @@ Five ways to get it wrong, all of them answering `400 signature_invalid`:
 - **Hashing twice.** Most libraries hash for you. Do not pre-hash and then sign the digest as a
   message.
 
-Sign on your server. The key can authorize a spend from every client wallet you control, so a browser
-is the wrong place for it.
+Sign on your server. The key can authorize a spend from your own wallet, so a browser is the wrong
+place for it.
 
 ## What HEVN binds, and what it verifies
 
@@ -142,9 +150,8 @@ You are not trusted to describe the operation, and you are not asked to. At prep
 
 - loads the target itself — the booked payout, the contact you named, the deal — and refuses anything
   that is not in a fundable state;
-- checks that your account controls the client's wallet and that the wallet's live on-chain owner is
-  your signer;
-- builds a **single stablecoin transfer** from the client's wallet, with the amount and destination
+- checks that the wallet is your own and that its live on-chain owner is your signer;
+- builds a **single stablecoin transfer** from that wallet, with the amount and destination
   taken from what it just booked, and checks the balance covers it;
 - re-validates that built operation against the stored terms before it hands you anything to sign;
 - pins an idempotency key of its own on the authorization, so the same signature cannot be replayed
@@ -157,8 +164,7 @@ consumed. A wrong signature is a refusal that costs you nothing: the approval su
 fix the signing and confirm again.
 
 The credential is re-checked at both ends. Every request on this API re-reads the developer key behind
-your session, the address the request came from and the scopes the key holds, and the confirm
-re-checks them once more immediately before HEVN co-signs — so a key deleted between the prepare and
+your session and the address the request came from, and the confirm re-checks both once more immediately before HEVN co-signs — so a key deleted between the prepare and
 the confirm, or a confirm sent from an address outside its allowlist, is a `403` and nothing is
 signed. See [Developer key](/whitelabel/developer-key#the-ip-allowlist).
 
@@ -212,6 +218,6 @@ import ConfirmLoop from "/snippets/confirm-loop.mdx";
 
 <ConfirmLoop />
 
-<Card title="Next: Clients" icon="building-2" href="/whitelabel/clients">
-  Create a client company, poll it to `ready`, and keep one id.
+<Card title="Next: Sign in with HEVN" icon="log-in" href="/whitelabel/sign-in-with-hevn">
+  Link your customer's own account through a HEVN popup on your site.
 </Card>

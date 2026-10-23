@@ -17,7 +17,7 @@ flowchart LR
     G2 -.->|"sandbox: you decide the review"| G4
 ```
 
-Gate 1 is [creating the client](/whitelabel/clients). Gate 4 is [opening a rail](/whitelabel/virtual-accounts). This page is gates 2 and 3: one document, one readiness list, one submission.
+Gate 1 is [linking the client](/whitelabel/sign-in-with-hevn). Gate 4 is [opening a rail](/whitelabel/virtual-accounts). This page is gates 2 and 3: one document, one readiness list, one submission.
 
 No route here names the client in its path. `PUT /dapi/v1/client/kyb`, `GET /dapi/v1/client/kyb` and `POST /dapi/v1/client/kyb/complete` all **require** `X-Hevn-Account`, and document upload accepts the same header. Your own access token is the only credential any of this needs. Examples use the client from [HTTP client](/whitelabel/reference/client).
 
@@ -388,10 +388,10 @@ The phone on the account and the phone in the document are different fields with
 
 | Field | Written by | Read by |
 | --- | --- | --- |
-| Account phone | `POST /dapi/v1/clients` or `PATCH /dapi/v1/client` | The rail requirements check. A company with no account phone reports the `phone_required` blocker on every rail. |
+| Account phone | `PATCH /dapi/v1/client` | The rail requirements check. A company with no account phone reports the `phone_required` blocker on every rail. |
 | `company.phone` | `PUT /dapi/v1/client/kyb` | The KYB gate. Either phone satisfies it. |
 
-Set the account phone at creation and this never comes up.
+Set the account phone right after you link the client and this never comes up.
 
 ## Complex ownership
 

@@ -12,12 +12,13 @@ Every HEVN account is a [Base Smart Wallet](https://docs.base.org/base-account/o
 Everything on this tab describes the **self-serve** product: the person who owns the email owns the
 wallet, and nothing moves without a signature from their own key. HEVN cannot sign for them.
 
-The [whitelabel](/whitelabel/overview) product moves that role. Your backend holds a developer key,
-your customer's company is the account holder and legal owner of the funds, and every payment is
-signed by you and co-signed by HEVN. Your customer never signs and never logs in.
+The [whitelabel](/whitelabel/overview) product keeps that rule and adds an operator. Your customer
+creates their own HEVN account in a sign-in window on your site and links it to your product; your
+backend, holding a developer key, verifies the account, opens its rails and books its payments; and
+your customer still approves every payment with their own key in that window.
 
 Read this tab for how the platform is built and what it cannot do with the money. Read the
-[Whitelabel](/whitelabel/overview) tab if you are the one holding the key.
+[Whitelabel](/whitelabel/overview) tab if you are building the product around it.
 
 <CardGroup cols={2}>
   <Card title="Architecture" icon="layers" href="/general/architecture">
@@ -33,7 +34,7 @@ Read this tab for how the platform is built and what it cannot do with the money
     What HEVN can and cannot do with your money.
   </Card>
   <Card title="Whitelabel" icon="boxes" href="/whitelabel/overview">
-    Run HEVN under your own brand: create accounts for your customers from code and move their money with a key you hold.
+    Run HEVN under your own brand: link your customers' accounts through a sign-in window and operate them from code.
   </Card>
 </CardGroup>
 
@@ -79,6 +80,6 @@ Authorization to actually **spend** funds always happens at the wallet layer, wi
 | Surface | What it is | Docs |
 | --- | --- | --- |
 | Web app | Full product UI at [app.gethevn.com](https://app.gethevn.com) | — |
-| REST API | The whitelabel integration surface: create and operate accounts for your own customers | [REST API tab](/api-reference/overview) |
+| REST API | The whitelabel integration surface: link and operate your customers' accounts | [REST API tab](/api-reference/overview) |
 | Whitelabel | HEVN as the payments engine behind your product, under your brand | [Whitelabel tab](/whitelabel/overview) |
 | Remote transfers | A capped key that lets your own server or script send USDC from your account. Advanced use only | [Remote Transfers tab](/remote-transfers/overview) |

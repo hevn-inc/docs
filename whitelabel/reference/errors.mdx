@@ -1,6 +1,6 @@
 ---
 title: "Errors"
-description: "One envelope and all 112 error slugs, grouped by resource, with what to do about each."
+description: "One envelope and every error slug, grouped by resource, with what to do about each."
 ---
 
 Every refusal from `/dapi/v1` has the same body. `code` is a stable lowercase slug — branch on it, and never on `message`.
@@ -76,7 +76,7 @@ No refusal is a `502`. A `502` with an HTML body comes from the network in front
 | `idempotency_key_reused` | 409 | The same key already names different terms. `details` carries the id it owns (`payoutId`, `escrowId`). Replay the exact body, or use a new key. |
 | `unauthenticated` | 401 | Send `Authorization: Bearer <accessToken>`. |
 | `token_expired` | 401 | Re-mint with `POST /dapi/v1/auth/refresh` and retry once. |
-| `forbidden` | 403 | This session may not perform this operation. On `/dapi/v1` it is also what a non-platform token, a deleted developer key, an off-allowlist source IP and a missing scope answer — see [Developer keys](#developer-keys). |
+| `forbidden` | 403 | This session may not perform this operation. On `/dapi/v1` it is also what a non-platform token, a deleted developer key and an off-allowlist source IP answer — see [Developer keys](#developer-keys). |
 | `not_found` | 404 | No such resource. |
 | `method_not_allowed` | 405 | Wrong verb for this path. |
 | `conflict` | 409 | A state conflict with no narrower slug. Read `message`, re-read the resource. |
@@ -110,15 +110,13 @@ No refusal is a `502`. A `502` with an HTML body comes from the network in front
 ## Developer keys
 
 A platform session is established by one developer key, and every `/dapi/v1` request re-reads it: the key must still
-exist, the request must arrive from an address inside the key's allowlist, and the route must be one the key's scopes
-cover. All three checks are repeated on `POST /dapi/v1/auth/refresh` and again immediately before HEVN co-signs, so
+exist, and the request must arrive from an address inside the key's allowlist. Both checks are repeated on `POST /dapi/v1/auth/refresh` and again immediately before HEVN co-signs, so
 deleting a key stops the sessions it already minted rather than waiting for them to expire.
 
 | Slug | Status | What to do |
 | --- | --- | --- |
 | `unauthenticated` | 401 | No bearer, or one that does not verify. `/dapi/v1` takes a **platform** access token and nothing else. |
 | `forbidden` | 403 | With `details.reason = "developerSessionRequired"`: the token is an ordinary API token, a `platform-refresh` token on a business route, or a platform token with no `developer_key_id`. Log in through `POST /dapi/v1/auth/challenge` and `POST /dapi/v1/auth/token`. |
-| `forbidden` | 403 | With `details.requiredScope`: the key does not hold the scope this route needs, and `details.scope` lists the ones it does. Scopes are fixed when a key is created, so this needs a key that has it — the four values are on [Developer key](/whitelabel/developer-key#scopes). |
 | `forbidden` | 403 | With no `details`: the key behind the session was deleted, or the call left an address outside its allowlist. Resume from an allowlisted host, or create a key that covers this one. |
 | `key_not_registered` | 403 | The public key you named in a signature is not one of this account's keys. |
 | `invalid_credentials` | 401 | At login only. A deleted key, an off-allowlist IP, an unknown email and a bad signature are all one code, deliberately. |
@@ -134,23 +132,26 @@ are deliberately absent from `/dapi/v1`.
 | Slug | Status | What to do |
 | --- | --- | --- |
 | `account_header_invalid` | 400 | `X-Hevn-Account` is not a `cl_…` id. |
-| `account_scope_conflict` | 400 | The header was sent to a self-scoped route — `POST /clients`, `GET /clients` or any escrow route — or the token itself is delegated to one client. `details.reason` is `selfScopedRoute` in both cases. |
+| `account_scope_conflict` | 400 | The header was sent to a self-scoped route — `POST /clients/link`, `GET /clients`, `POST /connect/sessions` or any escrow route — or the token itself is delegated to one client. `details.reason` is `selfScopedRoute` in both cases. |
 | `account_not_found` | 404 | Unknown client, or a client that is not yours. The two are indistinguishable by design. |
 | `account_forbidden` | 403 | The client exists but cannot be acted for right now — typically a paused integrator profile. |
 | `account_read_only` | 403 | This credential may read the client but not write. `details.credential` names it. |
-| `account_not_controlled` | 403 | This session does not control the account's wallet, so it cannot sign for it. |
+| `account_not_controlled` | 403 | This session does not control the account's wallet, so it cannot sign for it: a confirm on a client's payout, a swap for a client, or an escrow deal whose buyer is a linked client. A client's holder signs in the [sign-in window](/whitelabel/sign-in-with-hevn#approve-a-payout). |
 
-## Clients
+## Clients and the sign-in window
 
 | Slug | Status | What to do |
 | --- | --- | --- |
-| `integrator_inactive` | 403 | Your integrator profile is not active. HEVN switches it on; nothing in the API does. |
-| `client_creation_not_enabled` | 403 | Your account cannot create clients yet. HEVN enables this. |
-| `email_in_use` | 409 | That email already belongs to an account. Look it up with `GET /dapi/v1/clients?email=`. |
-| `name_in_use` | 409 | Company names are globally unique. Send a more specific legal name. |
-| `client_request_conflict` | 409 | An identical client request is already in flight. Poll instead of creating again. |
+| `client_creation_not_enabled` | 403 | Your integrator account is not active, or may not link clients. HEVN switches it on; nothing in the API does. |
+| `redirect_uri_not_allowed` | 403 | The `redirectUri` of a sign-in window session is not on an origin under **Allowed sites**. Add it in the app's **Sign-in window** card. |
+| `payout_not_awaiting_signature` | 409 | A `sign` session for a payout that no longer waits for its holder. Read the payout. |
+| `link_code_invalid` | 400 | The code from the sign-in window is malformed, belongs to another integrator, or its account is gone. Start a new sign-in. |
+| `link_code_expired` | 410 | The code is older than five minutes. Start a new sign-in. |
+| `client_already_linked` | 409 | The account is already connected to another integrator, or can no longer be connected to you. |
 | `client_not_found` | 404 | Unknown client id, or not one of yours. |
 | `profile_locked` | 409 | The field is frozen after verification. `details.fields` names them. |
+
+The sign-in window's own refusals — `access_denied`, `already_registered`, `already_linked`, `not_found`, `unsupported`, `expired` and `failed` — are not error slugs. They arrive as `error` on your callback page; [Sign in with HEVN](/whitelabel/sign-in-with-hevn#errors) has what each one means.
 
 ## Rails and payins
 
@@ -181,7 +182,7 @@ Booking a payout — to a bank account or to a wallet — and the contacts it pa
 | `account_unavailable` | 422 | The client holds no such account. A client with no custodial virtual account cannot name `FDIC_USD`. |
 | `account_not_supported` | 422 | The account cannot be used for this operation: a payin cannot settle into `FDIC_USD`, and a payout from it needs the rail that holds it. |
 | `payout_not_found` | 404 | Unknown payout id for this client. |
-| `payout_not_fundable` | 409 | This payout can no longer be funded. Book a new one. |
+| `payout_not_fundable` | 409 | This payout can no longer be funded. Book a new one. With `details.reason = "holder_signature_unsupported"`, a client's holder cannot approve this kind of payout in the sign-in window — a `FDIC_USD` payout, for now. |
 | `quote_expired` | 409 | The price expired. Book again with the same `Idempotency-Key` to get a fresh one. |
 | `swap_not_found` | 404 | Unknown swap id for this client. |
 | `swap_route_unavailable` | 422 | Nothing can move money between these two accounts right now. The sandbox answers it for every swap: it has no exchange venue. |
@@ -270,11 +271,11 @@ These arrive at `POST /dapi/v1/payouts/{payoutId}/confirm`; two of them — `quo
 | `action_in_flight` | 409 | One signing wallet runs one action at a time, across every deal. The refusal carries no `details`, so track the deal you left in flight yourself, sync it, then retry. |
 | `simulation_failed` | 409 | The action would revert on chain, or the gas sponsor refused it. `details.reason` carries the chain's own answer. Check balances and windows, then prepare again. |
 | `stale_nonce` | 409 | The wallet's nonce moved between prepare and confirm. Prepare again with the same key. |
-| `amount_not_allowed` | 409 | `void` and `reclaim` take no amount. |
+| `amount_not_allowed` | 409 | `void` takes no amount. |
 | `amount_out_of_range` | 422 | The amount is outside what the deal allows. An over-large `capture` or `authorize` currently arrives as a bare `400 invalid_request` instead, with no `details` and the generic message. |
 | `window_closed` | 409 | The action's window has passed. A closed window currently arrives as a bare `400 invalid_request` instead — handle both the same way: read the deal, pick from `availableActions`. |
 | `token_not_supported` | 422 | Escrow settles in `USDC` or `EURC`, by symbol. |
-| `receiver_not_a_client` | 422 | Both parties must be clients you provisioned with `POST /clients`. An account you only referred is never an escrow party. |
+| `receiver_not_a_client` | 422 | Both parties must be clients linked to you through Sign in with HEVN. An account you only referred is never an escrow party. |
 | `conflict` | 409 | A state conflict with no narrower slug — on escrow it is what an unclassified deal error becomes. Read `message`, re-read the deal. An approval that closed is `410 approval_expired`, one already used is `409 approval_consumed`. |
 | `bundler_rejected`, `bundler_unavailable` | 503 | Chain infrastructure. Confirm again with backoff. `bundler_unavailable` carries `details.reason`. |
 
@@ -284,7 +285,6 @@ Only the sandbox answers these. Each one names the limit in `message` and `detai
 
 | Slug | Status | What to do |
 | --- | --- | --- |
-| `sandbox_client_limit_reached` | 403 | You already hold `details.limit` clients. Reuse one; failed requests do not count. |
 | `sandbox_amount_limit_exceeded` | 422 | A payout, escrow, payin credit or faucet credit above the sandbox cap. `details.maximum` is the cap and `details.operation` names which one. |
 | `sandbox_faucet_balance_too_high` | 409 | The faucet only tops up a wallet holding less than `details.threshold` of the token. Spend what the client has first. |
 

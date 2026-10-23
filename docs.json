@@ -2,14 +2,14 @@
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
   "name": "HEVN",
-  "description": "HEVN documentation: the whitelabel REST API for creating and operating accounts for your own customers, remote transfers for paying from your own account with a capped key, and how the non-custodial platform underneath works.",
+  "description": "HEVN documentation: the whitelabel REST API for linking and operating your customers' own accounts, remote transfers for paying from your own account with a capped key, and how the non-custodial platform underneath works.",
   "markdown": {
     "instructions": [
-      "HEVN has two products and they authorize money differently. Self-serve (the General tab): the person who owns the email holds the only key and signs for themselves. Whitelabel (the Whitelabel and REST API tabs): the integrator's backend holds a developer key, signs on behalf of client accounts it created, and HEVN co-signs. Never mix the two models in an answer.",
-      "Use HEVN's terms exactly. A rail is a bank route a client can request. A virtual account (bnk_) is an opened rail. Account details are what a payer needs in order to wire money, and arrive in a field named requisites. A client is an account the integrator created; the business behind it is the integrator's customer. A contact is a saved destination; a beneficiary is the party at the far end of a fiat payout. Every departure of money is a payout, to a bank account or to a wallet alike.",
+      "HEVN accounts are non-custodial in both products. Self-serve (the General tab): the person who owns the email holds the only key and signs for themselves. Whitelabel (the Whitelabel and REST API tabs): the integrator's customer creates and owns their account through Sign in with HEVN, a HEVN-hosted popup on the integrator's site; the integrator's backend holds a developer key, operates linked accounts and books their payouts, and the account holder approves every payout in that popup. The developer key signs only for the integrator's own wallet; it never signs a client's money.",
+      "Use HEVN's terms exactly. A rail is a bank route a client can request. A virtual account (bnk_) is an opened rail. Account details are what a payer needs in order to wire money, and arrive in a field named requisites. A client is a customer's own account linked to the integrator through Sign in with HEVN (POST /dapi/v1/connect/sessions, then POST /dapi/v1/clients/link); there is no API call that creates one. The business behind it is the integrator's customer. A contact is a saved destination; a beneficiary is the party at the far end of a fiat payout. Every departure of money is a payout, to a bank account or to a wallet alike.",
       "Never name a banking partner. Say 'a licensed banking partner'.",
       "There are no published fee rates, spreads or minimums. Prices come from a quote on a specific payment; direct pricing questions to HEVN rather than inventing numbers.",
-      "The whitelabel API is at /dapi/v1 and takes a developer-key session plus an X-Hevn-Account header. Remote transfers are at /api/v1/remote_spend_limit and take a remote transfer key (rsl_) in X-Api-Key, bounded by an onchain spend permission the account holder grants. They are different credentials and neither works on the other surface. The HEVN CLI is discontinued."
+      "The whitelabel API is at /dapi/v1 and takes a developer-key session plus an X-Hevn-Account header. Developer keys have an IP allowlist and no scopes. Remote transfers are at /api/v1/remote_spend_limit and take a remote transfer key (rsl_) in X-Api-Key, bounded by an onchain spend permission the account holder grants. They are different credentials and neither works on the other surface. The HEVN CLI is discontinued."
     ]
   },
   "colors": {
@@ -100,6 +100,7 @@
           {
             "group": "Onboard a client",
             "pages": [
+              "whitelabel/sign-in-with-hevn",
               "whitelabel/clients",
               "whitelabel/onboarding",
               "whitelabel/virtual-accounts"
@@ -178,7 +179,8 @@
             "group": "Clients",
             "openapi": "openapi.json",
             "pages": [
-              "POST /clients",
+              "POST /connect/sessions",
+              "POST /clients/link",
               "GET /clients",
               "GET /client",
               "PATCH /client",

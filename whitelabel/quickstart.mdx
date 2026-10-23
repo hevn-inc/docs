@@ -1,22 +1,25 @@
 ---
 title: "Quickstart"
-description: "In the sandbox: log in with a developer key, create a client company, fund its wallet, and move its money on chain."
+description: "In the sandbox: log in with a developer key, link a client through Sign in with HEVN, fund its wallet, and have its holder approve a payout on chain."
 ---
 
-In about twenty minutes you will have a client company that holds 6 testnet USDC and has sent 5 of
-them out of its own wallet, signed by your key. Nine steps, all of them in the sandbox.
+In about twenty minutes you will have a client account linked to yours through the HEVN sign-in window, holding testnet USDC, with one payout its holder approved and HEVN settled on chain. Ten steps, all of them in the sandbox.
 
 ## Before you start
 
 - **Create a sandbox account in a browser.** Sign up at
   [`https://sandbox.gethevn.com`](https://sandbox.gethevn.com) with your work email. Sandbox and
   production are separate accounts; nothing you do here touches real money.
-- **Create a developer key, in the same browser.** Open **Settings → Partner program → Developer keys** and create one.
-  You set two things that can never be changed afterwards: the **IP allowlist**, which for this
-  quickstart is the egress address of the machine you will run it from, and the **scopes**, which for
-  this quickstart are `payout:sign` and `recipient:write`. Every later call is re-checked against the
-  allowlist — a request from an address you did not list is a `403` however correct the key and the
-  signature are — and a route whose scope the key lacks is a `403` with `details.requiredScope`.
+- **Create a developer key, in the same browser.** Open **Settings → Partner program → Developer** and create one.
+  You set one thing that can never be changed afterwards: the **IP allowlist**, which for this
+  quickstart is the egress address of the machine you will run it from. Every later call is
+  re-checked against it — a request from an address you did not list is a `403` however correct the
+  key and the signature are.
+- **Allow your local site in the sign-in window.** On the same tab, in the **Sign-in window** card,
+  add `http://localhost:8080` under **Allowed sites** and save. Give the window a title while you are
+  there; it is what your test customer will see.
+- **Have a second Google account ready.** It plays your customer. It must not have a HEVN sandbox
+  account of its own: an existing account answers `already_registered` and can never be linked.
 - **Save the private key into your environment.** The browser shows it once. Write it to
   `$HEVN_KEY_PEM` with mode `0600`; HEVN never holds it and cannot show it again. Walk-through:
   [Developer key](/whitelabel/developer-key).
@@ -25,7 +28,6 @@ them out of its own wallet, signed by your key. Nine steps, all of them in the s
 import Env from "/snippets/env.mdx";
 import Install from "/snippets/install.mdx";
 import LoginSnippet from "/snippets/login.mdx";
-import SignPayload from "/snippets/sign-payload.mdx";
 import SandboxCaps from "/snippets/sandbox-caps.mdx";
 
 <Env />
@@ -34,7 +36,7 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
 
 <SandboxCaps />
 
-## Nine steps
+## Ten steps
 
 <Steps>
   <Step title="Log in">
@@ -55,115 +57,139 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
     ```
 
     Keep both: `export HEVN_ACCESS_TOKEN=…` and `export HEVN_USER_ID=cl_9f2c…`.
+
+    The `hevn` / `api` client, `key` and `poll_until` in every tab below are
+    [the reference client](/whitelabel/reference/client) — copy it once and the rest of this page
+    is three lines a step.
   </Step>
 
-  <Step title="Check that your account may create clients">
-    Being an integrator is not something the API grants — HEVN switches it on for your account, in
-    the sandbox as in production. The cheapest confirmation is a list that answers instead of
-    refusing. `GET /clients` is the collection you own, so it is the one call on this page that must
-    **not** carry `X-Hevn-Account`; sending it is `400 account_scope_conflict`.
+  <Step title="Serve a page that opens the sign-in window">
+    The window is opened by your page and answers to your callback page. For this quickstart both are
+    static files. Save them in an empty folder and serve it on the origin you allowed:
+
+    ```html index.html
+    <!doctype html>
+    <meta charset="utf-8">
+    <title>HEVN quickstart</title>
+    <input id="url" placeholder="Paste a session url" size="90">
+    <button id="open">Open HEVN</button>
+    <pre id="out"></pre>
+    <script>
+      const out = document.getElementById("out");
+      const channel = new BroadcastChannel("hevn-connect");
+      channel.onmessage = ({ data }) => { out.textContent = JSON.stringify(data.result, null, 2); };
+      document.getElementById("open").onclick = () => {
+        window.open(document.getElementById("url").value, "hevn-connect", "popup,width=460,height=720");
+      };
+    </script>
+    ```
+
+    ```html callback.html
+    <!doctype html>
+    <meta charset="utf-8">
+    <title>Signing in…</title>
+    <script>
+      const result = Object.fromEntries(new URLSearchParams(location.search));
+      if (result.state) {
+        const channel = new BroadcastChannel("hevn-connect");
+        channel.postMessage({ state: result.state, result });
+        channel.close();
+        window.close();
+      }
+    </script>
+    ```
+
+    ```bash
+    python3 -m http.server 8080
+    ```
+
+    Open `http://localhost:8080` in a browser. The popup opens straight from the click, which is what
+    keeps the browser from blocking it. A real integration fetches the session URL from its own server
+    inside that click instead of having you paste it — [Sign in with HEVN](/whitelabel/sign-in-with-hevn)
+    has that version, and the cookie check this quickstart skips.
+  </Step>
+
+  <Step title="Create a link session">
+    The session is about your own account, so it carries **no** `X-Hevn-Account`.
 
     <CodeGroup>
 
     ```bash cURL
-    curl -s "$HEVN_API/clients" \
-      -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" | jq
+    curl -s -X POST "$HEVN_API/connect/sessions" \
+      -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" -H "Content-Type: application/json" \
+      -d '{"action":"link","redirectUri":"http://localhost:8080/callback.html"}' | jq -r .url
     ```
 
     ```python Python
-    mine = hevn.get("/clients")["items"]
+    session = hevn.post("/connect/sessions", {
+        "action": "link", "redirectUri": "http://localhost:8080/callback.html",
+    })
+    print(session["url"])
     ```
 
     ```javascript Node
-    const { items: mine } = await hevn.get("/clients");
+    const session = await hevn.post("/connect/sessions", {
+      action: "link", redirectUri: "http://localhost:8080/callback.html",
+    });
+    console.log(session.url);
     ```
 
     ```go Go
-    page, err := api.Get("/clients")
-    mine := page.List("items")
+    session, err := api.Post("/connect/sessions", hevn.Body{
+    	"action": "link", "redirectUri": "http://localhost:8080/callback.html",
+    })
+    fmt.Println(session.Str("url"))
     ```
 
     </CodeGroup>
 
     ```json Response
-    { "items": [] }
+    { "url": "https://sandbox.gethevn.com/connect?session=eyJ…", "state": "pQ8v2Zr0…", "expiresAt": "2026-09-17T10:14:11Z" }
     ```
 
-    The `hevn` / `api` client, `key` and `poll_until` in every tab below are
-    [the reference client](/whitelabel/reference/client) — copy it once and the rest of this page
-    is three lines a step.
-
-    An empty page means you are an integrator with no clients yet — carry on. If the next step
-    answers `403 integrator_inactive` or `403 client_creation_not_enabled`, the flag is not on
-    your account yet; ask HEVN before you write any more code. See
+    The URL works for about ten minutes. `403 redirect_uri_not_allowed` means `http://localhost:8080`
+    is not saved under **Allowed sites**. `403 client_creation_not_enabled` means your account is not
+    an active integrator yet; ask HEVN before you write any more code — see
     [Going live](/whitelabel/going-live#what-hevn-must-enable).
   </Step>
 
-  <Step title="Create a client and wait for it to be ready">
-    `phone` is optional here and required later by every bank rail, so send it now.
+  <Step title="Sign in as your customer">
+    Paste the URL into the page and click **Open HEVN**. In the popup, sign in with the second Google
+    account and choose **Allow**. The popup closes and the page shows what came back:
 
+    ```json
+    { "code": "eyJhbGciOiJFUzI1NiIs…", "state": "pQ8v2Zr0…" }
+    ```
+
+    `state` is the one `POST /connect/sessions` answered. The code lives for five minutes.
+  </Step>
+
+  <Step title="Exchange the code for a client">
     <CodeGroup>
 
     ```bash cURL
-    curl -X POST "$HEVN_API/clients" \
+    curl -s -X POST "$HEVN_API/clients/link" \
       -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" -H "Content-Type: application/json" \
-      -d '{"name":"Northwind Trading Ltd","email":"ops@northwind.example","phone":"+13125550142"}'
+      -d '{"code":"eyJhbGciOiJFUzI1NiIs…"}' | jq '{id, status, baseSmartWallet}'
     ```
 
     ```python Python
-    client = hevn.post("/clients", {
-        "name": "Northwind Trading Ltd", "email": "ops@northwind.example",
-        "phone": "+13125550142",
-    })
-    ```
-
-    ```javascript Node
-    const client = await hevn.post("/clients", {
-      name: "Northwind Trading Ltd", email: "ops@northwind.example",
-      phone: "+13125550142",
-    });
-    ```
-
-    ```go Go
-    client, err := api.Post("/clients", hevn.Body{
-    	"name": "Northwind Trading Ltd", "email": "ops@northwind.example",
-    	"phone": "+13125550142",
-    })
-    ```
-
-    </CodeGroup>
-
-    The `201` answers `status: "provisioning"`, an id you can already read, and a `pollUrl` of
-    `/dapi/v1/client` — a path that names no account by itself. The id goes in `X-Hevn-Account`
-    instead, which is how every read of one client works. Poll it every two seconds; it becomes
-    `ready` in about thirty seconds, when the client's wallet exists.
-
-    <CodeGroup>
-
-    ```bash cURL
-    export HEVN_CLIENT_ID=cl_7YQ2Kf3mN8
-    curl -s "$HEVN_API/client" \
-      -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
-      -H "X-Hevn-Account: $HEVN_CLIENT_ID" | jq '{status, baseSmartWallet}'
-    ```
-
-    ```python Python
-    client_id = client["id"]
-    northwind = hevn.acting_as(client_id)
+    client = hevn.post("/clients/link", {"code": code})
+    northwind = hevn.acting_as(client["id"])
     ready = poll_until(lambda: northwind.get("/client"),
                        lambda seen: seen["status"] != "provisioning")
     ```
 
     ```javascript Node
-    const clientId = client.id;
-    const northwind = hevn.actingAs(clientId);
+    const client = await hevn.post("/clients/link", { code });
+    const northwind = hevn.actingAs(client.id);
     const ready = await pollUntil(() => northwind.get("/client"),
       (seen) => seen.status !== "provisioning");
     ```
 
     ```go Go
-    clientID := client.Str("id")
-    northwind := api.ActingAs(clientID)
+    client, err := api.Post("/clients/link", hevn.Body{"code": code})
+    northwind := api.ActingAs(client.Str("id"))
     ready, err := hevn.PollUntil(
     	func() (hevn.Payload, error) { return northwind.Get("/client") },
     	func(seen hevn.Payload) bool { return seen.Str("status") != "provisioning" },
@@ -174,8 +200,11 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
     </CodeGroup>
 
     ```json Response
-    { "status": "ready", "baseSmartWallet": "0x2f1c9d0b8a7e6532d41ac9f0b3e27d5581a4c6f9" }
+    { "id": "cl_7YQ2Kf3mN8", "status": "ready", "baseSmartWallet": "0x2f1c9d0b8a7e6532d41ac9f0b3e27d5581a4c6f9" }
     ```
+
+    Keep the id: `export HEVN_CLIENT_ID=cl_7YQ2Kf3mN8`. If it says `provisioning`, read
+    `GET /dapi/v1/client` with the id in `X-Hevn-Account` every two seconds until it is `ready`.
   </Step>
 
   <Step title="Fund the client's wallet">
@@ -254,10 +283,10 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
     That balance is read from Base Sepolia, not from a HEVN table.
   </Step>
 
-  <Step title="Save a contact">
+  <Step title="Save a contact and book a payout">
     Pay the money to an address you control: your own account's wallet. Read it with the same
     balance route, acting as yourself — the `userId` from step 1 goes in `X-Hevn-Account`, because
-    that header is the only thing that selects an account on `/client*`.
+    that header is the only thing that selects an account on `/client*`. Then book `1.00` to it.
 
     <CodeGroup>
 
@@ -266,10 +295,15 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
       -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
       -H "X-Hevn-Account: $HEVN_USER_ID" | jq -r .baseSmartWallet)
 
-    curl -X POST "$HEVN_API/contacts" \
+    export HEVN_CONTACT_ID=$(curl -s -X POST "$HEVN_API/contacts" \
       -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" -H "X-Hevn-Account: $HEVN_CLIENT_ID" \
       -H "Content-Type: application/json" \
-      -d "{\"name\":\"Treasury\",\"crypto\":{\"chain\":\"base\",\"token\":\"USDC\",\"address\":\"$HEVN_OWN_WALLET\"}}"
+      -d "{\"name\":\"Treasury\",\"crypto\":{\"chain\":\"base\",\"token\":\"USDC\",\"address\":\"$HEVN_OWN_WALLET\"}}" | jq -r .id)
+
+    curl -s -X POST "$HEVN_API/payouts" \
+      -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" -H "X-Hevn-Account: $HEVN_CLIENT_ID" \
+      -H "Idempotency-Key: quickstart-payout-1" -H "Content-Type: application/json" \
+      -d "{\"contactId\":\"$HEVN_CONTACT_ID\",\"amount\":\"1.00\"}"
     ```
 
     ```python Python
@@ -278,6 +312,8 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
         "name": "Treasury",
         "crypto": {"chain": "base", "token": "USDC", "address": own_wallet},
     })
+    payout = northwind.post("/payouts", {"contactId": contact["id"], "amount": "1.00"},
+                            idempotency_key="quickstart-payout-1")
     ```
 
     ```javascript Node
@@ -286,54 +322,18 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
       name: "Treasury",
       crypto: { chain: "base", token: "USDC", address: ownWallet },
     });
+    const payout = await northwind.post("/payouts", { contactId: contact.id, amount: "1.00" },
+      { idempotencyKey: "quickstart-payout-1" });
     ```
 
     ```go Go
     own, err := api.ActingAs(userID).Get("/client/balance")
-    ownWallet := own.Str("baseSmartWallet")
     contact, err := northwind.Post("/contacts", hevn.Body{
     	"name":   "Treasury",
-    	"crypto": hevn.Body{"chain": "base", "token": "USDC", "address": ownWallet},
+    	"crypto": hevn.Body{"chain": "base", "token": "USDC", "address": own.Str("baseSmartWallet")},
     })
-    ```
-
-    </CodeGroup>
-
-    Keep the `ct_…` id from the response: `export HEVN_CONTACT_ID=ct_3K9…`. `user_id` is the
-    `userId` login returned in step 1.
-  </Step>
-
-  <Step title="Prepare the payout">
-    `publicKey` says which of your keys will sign this payment.
-
-    <CodeGroup>
-
-    ```bash cURL
-    export HEVN_PUBLIC_KEY=$(openssl ec -in "$HEVN_KEY_PEM" -pubout -outform DER 2>/dev/null \
-      | base64 | tr -d '\n')
-
-    curl -X POST "$HEVN_API/payouts" \
-      -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" -H "X-Hevn-Account: $HEVN_CLIENT_ID" \
-      -H "Idempotency-Key: quickstart-payout-1" -H "Content-Type: application/json" \
-      -d "{\"contactId\":\"$HEVN_CONTACT_ID\",\"amount\":\"1.00\",\"publicKey\":\"$HEVN_PUBLIC_KEY\"}"
-    ```
-
-    ```python Python
-    payout = northwind.post("/payouts", {
-        "contactId": contact["id"], "amount": "1.00", "publicKey": key.public_key,
-    }, idempotency_key="quickstart-payout-1")
-    ```
-
-    ```javascript Node
-    const payout = await northwind.post("/payouts", {
-      contactId: contact.id, amount: "1.00", publicKey: key.publicKey,
-    }, { idempotencyKey: "quickstart-payout-1" });
-    ```
-
-    ```go Go
-    payout, err := northwind.Post("/payouts", hevn.Body{
-    	"contactId": contact.Str("id"), "amount": "1.00", "publicKey": key.PublicKey,
-    }, hevn.IdempotencyKey("quickstart-payout-1"))
+    payout, err := northwind.Post("/payouts", hevn.Body{"contactId": contact.Str("id"), "amount": "1.00"},
+    	hevn.IdempotencyKey("quickstart-payout-1"))
     ```
 
     </CodeGroup>
@@ -343,126 +343,130 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
       "id": "po_6d21…",
       "kind": "onchain",
       "status": "awaitingSignature",
-      "approval": { "id": "…", "payload": "eyJib2R5Ijp…", "expiresAt": "2026-09-17T10:06:10Z" },
-      "debit": { "address": "0x8f3bd1c7a0e94f25b6d1c83a5e07f4b219ad6e80", "amount": "1.00",
-                 "amountAtomic": "1000000", "token": "USDC", "chainId": 84532 },
+      "idempotencyKey": "quickstart-payout-1",
+      "quote": { "fromAmount": "1.00", "fromCurrency": "USDC", "toAmount": "1.00", "toCurrency": "USDC" },
+      "authorization": "client",
       "contact": { "contactId": "ct_3K9…", "name": "Treasury",
                    "address": "0x8f3bd1c7a0e94f25b6d1c83a5e07f4b219ad6e80",
-                   "chainId": "base", "token": "USDC" },
-      "idempotencyKey": "quickstart-payout-1"
+                   "chainId": "base", "token": "USDC" }
     }
     ```
 
-    A contact that is a wallet address makes this an on-chain payout — `kind` says `onchain`, there is
-    no conversion, and `quote` carries no rate and no fee. `contact` is the snapshot of the saved
-    destination, fixed when the payment was booked. `debit` is what will actually leave the wallet,
-    decoded from the operation you are about to sign, and for a wallet contact its `address` is that
-    destination. `approval.payload` is the bytes to sign, live for 120 seconds.
-
-    `quickstart-payout-1` names this payment. Re-run this step with the same key and you replay
-    the payout you already have, at the same price; change the key and you send twice.
+    `authorization: "client"` and no `approval`: this is the client's money, so its holder signs it,
+    not your key. Keep the id: `export HEVN_PAYOUT_ID=po_6d21…`. `quickstart-payout-1` names this
+    payment — re-run the call with the same key and you replay it; change the key and you book twice.
   </Step>
 
-  <Step title="Check the debit, sign it, confirm">
-    Check the terms against what you meant to send, then sign the decoded payload and confirm.
-    Nothing here re-prices anything: `payout` is the record step 7 returned.
-
-    <SignPayload />
+  <Step title="Approve it in the sign-in window">
+    Create a `sign` session for the payout, paste its URL into the page and click **Open HEVN** again.
 
     <CodeGroup>
 
-    ```python Python
-    debit, expected = payout["debit"], own_wallet
-    if (debit["amount"], debit["token"], debit["address"].lower()) != ("1.00", "USDC", expected.lower()):
-        raise RuntimeError(f"refusing to sign {debit}")
+    ```bash cURL
+    curl -s -X POST "$HEVN_API/connect/sessions" \
+      -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" -H "Content-Type: application/json" \
+      -d "{\"action\":\"sign\",\"payoutId\":\"$HEVN_PAYOUT_ID\",\"redirectUri\":\"http://localhost:8080/callback.html\"}" \
+      | jq -r .url
+    ```
 
-    signature = key.sign_payload(payout["approval"]["payload"])
-    receipt = northwind.post(f"/payouts/{payout['id']}/confirm", {"signature": signature})
+    ```python Python
+    session = hevn.post("/connect/sessions", {
+        "action": "sign", "payoutId": payout["id"],
+        "redirectUri": "http://localhost:8080/callback.html",
+    })
     ```
 
     ```javascript Node
-    const { amount, token, address } = payout.debit;
-    const expected = ownWallet.toLowerCase();
-    if (amount !== "1.00" || token !== "USDC" || address.toLowerCase() !== expected) {
-      throw new Error(`refusing to sign ${amount} ${token} to ${address}`);
-    }
-
-    const signature = key.signPayload(payout.approval.payload);
-    const receipt = await northwind.post(`/payouts/${payout.id}/confirm`, { signature });
+    const session = await hevn.post("/connect/sessions", {
+      action: "sign", payoutId: payout.id,
+      redirectUri: "http://localhost:8080/callback.html",
+    });
     ```
 
     ```go Go
-    expected := strings.ToLower(ownWallet)
-    if payout.Str("debit.amount") != "1.00" || payout.Str("debit.token") != "USDC" ||
-    	strings.ToLower(payout.Str("debit.address")) != expected {
-    	return fmt.Errorf("refusing to sign %v", payout["debit"])
-    }
-
-    signature, err := key.SignPayload(payout.Str("approval.payload"))
-    receipt, err := northwind.Post("/payouts/"+payout.Str("id")+"/confirm",
-    	hevn.Body{"signature": signature})
+    session, err := api.Post("/connect/sessions", hevn.Body{
+    	"action": "sign", "payoutId": payout.Str("id"),
+    	"redirectUri": "http://localhost:8080/callback.html",
+    })
     ```
 
     </CodeGroup>
 
-    A `200` carries `status: "settled"` and the `transactionHash`. A `202` carries
-    `status: "submitted"`: the operation is on its way and has no receipt yet, so confirm again with
-    the same body until you get a `200`. Confirm is always safe to repeat and never pays twice.
+    Sign in with the same second Google account. The window shows `1.00 USDC`, the contact `Treasury`
+    and your title, and the holder's wallet signs the debit. The page then shows:
+
+    ```json
+    { "status": "submitted", "payout": "po_6d21…", "reference": "0x…", "state": "…" }
+    ```
   </Step>
 
-  <Step title="Read the ledger">
+  <Step title="Read the payout and the ledger">
+    The redirect said `submitted`. The payout read is the record:
+
     <CodeGroup>
 
     ```bash cURL
-    curl -s "$HEVN_API/transactions?limit=5" \
+    curl -s "$HEVN_API/payouts/$HEVN_PAYOUT_ID" \
       -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" -H "X-Hevn-Account: $HEVN_CLIENT_ID" \
-      | jq '.items[] | {id, type, status, isIncome, from, to, txHash}'
+      | jq '{status, transactionHash}'
     ```
 
     ```python Python
+    done = poll_until(lambda: northwind.get(f"/payouts/{payout['id']}"),
+                      lambda seen: seen["status"] not in ("awaitingSignature", "submitted"))
     rows = northwind.get("/transactions", {"limit": 5})["items"]
     ```
 
     ```javascript Node
+    const done = await pollUntil(() => northwind.get(`/payouts/${payout.id}`),
+      (seen) => !["awaitingSignature", "submitted"].includes(seen.status));
     const { items: rows } = await northwind.get("/transactions", { limit: 5 });
     ```
 
     ```go Go
+    done, err := hevn.PollUntil(
+    	func() (hevn.Payload, error) { return northwind.Get("/payouts/" + payout.Str("id")) },
+    	func(seen hevn.Payload) bool { s := seen.Str("status"); return s != "awaitingSignature" && s != "submitted" },
+    	2*time.Minute,
+    )
     page, err := northwind.Get("/transactions", hevn.Query{"limit": "5"})
-    rows := page.List("items")
     ```
 
     </CodeGroup>
 
-    A row carries its amounts as two sides — `from` is what left the source, `to` is what arrived —
-    rather than a single `amount`. On this payout both are `1.000000 USDC`.
+    ```json Response
+    { "status": "settled", "transactionHash": "0x3a77…" }
+    ```
 
-    The 5 USDC that left in step 8 is there with its `txHash`, and the same 5 USDC are now in your
-    own account's balance — read it with the balance call from step 5, with `$HEVN_USER_ID` in
-    `X-Hevn-Account`.
+    The ledger row carries its amounts as two sides — `from` is what left the source, `to` is what
+    arrived — rather than a single `amount`. On this payout both are `1.000000 USDC`, and the same
+    1 USDC is now in your own account's balance: read it with the balance call from step 7, with
+    `$HEVN_USER_ID` in `X-Hevn-Account`.
   </Step>
 </Steps>
 
 ## What just happened
 
-- **Your key, not a password.** Login was a signature over a payload HEVN built, and the payout was
-  a second signature over an operation HEVN built. Neither exposes a secret you could leak twice.
-  See [Signing](/whitelabel/signing).
-- **The client is a real account.** It has its own wallet, its own ledger and its own legal identity —
-  you act for it with one header. See [Accounts and control](/whitelabel/accounts-and-control).
+- **Your customer owns the account.** They created it in the sign-in window with their own Google
+  sign-in, and allowed your product to act on it. You got a `cl_…` id, never their credentials.
+- **Your key logged you in; it never touched their money.** The payout was booked by you and signed by
+  the holder's own wallet. See [Accounts and control](/whitelabel/accounts-and-control).
 - **The money is real testnet money.** It moved on Base Sepolia; `transactionHash` is on chain.
-- **Every constant came out of an earlier response.** Client id, wallet address, contact id, approval
-  payload — nothing was invented.
+- **Every constant came out of an earlier response.** Client id, wallet address, contact id, payout
+  id — nothing was invented.
 - **One key was yours to choose:** the `Idempotency-Key`. It names the payment, so a retry is the
   same payment. See [Conventions](/whitelabel/conventions#idempotency-key).
 
 ## What this quickstart did not do
 
-It never touched fiat. Getting the client its own account details, and paying a bank account with a currency
-conversion, needs a client the partner has approved: the KYB document filled and its rail open. That is the next
-piece of work — [Onboard a client](/whitelabel/onboarding), then
+It skipped the server half of the sign-in: binding the session's `state` to the browser and keeping
+the client id in your own session. Do that before anything else — [Sign in with HEVN](/whitelabel/sign-in-with-hevn).
+
+It never touched fiat either. Getting the client its own account details, and paying a bank account with
+a currency conversion, needs a client the partner has approved: the KYB document filled and its rail open.
+That is the next piece of work — [Onboard a client](/whitelabel/onboarding), then
 [Virtual accounts](/whitelabel/virtual-accounts) and [Payouts](/whitelabel/payouts).
 
 <Card title="Next: Accounts and control" icon="shield" href="/whitelabel/accounts-and-control">
-  Who can move a client's money, and what happens if your key leaks.
+  Who owns a client account, and what your key can and cannot do.
 </Card>

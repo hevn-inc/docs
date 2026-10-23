@@ -28,13 +28,17 @@ stateDiagram-v2
 
 A `voided` or `reclaimed` deal can still be refunded, if something was captured before the hold was released.
 
-Every transition is one `POST /dapi/v1/escrow/{escrowId}/actions` that you sign with your developer key. You are the **operator** of every deal you create; escrow never takes `X-Hevn-Account`, because the caller is always you. It is one of two self-scoped families — the other is `POST /clients` and `GET /clients` — and both refuse the header the same way, with `400 account_scope_conflict` and `details.reason = "selfScopedRoute"`. See [Sessions](/whitelabel/sessions#acting-as-a-client).
+Every transition you drive is one `POST /dapi/v1/escrow/{escrowId}/actions` that you sign with your developer key, on your own wallet. You are the **operator** of every deal you create; escrow never takes `X-Hevn-Account`, because the caller is always you. Like `/clients*` and `/connect/sessions`, it refuses the header with `400 account_scope_conflict` and `details.reason = "selfScopedRoute"`. See [Sessions](/whitelabel/sessions#acting-as-a-client).
+
+<Warning>
+  The buyer approves a deal with their own key: the spend permission that lets you pull the money later lives on the buyer's wallet, and your key never signs there. The [sign-in window](/whitelabel/sign-in-with-hevn) does not offer escrow approvals yet, so `POST /dapi/v1/escrow` with a client linked through Sign in with HEVN as the buyer answers `403 account_not_controlled`. Talk to HEVN before you build on escrow. The rest of this page describes the deal and the operator actions as they work once the buyer has approved.
+</Warning>
 
 ## The states money is in
 
 A deal carries two amounts, and they are what you branch on:
 
-- **`capturableAmount`** — money out of the buyer's wallet, held in the contract, not yet paid to the seller. `capture` moves it to the seller, `void` returns it to the buyer, `reclaim` returns it after the hold window.
+- **`capturableAmount`** — money out of the buyer's wallet, held in the contract, not yet paid to the seller. `capture` moves it to the seller, `void` returns it to the buyer, and the buyer's own `reclaim` returns it after the hold window.
 - **`refundableAmount`** — money already paid to the seller that you can still send back. A refund leaves **your own** wallet, not the seller's, so keep a working balance in the deal's token.
 
 `status` is a label for the last thing that happened, not a decision input. Read **`availableActions`** — the server computes it from the amounts, the windows and what already landed on chain — and pick from it. A draft nobody approved in time has an empty `availableActions`; there is no `expired` status and nothing sweeps a stale deal.
@@ -45,11 +49,11 @@ Amounts are decimal strings in the token's major unit, rendered at the token's p
 
 | Party | Who | What they do |
 | --- | --- | --- |
-| Sender | one of your clients, the buyer | Their wallet funds the deal. They sign nothing: your key signs on their wallet. |
+| Sender | one of your clients, the buyer | Their wallet funds the deal. They approve its spend permission with their own key, and can reclaim an uncaptured hold after `holdUntil`. |
 | Receiver | another of your clients, the seller | Receives what you capture. |
-| Operator | you, the integrator | Authorize, charge, capture, void, refund and reclaim. Every action, one key. |
+| Operator | you, the integrator | Authorize, charge, capture, void and refund. Every one is signed by your key on your own wallet. |
 
-All three must be different accounts, and both parties must be clients you created. HEVN binds sender and receiver through the sub-user relationship that `POST /clients` writes, so only accounts you provisioned through this API qualify; an account you merely referred never does, and a stranger's account id answers `422 receiver_not_a_client` or `404 client_not_found`. The addresses are each party's Base smart wallet at creation time, and the deal is immutable: its terms are hashed into an on-chain payment record.
+All three must be different accounts, and both parties must be clients linked to you. HEVN binds sender and receiver through the relationship [Sign in with HEVN](/whitelabel/sign-in-with-hevn) writes; an account you merely referred never qualifies, and a stranger's account id answers `422 receiver_not_a_client` or `404 client_not_found`. The addresses are each party's Base smart wallet at creation time, and the deal is immutable: its terms are hashed into an on-chain payment record.
 
 ## The three windows
 
@@ -90,11 +94,11 @@ HEVN sponsors the gas for every action and charges nothing on top.
 
 ## Before you start
 
-- Both parties are clients of yours and are `ready` — see [Clients](/whitelabel/clients).
+- Both parties are clients linked to you and are `ready` — see [Clients](/whitelabel/clients).
 - Your account may operate escrow. HEVN enables that, in the sandbox as in production; nothing in the API grants it. Without it every escrow call is refused — see [Going live](/whitelabel/going-live#what-hevn-must-enable).
 - The buyer's wallet holds the token when you authorize, not when you create. Creating a deal moves nothing.
 - Call escrow with your own access token and **no** `X-Hevn-Account` — the header answers `400 account_scope_conflict` on every escrow route.
-- Your developer key still exists, holds the `escrow:sign` scope, and the call leaves an allowlisted source IP. All three are re-checked on every request, and again immediately before HEVN co-signs an action — see [Developer key](/whitelabel/developer-key#scopes).
+- Your developer key still exists and the call leaves an allowlisted source IP. Both are re-checked on every request, and again immediately before HEVN co-signs an action — see [Developer key](/whitelabel/developer-key#the-ip-allowlist).
 
 <IdempotencySnippet />
 
@@ -105,8 +109,8 @@ Every example below uses the client from [HTTP client](/whitelabel/reference/cli
 Order `A-1187`: Northwind Trading Ltd (`cl_7YQ2Kf3mN8`) buys 100 USDC of parts from Ardenne Fabrication SARL (`cl_2ABxR9dL4m`), and you take 2.5% when it ships.
 
 <Steps>
-  <Step title="Open the deal and approve the spend permission">
-    One call creates the deal and prepares the buyer's approval — the on-chain permission that lets you pull the money later. Confirm it with the **same** key the create carried; the response echoes it as `action.idempotencyKey`.
+  <Step title="Open the deal, and let the buyer approve it">
+    One call creates the deal and prepares the buyer's approval — the on-chain permission that lets you pull the money later. The response echoes the create's key as `action.idempotencyKey`. The approval is the buyer's to sign with their own key, not yours.
 
     <CodeGroup>
     ```python Python
@@ -119,11 +123,6 @@ Order `A-1187`: Northwind Trading Ltd (`cl_7YQ2Kf3mN8`) buys 100 USDC of parts f
         "feeBps": 250,
         "reference": {"orderId": "A-1187"},
     }, idempotency_key="order-A-1187")
-
-    approve = deal["action"]
-    signature = key.sign_payload(approve["approval"]["payload"])
-    hevn.post(f"/escrow/{deal['id']}/actions/{approve['idempotencyKey']}/confirm",
-              {"signature": signature})
     ```
 
     ```javascript Node
@@ -136,10 +135,6 @@ Order `A-1187`: Northwind Trading Ltd (`cl_7YQ2Kf3mN8`) buys 100 USDC of parts f
       feeBps: 250,
       reference: { orderId: "A-1187" },
     }, { idempotencyKey: "order-A-1187" });
-
-    const approve = deal.action;
-    const signature = key.signPayload(approve.approval.payload);
-    await hevn.post(`/escrow/${deal.id}/actions/${approve.idempotencyKey}/confirm`, { signature });
     ```
 
     ```go Go
@@ -152,10 +147,6 @@ Order `A-1187`: Northwind Trading Ltd (`cl_7YQ2Kf3mN8`) buys 100 USDC of parts f
     	"feeBps":    250,
     	"reference": hevn.Body{"orderId": "A-1187"},
     }, hevn.IdempotencyKey("order-A-1187"))
-
-    signature, err := key.SignPayload(deal.Str("action.approval.payload"))
-    _, err = api.Post("/escrow/"+deal.Str("id")+"/actions/"+
-    	deal.Str("action.idempotencyKey")+"/confirm", hevn.Body{"signature": signature})
     ```
     </CodeGroup>
 
@@ -179,7 +170,7 @@ Order `A-1187`: Northwind Trading Ltd (`cl_7YQ2Kf3mN8`) buys 100 USDC of parts f
     }
     ```
 
-    Nothing has moved. `availableActions` becomes `["authorize", "charge"]` once the approval lands on chain — if the confirm answers `202`, poll it to settlement first ([Escrow actions](/whitelabel/escrow-actions#confirming-an-action)).
+    Nothing has moved. `availableActions` becomes `["authorize", "charge"]` once the buyer's approval lands on chain; read the deal until it does.
   </Step>
 
   <Step title="Lock the buyer's funds in the contract">
@@ -271,9 +262,9 @@ Order `A-1187`: Northwind Trading Ltd (`cl_7YQ2Kf3mN8`) buys 100 USDC of parts f
 | Cancelled before you ship | `void` | The whole hold returns to the buyer. The deal ends `voided` and nothing was charged. |
 | Only part shipped | `capture` the shipped lines, then `void` the rest | The deal passes `partiallyCaptured` and ends `voided`, with the captured amount still refundable. |
 | Returned after delivery | `refund` | The amount leaves **your** wallet and reaches the buyer. `partiallyRefunded`, then `refunded`. |
-| You never captured | `reclaim`, after `holdUntil` | The hold returns to the buyer. You can run it for them; it keeps working even if your integrator profile is paused. |
+| You never captured | The buyer's own `reclaim`, after `holdUntil` | The hold returns to the buyer. It is not an action you send, and it keeps working even if your integrator profile is paused. |
 
-`void`, `refund` and `reclaim` keep working when your relationship with a client is paused or your profile is suspended, so held money is never stranded.
+`void` and `refund` keep working when your relationship with a client is paused or your profile is suspended, and so does the buyer's `reclaim`, so held money is never stranded.
 
 <Warning>
   A refund is paid by your own wallet, not out of the deal. If you owe refunds, keep a balance in the deal's token — an empty operator wallet turns `refund` into `409 simulation_failed`.

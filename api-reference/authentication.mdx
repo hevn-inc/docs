@@ -14,8 +14,8 @@ The access token is a short-lived JWT your backend mints for itself, and the onl
 audience is `platform`, it carries a `developer_key_id` claim, and `/dapi/v1` refuses anything else before routing —
 `401 unauthenticated` with no bearer, `403 forbidden` with `details.reason: "developerSessionRequired"` for an ordinary
 token or a refresh token on a business route. The refresh token, audience `platform-refresh`, is taken by
-`POST /auth/refresh` alone. The optional `x-api-key` the schema shows on every operation is an artefact of a shared
-dependency: an API key belongs to [remote transfers](/remote-transfers/overview) and cannot authenticate here at all.
+`POST /auth/refresh` alone. An API key belongs to [remote transfers](/remote-transfers/overview) and cannot
+authenticate here at all.
 
 This page is the reference summary. [Sessions](/whitelabel/sessions) is the same flow with runnable
 Python, Node and Go.
@@ -24,34 +24,27 @@ Python, Node and Go.
 
 | Credential | Where it lives | Lifetime | What it authorizes |
 | --- | --- | --- | --- |
-| **Developer key** — a P-256 keypair, `dk_…` | Your servers. HEVN stores only the public half | Until you delete it | Logging in without a browser, and signing money movement |
-| **Its allowlist and scopes** — fixed when the key is created | HEVN's database | The life of the key | Which source addresses may use it, and which routes a session from it may call |
+| **Developer key** — a P-256 keypair, `dk_…` | Your servers. HEVN stores only the public half | Until you delete it | Logging in without a browser, and signing money movement from your own account |
+| **Its allowlist** — fixed when the key is created | HEVN's database | The life of the key | Which source addresses may use it |
 | **Refresh token** (`platform-refresh`) | Your secret store | 60 days | Only `POST /auth/refresh` |
 | **Access token** (`platform`, carrying `developer_key_id`) | In memory | 60 minutes (`expiresIn: 3600`) | Every other operation |
 
 A key is created in the HEVN app, once per environment, not over the API — the browser generates the private half and
-shows it once, and the public half joins your account's signer in the same action. Creation fixes the **IP allowlist**
-and the **scopes**, neither of which can be edited afterwards, so rotation is create-then-delete rather than edit.
+shows it once, and the public half joins your account's signer in the same action. Creation fixes the **IP
+allowlist**, which cannot be edited afterwards, so rotation is create-then-delete rather than edit.
 Everything after that is code — see [Developer key](/whitelabel/developer-key).
 
-Every `/dapi/v1` request re-reads the key: it must still exist, the call must come from an address the allowlist
-covers, and the route must be one the key's scopes open. Deleting a key stops the sessions it already minted on their
+Every `/dapi/v1` request re-reads the key: it must still exist, and the call must come from an address the allowlist
+covers. Deleting a key stops the sessions it already minted on their
 next request, and the same checks run again on `POST /auth/refresh` and immediately before HEVN co-signs.
 
-## Scopes
+## What a session may sign
 
-Four scopes exist. A key holds the ones it was created with, and a route it lacks the scope for is `403 forbidden`
-with `details.requiredScope` and `details.scope`.
-
-| Scope | Operations it opens |
-| --- | --- |
-| `payout:sign` | `POST /payouts/{payoutId}/confirm` |
-| `escrow:sign` | `POST /escrow/{escrowId}/actions/{idempotencyKey}/confirm` |
-| `recipient:write` | `POST /contacts`, `PATCH /contacts/{contactId}`, `DELETE /contacts/{contactId}` |
-| `swap:sign` | Nothing today. No operation in this reference reads it |
-
-Every other operation is open to any platform session. A scope decides which routes the session may call; it puts no
-ceiling on the amounts those routes move.
+Every operation is open to any platform session. What the developer key may sign is fixed by whose wallet it is: a
+payout or swap from your own account and an operator action on your escrow deals, and nothing of a client's. A
+client's payout answers `authorization: "client"` and is approved by its holder in the sign-in window that
+`POST /connect/sessions` opens; confirming it with your key is `403 account_not_controlled`. See
+[Sign in with HEVN](/whitelabel/sign-in-with-hevn).
 
 ## Log in
 
@@ -114,10 +107,10 @@ Authorization: Bearer <accessToken>
 X-Hevn-Account: cl_7YQ2Kf3mN8
 ```
 
-Omit the header and most calls act on your integrator account. One token covers every client you control, so there is
+Omit the header and most calls act on your integrator account. One token covers every client linked to you, so there is
 nothing to cache per client. No operation names a client in its path any more, so the header is the only selector:
-`/client`, `/client/balance`, `/client/kyb` and `/client/kyb/complete` **require** it, `POST /clients`, `GET /clients`
-and every escrow route **refuse** it, and everything else takes it or leaves it. The table of which is which is in
+`/client`, `/client/balance`, `/client/kyb` and `/client/kyb/complete` **require** it, `POST /clients/link`,
+`GET /clients`, `POST /connect/sessions` and every escrow route **refuse** it, and everything else takes it or leaves it. The table of which is which is in
 [Sessions](/whitelabel/sessions#acting-as-a-client).
 
 Sending the header where it is refused is an error, not a silent no-op, and so is omitting it where it is required:
@@ -132,12 +125,13 @@ Sending the header where it is refused is an error, not a silent no-op, and so i
 
 ## Signing money movement
 
-A token is enough to read data and write metadata. Moving money additionally needs a signature from
-the developer key, because that key — not HEVN alone — can authorize a spend from a client wallet.
+A token is enough to read data, write metadata and book a client's payout. Moving money out of your own account
+additionally needs a signature from the developer key, because that key — not HEVN alone — can authorize a spend from
+your wallet.
 
 <Steps>
   <Step title="Prepare">
-    The opening call — `POST /payouts`, `POST /escrow`, `POST /escrow/{escrowId}/actions` —
+    The opening call — `POST /payouts`, `POST /swaps`, `POST /escrow/{escrowId}/actions` —
     prices the payment, books it, builds the on-chain operation and answers `approval.payload`
     plus a `debit` decoded from that operation.
   </Step>
@@ -152,12 +146,12 @@ the developer key, because that key — not HEVN alone — can authorize a spend
   </Step>
 </Steps>
 
-Approvals are short: 120 seconds for a payout, 60 seconds for an escrow action. HEVN re-checks the key, its scopes and
-your source IP immediately before it co-signs, so a key deleted between prepare and confirm fails the confirm with a
+Approvals are short: 120 seconds for a payout, 60 seconds for an escrow action. HEVN re-checks the key and your source
+IP immediately before it co-signs, so a key deleted between prepare and confirm fails the confirm with a
 `403`. The byte-level rules, the pitfalls and the retry table are in [Signing](/whitelabel/signing).
 
 <Warning>
-  The developer key can authorize a spend from every client wallet you control. Keep the private half
+  The developer key can authorize a spend from your own wallet and act on every client linked to you. Keep the private half
   in a secret manager, never in a browser, and rehearse
   [rotation](/whitelabel/developer-key#rotate-a-key) before you need it.
 </Warning>

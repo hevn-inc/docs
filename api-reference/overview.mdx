@@ -9,16 +9,17 @@ schema, request examples and an interactive playground. The API serves that docu
 `https://sandbox-api.hevn.finance/dapi/v1/docs` — so the running deployment is always the authority for a field.
 
 It is the machine-readable half of the [Whitelabel guide](/whitelabel/overview). The guide explains
-the model — your integrator account, the client accounts you create, the developer key that signs
-their money out. This reference is the exact contract for every call, and its groups follow the
-guide's order: log in, create a client, submit its verification, open a rail, move money, operate escrow.
+the model — your integrator account, the client accounts your customers link to it through Sign in with
+HEVN, the developer key that logs your backend in. This reference is the exact contract for every call, and its
+groups follow the guide's order: log in, link a client, submit its verification, open a rail, move money, operate
+escrow.
 
 <CardGroup cols={2}>
   <Card title="Whitelabel overview" icon="book-open" href="/whitelabel/overview">
     What you can build, and the object graph behind it.
   </Card>
   <Card title="Quickstart" icon="rocket" href="/whitelabel/quickstart">
-    Nine steps in the sandbox, from an empty account to money that moved on chain.
+    Ten steps in the sandbox, from an empty account to money that moved on chain.
   </Card>
 </CardGroup>
 
@@ -54,13 +55,12 @@ anything else — no bearer, an ordinary API token, or the `platform-refresh` to
 route, with `401 unauthenticated` or `403 forbidden` and `details.reason: "developerSessionRequired"`. Ordinary
 `/api/v1` routes refuse a platform token just as firmly, in the other direction.
 
-The schema shows an optional `x-api-key` parameter on every operation. That is an artefact of a shared dependency, not
-a credential: an API key belongs to [remote transfers](/remote-transfers/overview) and can never authenticate here, because the boundary
-refuses the request before the key is read.
+An API key belongs to [remote transfers](/remote-transfers/overview) and can never authenticate here, because the
+boundary refuses the request before the key is read.
 
 HEVN re-reads the developer key on every request: it must still exist, the request must arrive from an address inside
-the immutable allowlist set when the key was created, and the operation must be one the key's scopes open. A deleted
-key, a new egress IP or a missing scope is a `403` on every operation, whatever the token says — see
+the immutable allowlist set when the key was created. A deleted key or a new egress IP is a `403` on every operation,
+whatever the token says — see
 [Developer key](/whitelabel/developer-key).
 
 To act for one of your clients, send that client's id in a second header instead of minting a second
@@ -74,7 +74,7 @@ No operation names a client in its path; the header is the only selector, and op
 Most accept it and act on your own account when you omit it. The singular `/client`, `/client/balance`, `/client/kyb`
 and `/client/kyb/complete` **require** it — the spec marks it `required: true`, and omitting it is a
 `422 validation_failed` on a missing header, not a read of your own account. Operations that are about your own account
-by definition — `POST /clients`, `GET /clients` and all of **escrow** — refuse it with `400 account_scope_conflict` and
+by definition — `POST /clients/link`, `GET /clients`, `POST /connect/sessions` and all of **escrow** — refuse it with `400 account_scope_conflict` and
 `details.reason: "selfScopedRoute"`. The three under **auth** ignore it: a login has no account to act for yet. The
 full table is in [Sessions](/whitelabel/sessions#acting-as-a-client).
 
@@ -107,17 +107,17 @@ on none. All seven rules, in one page:
 
 ## Money movement is signed
 
-Reading data and writing metadata need only a token. Moving money needs a signature from your
-developer key, and every such operation is a pair: an opening call that prices and builds the
-operation and hands you an `approval.payload`, then a confirm that carries your signature over the
-decoded bytes of that payload.
+Reading data, writing metadata and booking a client's payout need only a token. Every money movement
+needs a signature from the wallet's owner:
 
-| What moves | Prepare | Confirm |
+| What moves | Prepare | Who signs, and where |
 | --- | --- | --- |
-| Fiat out over a bank rail, or USDC out on Base | `POST /payouts` | `POST /payouts/{payoutId}/confirm` |
-| An escrow deal or action | `POST /escrow`, `POST /escrow/{escrowId}/actions` | `POST /escrow/{escrowId}/actions/{idempotencyKey}/confirm` |
+| A client's payout, to a bank or a wallet | `POST /payouts` with `X-Hevn-Account` | The client's holder, in the sign-in window `POST /connect/sessions` opens |
+| A payout or swap from your own account | `POST /payouts`, `POST /swaps` | Your developer key: `POST /payouts/{payoutId}/confirm`, `POST /swaps/{swapId}/confirm` |
+| An escrow action you operate | `POST /escrow/{escrowId}/actions` | Your developer key: `POST /escrow/{escrowId}/actions/{idempotencyKey}/confirm` |
 
-One mechanism, described once in [Signing](/whitelabel/signing).
+The holder's side is [Sign in with HEVN](/whitelabel/sign-in-with-hevn); your key's side is one
+mechanism, described once in [Signing](/whitelabel/signing).
 
 <CardGroup cols={2}>
   <Card title="Authentication" icon="key-round" href="/api-reference/authentication">

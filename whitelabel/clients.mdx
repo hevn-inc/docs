@@ -1,110 +1,54 @@
 ---
 title: "Clients"
-description: "Create a client company with one call, poll it until it is usable, and keep the one id that identifies it forever."
+description: "Read a client linked through Sign in with HEVN, wait until it is usable, list your clients, and keep the one id that identifies each of them."
 ---
 
 import PollSnippet from "/snippets/poll.mdx";
 
-A client is a real HEVN account whose wallet your key controls. One call creates it; one id identifies it forever.
+A client is your customer's own HEVN account, linked to your integrator account through [Sign in with HEVN](/whitelabel/sign-in-with-hevn). You do not create it with an API call: the account holder creates it in the sign-in window, and `POST /dapi/v1/clients/link` hands you its id.
 
-<CodeGroup>
-
-```bash cURL
-curl -X POST "$HEVN_API/clients" \
-  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Northwind Trading Ltd","email":"ops@northwind.example","phone":"+13125550142"}'
-```
-
-```python Python
-client = hevn.post("/clients", {
-    "name": "Northwind Trading Ltd",
-    "email": "ops@northwind.example",
-    "phone": "+13125550142",
-})
-```
-
-```javascript Node
-const client = await hevn.post("/clients", {
-  name: "Northwind Trading Ltd",
-  email: "ops@northwind.example",
-  phone: "+13125550142",
-});
-```
-
-```go Go
-client, err := api.Post("/clients", hevn.Body{
-	"name":  "Northwind Trading Ltd",
-	"email": "ops@northwind.example",
-	"phone": "+13125550142",
-})
-```
-
-</CodeGroup>
-
-`201 Created`, `Location: /dapi/v1/client`:
-
-```json
+```json POST /dapi/v1/clients/link — 200
 {
   "id": "cl_7YQ2Kf3mN8",
-  "status": "provisioning",
-  "name": "Northwind Trading Ltd",
+  "status": "ready",
   "email": "ops@northwind.example",
-  "phone": "+13125550142",
+  "baseSmartWallet": "0x2f1c9a3b7e5d41c8a06f2d9b4e7c15839af0d6b2",
   "kybStatus": "notStarted",
   "createdAt": "2026-09-17T10:04:11Z",
   "pollUrl": "/dapi/v1/client"
 }
 ```
 
-`baseSmartWallet` is absent because it does not exist yet. Responses omit fields with no value, so an absent field and a null field are the same thing — see [conventions](/whitelabel/conventions).
+`email` is the address the holder signed in with. A newly created account has nothing else on it yet, so `name` and `phone` are usually absent: the company's identity goes into its [verification document](/whitelabel/onboarding), the phone in through `PATCH /dapi/v1/client`. Responses omit fields with no value, so an absent field and a null field are the same thing — see [conventions](/whitelabel/conventions).
 
-`pollUrl` carries no id. It is literally `/dapi/v1/client`, the singular route that reads whichever account `X-Hevn-Account` names — so a poller sends the new `cl_…` in that header rather than building a path from it.
-
-Examples use the client from [HTTP client](/whitelabel/reference/client). This page straddles the two account scopes: `POST /dapi/v1/clients` and `GET /dapi/v1/clients` are the collection **you** own and **refuse** `X-Hevn-Account` with `400 account_scope_conflict`, while `GET /dapi/v1/client` and `PATCH /dapi/v1/client` act on one client and **require** it. [Sessions](/whitelabel/sessions#acting-as-a-client) has the whole table.
-
-## The three fields
-
-<ParamField body="name" type="string" required>
-  The company's legal name. It becomes the client's account name and the legal name of its KYB subject, so you write it once and never again. Uniqueness is global across HEVN — a generic name answers `409 name_in_use`.
-</ParamField>
-
-<ParamField body="email" type="string" required>
-  The client's identity, lowercased server-side. HEVN sends no mail to this address: the account's own seat is an administrator seat, and administrators are not mail recipients. Treat it as an identifier and as your recovery key for a lost response.
-</ParamField>
-
-<ParamField body="phone" type="string">
-  E.164, for example `+13125550142`. Optional here and required later: every rail a company opens checks for a phone number on the account. Passing it at creation is the difference between opening a rail in one call and opening it in two.
-</ParamField>
+Examples use the client from [HTTP client](/whitelabel/reference/client). This page straddles the two account scopes: `POST /dapi/v1/clients/link` and `GET /dapi/v1/clients` are about **your** account and **refuse** `X-Hevn-Account` with `400 account_scope_conflict`, while `GET /dapi/v1/client` and `PATCH /dapi/v1/client` act on one client and **require** it. [Sessions](/whitelabel/sessions#acting-as-a-client) has the whole table.
 
 ## Three statuses
 
 ```mermaid
 stateDiagram-v2
-    [*] --> provisioning: POST /dapi/v1/clients
+    [*] --> provisioning: account created in the sign-in window
     provisioning --> ready: smart wallet deployed
     provisioning --> failed: provisioning refused
 
     note right of provisioning
         Poll GET /dapi/v1/client every 2 s,
         with the id in X-Hevn-Account.
-        Expect ready in about 30 seconds.
     end note
     note right of ready
-        The user row, the owner seat, the KYB subject
+        The account, your seat on it, the KYB subject
         and the Base smart wallet all exist.
     end note
     note right of failed
-        The id and the email stay taken.
         Contact support with the client id.
     end note
 ```
 
-`ready` means usable. It is the only signal you need before you write the client's KYB document, open a rail for it or move its money.
+`ready` means usable. It is the only signal you need before you write the client's KYB document, open a rail for it or book its payouts. A client the window just created is usually `ready` by the time you exchange the code; when it is still `provisioning`, wait for it.
 
 ## Wait until it is ready
 
-Read the client until its status changes. `pollUrl` on the create response is the path, and the id you were given goes in `X-Hevn-Account`.
+`pollUrl` carries no id. It is literally `/dapi/v1/client`, the singular route that reads whichever account `X-Hevn-Account` names — so a poller sends the `cl_…` in that header rather than building a path from it.
 
 <PollSnippet />
 
@@ -141,80 +85,37 @@ ready, err := hevn.PollUntil(func() (hevn.Payload, error) {
 
 </CodeGroup>
 
-A `ready` client carries the address that holds its money:
-
-```json
-{
-  "id": "cl_7YQ2Kf3mN8",
-  "status": "ready",
-  "name": "Northwind Trading Ltd",
-  "email": "ops@northwind.example",
-  "phone": "+13125550142",
-  "baseSmartWallet": "0x2f1c9a3b7e5d41c8a06f2d9b4e7c15839af0d6b2",
-  "kybStatus": "notStarted",
-  "createdAt": "2026-09-17T10:04:11Z"
-}
-```
-
-There is one id to store. `cl_7YQ2Kf3mN8` is what you put in `X-Hevn-Account`: to read this client, to write its KYB document, and to act for it on every money route. Nothing takes it in a path. `baseSmartWallet` is the address that holds its balance; keep it for your own reconciliation, but no call takes it as an argument.
-
-`Idempotency-Key` is accepted on the create and is not needed: an identical retry replays rather than creating a second company, and an open request for the same email is deduplicated whether you sent a key or not.
+There is one id to store. `cl_7YQ2Kf3mN8` is what you put in `X-Hevn-Account`: to read this client, to write its KYB document, and to act for it on every money route. Nothing takes it in a path. Keep it in your own records against your own user, server-side — never accept it from a browser, where any page could substitute another customer's id. `baseSmartWallet` is the address that holds the client's balance; keep it for your own reconciliation, but no call takes it as an argument.
 
 `kybStatus` follows the client's verification from here on — `notStarted`, then `pending`, `approved`, `rfi` or `rejected` — and `kybApplicationId` names the latest submission behind it. [Onboarding](/whitelabel/onboarding) owns that vocabulary; this row is where you read it without a second call.
 
-## If provisioning fails
+A `failed` client answers with a `failure` object whose `code` is `provisioning_failed`, `request_rejected` or `request_canceled`. Contact support with the client id.
 
-A `failed` client answers with a `failure` object and stays in your list:
-
-```json
-{
-  "id": "cl_7YQ2Kf3mN8",
-  "status": "failed",
-  "failure": {
-    "code": "provisioning_failed",
-    "message": "Provisioning this client did not complete. Contact support with the client id.",
-    "retriable": false
-  }
-}
-```
-
-The codes are `provisioning_failed`, `request_rejected` and `request_canceled`. The id and the email stay taken in all three cases, so re-sending the same body answers `409 email_in_use` rather than starting over. Contact support with the client id.
-
-## Recover a lost response
-
-The email is the recovery key. If a create call timed out and you never saw the id, ask for it back instead of creating a second company:
+## List your clients
 
 <CodeGroup>
 
 ```bash cURL
-curl "$HEVN_API/clients?email=ops@northwind.example" \
+curl "$HEVN_API/clients?status=ready" \
   -H "Authorization: Bearer $HEVN_ACCESS_TOKEN"
 ```
 
 ```python Python
-found = hevn.get("/clients", {"email": "ops@northwind.example"})["items"]
+mine = hevn.get("/clients", {"status": "ready"})["items"]
 ```
 
 ```javascript Node
-const { items: found } = await hevn.get("/clients", { email: "ops@northwind.example" });
+const { items: mine } = await hevn.get("/clients", { status: "ready" });
 ```
 
 ```go Go
-page, err := api.Get("/clients", hevn.Query{"email": "ops@northwind.example"})
-found := page.List("items")
+page, err := api.Get("/clients", hevn.Query{"status": "ready"})
+mine := page.List("items")
 ```
 
 </CodeGroup>
 
-`GET /dapi/v1/clients` answers `{ "items": [...], "nextCursor": "..." }`, newest first, and includes clients that are still provisioning. It also takes `status` (`provisioning`, `ready`, `failed`) and cursor pagination. Re-sending an identical create body while the first request is still open replays it and answers `200` with `Idempotency-Replayed: true` and the same id; a different `name` or `phone` for the same open email answers `409 client_request_conflict`.
-
-## Creating clients at scale
-
-Two things bite when you onboard in bulk rather than one at a time.
-
-The first is `name`. Uniqueness is global across HEVN, not per integrator, so a generic trading name will eventually answer `409 name_in_use` against a company that is not yours. Send the registered legal name, including its suffix — `Northwind Trading Ltd`, not `Northwind` — and treat the 409 as a signal to ask your customer for the exact name on their certificate, not as a reason to append a number.
-
-The second is concurrency. Client creation is a queued operation; `ready` arrives in roughly 30 seconds under normal load and there is no ordering guarantee between two creates. Poll each client independently rather than waiting for a batch, and do not hold a request open waiting for the wallet.
+`GET /dapi/v1/clients` answers `{ "items": [...], "nextCursor": "..." }`, every account connected to you, newest first. It takes `status` (`provisioning`, `ready`, `failed`), `email` as an exact, lowercased match, and cursor pagination. It is the place to recover an id you lost: a holder who signs in again through the window also gives you a fresh code for the same client.
 
 ## Update the phone and the address
 
@@ -244,13 +145,13 @@ patched, err := api.ActingAs(clientID).Patch("/client", hevn.Body{"phone": "+131
 
 </CodeGroup>
 
-`address` takes `streetAddress`, `addressLine2`, `city`, `state` and `zip`. Only the keys you send are written.
+`phone` is E.164, for example `+13125550142`. Every rail a company opens checks for a phone number on the account, so set it before you [open one](/whitelabel/virtual-accounts). `address` takes `streetAddress`, `addressLine2`, `city`, `state` and `zip`. Only the keys you send are written.
 
 Everything else a company has to tell HEVN is verification data and belongs in its KYB document. The address country is frozen at registration; changing a locked field answers `409 profile_locked` with `details.fields`.
 
-## What your key can do with a client
+## What you can do with a client
 
-Your developer key is the only key on your side that can authorize a spend from this client's wallet — HEVN co-signs the operation it built, and neither signature alone is a quorum. The client has no signer of its own and no login. That is the whole point of the whitelabel model, and it is the one thing to be deliberate about before you create your first client in production — see [accounts and control](/whitelabel/accounts-and-control).
+Linking gives your integrator account a seat on the client's account. With it you read and write everything a finance team would set up — the verification document, rails, contacts, payins, the ledger — and you **book** payouts. You never **sign** them: the account holder's own key is the only one that can spend from their wallet, and they approve each payout in the [sign-in window](/whitelabel/sign-in-with-hevn#approve-a-payout). Your developer key has no power over the client's money at all. That is the whole point of the model — see [accounts and control](/whitelabel/accounts-and-control).
 
 <Card title="Next: Onboard a client" icon="arrow-right" href="/whitelabel/onboarding">
   Fill the KYB document, upload its papers, submit, and answer an RFI.

@@ -1,6 +1,6 @@
 ---
 title: "Payouts"
-description: "Price and book a payout in one call, sign it in the next, and track it to settlement — to a bank account or to a wallet."
+description: "Price and book a payout in one call, have the account holder approve it in the sign-in window, and track it to settlement — to a bank account or to a wallet."
 ---
 
 import ActingAsSnippet from "/snippets/acting-as.mdx";
@@ -10,7 +10,7 @@ import PollSnippet from "/snippets/poll.mdx";
 import SandboxCapsSnippet from "/snippets/sandbox-caps.mdx";
 import SignPayloadSnippet from "/snippets/sign-payload.mdx";
 
-Two calls move money: `POST /dapi/v1/payouts` prices and books it, `POST /dapi/v1/payouts/{payoutId}/confirm` signs it. One resource pays a bank account and a wallet alike — the contact decides which route runs, and you never pick. You pin one side of the payment and HEVN derives the other; the side you sent is never recalculated.
+One resource pays a bank account and a wallet alike — the contact decides which route runs, and you never pick. You pin one side of the payment and HEVN derives the other; the side you sent is never recalculated. Who signs depends on whose money it is: a client's payout is approved by its holder in the [sign-in window](/whitelabel/sign-in-with-hevn), and a payout from your own account is signed by your developer key.
 
 <CodeGroup>
 ```python Python
@@ -19,12 +19,15 @@ northwind = hevn.acting_as(CLIENT_ID)
 payout = northwind.post("/payouts", {
     "contactId": "ct_3K9…",
     "amount": "500.00",
-    "publicKey": key.public_key,
     "paymentReference": "INV-2026-114",
 }, idempotency_key="order-A-1187")
 
-signature = key.sign_payload(payout["approval"]["payload"])
-receipt = northwind.confirm_until_settled(f"/payouts/{payout['id']}/confirm", signature)
+session = hevn.post("/connect/sessions", {
+    "action": "sign",
+    "payoutId": payout["id"],
+    "redirectUri": "https://app.example.com/hevn/callback",
+})
+# hand session["url"] to the browser; the holder approves it in the popup
 ```
 
 ```javascript Node
@@ -33,12 +36,15 @@ const northwind = hevn.actingAs(clientId);
 const payout = await northwind.post("/payouts", {
   contactId: "ct_3K9…",
   amount: "500.00",
-  publicKey: key.publicKey,
   paymentReference: "INV-2026-114",
 }, { idempotencyKey: "order-A-1187" });
 
-const signature = key.signPayload(payout.approval.payload);
-const receipt = await northwind.confirmUntilSettled(`/payouts/${payout.id}/confirm`, signature);
+const session = await hevn.post("/connect/sessions", {
+  action: "sign",
+  payoutId: payout.id,
+  redirectUri: "https://app.example.com/hevn/callback",
+});
+// hand session.url to the browser; the holder approves it in the popup
 ```
 
 ```go Go
@@ -47,12 +53,15 @@ northwind := api.ActingAs(clientID)
 payout, err := northwind.Post("/payouts", hevn.Body{
 	"contactId":        "ct_3K9…",
 	"amount":           "500.00",
-	"publicKey":        key.PublicKey,
 	"paymentReference": "INV-2026-114",
 }, hevn.IdempotencyKey("order-A-1187"))
 
-signature, err := key.SignPayload(payout.Str("approval.payload"))
-receipt, err := northwind.ConfirmUntilSettled("/payouts/"+payout.Str("id")+"/confirm", signature)
+session, err := api.Post("/connect/sessions", hevn.Body{
+	"action":      "sign",
+	"payoutId":    payout.Str("id"),
+	"redirectUri": "https://app.example.com/hevn/callback",
+})
+// hand session.Str("url") to the browser; the holder approves it in the popup
 ```
 </CodeGroup>
 
@@ -63,8 +72,8 @@ Examples use the client from [HTTP client](/whitelabel/reference/client). `actin
 ```mermaid
 stateDiagram-v2
     [*] --> awaitingSignature: POST /dapi/v1/payouts
-    awaitingSignature --> awaitingSignature: approval expired — re-open with the same key, at the same price
-    awaitingSignature --> submitted: POST /confirm with your signature
+    awaitingSignature --> submitted: the holder approves it in the sign-in window
+    awaitingSignature --> submitted: your account — POST /confirm with your signature
     submitted --> settled
     submitted --> failed: retry with POST /dapi/v1/payouts and the same Idempotency-Key
     settled --> refunded
@@ -151,197 +160,294 @@ Five decisions live here:
 
 Two optional reads price a payout before you book one. `GET /dapi/v1/contacts/{contactId}/capabilities?amount=500.00` reports one `options` row per payable account — `method`, `currency`, `minAmount`, `maxAmount`, `feeBps`, `fixedFee`, and whether `purpose`, a memo or documents are required; anything that would refuse a payout comes back in `blockers[]` ([Errors](/whitelabel/reference/errors) has the codes). `POST /dapi/v1/payouts/preview` takes `{"rail", "amount"}` and prices a **rail** with no contact and no side effects. Neither is a gate: `POST /dapi/v1/payouts` refuses the same cases on its own, and its numbers are the ones you are held to.
 
-## Move the money
+## Book the payout
 
-<Steps>
-  <Step title="Price and book the payout">
-    One call quotes the payout, books it with the partner, and prepares the operation you sign.
+One call quotes the payout, books it with the partner, and prepares what has to be signed.
 
-    <CodeGroup>
-    ```bash cURL
-    curl -s -X POST "$HEVN_API/payouts" \
-      -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
-      -H "X-Hevn-Account: $HEVN_CLIENT_ID" \
-      -H "Idempotency-Key: order-A-1187" \
-      -H "Content-Type: application/json" \
-      -d '{"contactId":"ct_3K9…","amount":"500.00",
-           "publicKey":"'"$HEVN_PUBLIC_KEY"'","paymentReference":"INV-2026-114"}'
-    ```
+<CodeGroup>
+```bash cURL
+curl -s -X POST "$HEVN_API/payouts" \
+  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+  -H "X-Hevn-Account: $HEVN_CLIENT_ID" \
+  -H "Idempotency-Key: order-A-1187" \
+  -H "Content-Type: application/json" \
+  -d '{"contactId":"ct_3K9…","amount":"500.00","paymentReference":"INV-2026-114"}'
+```
 
-    ```python Python
-    payout = northwind.post("/payouts", {
-        "contactId": contact["id"],
-        "amount": "500.00",
-        "publicKey": key.public_key,
-        "paymentReference": "INV-2026-114",
-    }, idempotency_key="order-A-1187")
-    ```
+```python Python
+payout = northwind.post("/payouts", {
+    "contactId": contact["id"],
+    "amount": "500.00",
+    "paymentReference": "INV-2026-114",
+}, idempotency_key="order-A-1187")
+```
 
-    ```javascript Node
-    const payout = await northwind.post("/payouts", {
-      contactId: contact.id,
-      amount: "500.00",
-      publicKey: key.publicKey,
-      paymentReference: "INV-2026-114",
-    }, { idempotencyKey: "order-A-1187" });
-    ```
+```javascript Node
+const payout = await northwind.post("/payouts", {
+  contactId: contact.id,
+  amount: "500.00",
+  paymentReference: "INV-2026-114",
+}, { idempotencyKey: "order-A-1187" });
+```
 
-    ```go Go
-    payout, err := northwind.Post("/payouts", hevn.Body{
-    	"contactId":        contact.Str("id"),
-    	"amount":           "500.00",
-    	"publicKey":        key.PublicKey,
-    	"paymentReference": "INV-2026-114",
-    }, hevn.IdempotencyKey("order-A-1187"))
-    ```
-    </CodeGroup>
+```go Go
+payout, err := northwind.Post("/payouts", hevn.Body{
+	"contactId":        contact.Str("id"),
+	"amount":           "500.00",
+	"paymentReference": "INV-2026-114",
+}, hevn.IdempotencyKey("order-A-1187"))
+```
+</CodeGroup>
 
-    ```json Response — 201, Location: /dapi/v1/payouts/po_4c8a…
-    {
-      "id": "po_4c8a…",
-      "kind": "fiat",
-      "status": "awaitingSignature",
-      "idempotencyKey": "order-A-1187",
-      "quote": { "fromAmount": "500.00", "fromCurrency": "USD", "sourceAccount": "USDC",
-                 "toAmount": "459.31", "toCurrency": "EUR",
-                 "rate": "0.9247", "feeAmount": "1.00", "feeCurrency": "USD",
-                 "expiresAt": "2026-09-17T10:06:11Z" },
-      "approval": { "id": "…", "payload": "eyJ…", "expiresAt": "2026-09-17T10:06:10Z" },
-      "debit": { "address": "0x8f3b…", "amount": "500.00", "amountAtomic": "500000000",
-                 "token": "USDC", "chainId": 8453 },
-      "contact": { "contactId": "ct_3K9…", "name": "Ardenne Fabrication SARL" }
-    }
-    ```
+```json Response — 201, Location: /dapi/v1/payouts/po_4c8a…
+{
+  "id": "po_4c8a…",
+  "kind": "fiat",
+  "status": "awaitingSignature",
+  "idempotencyKey": "order-A-1187",
+  "quote": { "fromAmount": "500.00", "fromCurrency": "USD", "sourceAccount": "USDC",
+             "toAmount": "459.31", "toCurrency": "EUR",
+             "rate": "0.9247", "feeAmount": "1.00", "feeCurrency": "USD",
+             "expiresAt": "2026-09-17T10:06:11Z" },
+  "authorization": "client",
+  "contact": { "contactId": "ct_3K9…", "name": "Ardenne Fabrication SARL" }
+}
+```
 
-    | Decision | Field |
-    | --- | --- |
-    | Which side of the conversion you pin | `amount` is what leaves the client's balance, `amountTo` is what the beneficiary receives. Send exactly one. HEVN never adjusts the side you sent — it derives the other one through the partner's own fee formula. |
-    | Which of your keys will sign | `publicKey`. A real choice while you rotate keys, which is why it is on the opening call and not on confirm. |
-    | What the beneficiary sees | `paymentReference`, up to 140 characters. |
-    | What the destination rail demands | `purpose` when `capabilities` reports `purposeRequired`, and up to ten `documentIds` from [document upload](/whitelabel/onboarding) when it reports `documentsRequired`. |
-    | Which of several accounts to pay | `bankId` (`bnk_…`), the same id `capabilities` returns on each option, when a contact has more than one. Omit it and HEVN picks the account `capabilities` would pick. |
-    | Which account pays for it | `sourceAccount`, `USDC` (the default), `EURC` or `FDIC_USD`. The first two debit the client's wallet; `FDIC_USD` spends the custodial dollar balance and is authorized differently (see below). A wallet contact must be able to receive what you name: asking to pay a USDC address from `EURC` is refused with `400`, and so is an account the rail cannot be funded with. |
+`authorization: "client"` means the account holder signs this payout, so the response carries no `approval` and no `debit`: there is nothing for your key to sign, and `publicKey` is not needed. Show your customer the `quote` and the `contact`, then send them to the window.
 
-    Amounts are decimal strings in the major unit — `"500.00"`, never `500` and never atomic units. More precision than the asset allows is refused, never rounded ([Conventions](/whitelabel/conventions#money)).
+| Decision | Field |
+| --- | --- |
+| Which side of the conversion you pin | `amount` is what leaves the client's balance, `amountTo` is what the beneficiary receives. Send exactly one. HEVN never adjusts the side you sent — it derives the other one through the partner's own fee formula. |
+| What the beneficiary sees | `paymentReference`, up to 140 characters. |
+| What the destination rail demands | `purpose` when `capabilities` reports `purposeRequired`, and up to ten `documentIds` from [document upload](/whitelabel/onboarding) when it reports `documentsRequired`. |
+| Which of several accounts to pay | `bankId` (`bnk_…`), the same id `capabilities` returns on each option, when a contact has more than one. Omit it and HEVN picks the account `capabilities` would pick. |
+| Which account pays for it | `sourceAccount`, `USDC` (the default) or `EURC`, both debited from the client's wallet. A wallet contact must be able to receive what you name: asking to pay a USDC address from `EURC` is refused with `400`, and so is an account the rail cannot be funded with. `FDIC_USD` is [not available to a client yet](#pay-out-of-the-custodial-balance). |
+| Which of your keys signs | `publicKey` — only on a payout from [your own account](#pay-from-your-own-account). |
 
-    `quote.sourceAccount` is the account the payout is actually paid from. Read the account from it, not from `fromCurrency`: `fromCurrency` is the currency the partner prices the debit in, and a partner prices a `USDC` debit and an `FDIC_USD` debit alike in `USD`.
-  </Step>
+Amounts are decimal strings in the major unit — `"500.00"`, never `500` and never atomic units. More precision than the asset allows is refused, never rounded ([Conventions](/whitelabel/conventions#money)).
 
-  <Step title="Check the debit, then sign">
-    `debit` is not an echo of your request. It is decoded out of the [operation you are about to sign](/whitelabel/signing): `address` is the funding address for this payout, `amount` and `amountAtomic` are what will leave the client's wallet, in `token` on chain `chainId`. Compare it against your own record and raise if it drifted — this is the one cross-check a signer has.
+`quote.sourceAccount` is the account the payout is actually paid from. Read the account from it, not from `fromCurrency`: `fromCurrency` is the currency the partner prices the debit in, and a partner prices a `USDC` debit and an `FDIC_USD` debit alike in `USD`.
 
-    <SignPayloadSnippet />
+## Approve it in the sign-in window
 
-    Then confirm. The body is the signature over the **decoded** `approval.payload` bytes:
+Create a `sign` session for the payout and open the popup from your page, as described in [Sign in with HEVN](/whitelabel/sign-in-with-hevn#approve-a-payout). The session must name a payout of a client linked to you that is still `awaitingSignature`.
 
-    <CodeGroup>
-    ```python Python
-    if payout["debit"]["amount"] != order.usdc_total or payout["debit"]["token"] != "USDC":
-        raise DebitDrift(payout["id"], payout["debit"])
+<CodeGroup>
+```bash cURL
+curl -s -X POST "$HEVN_API/connect/sessions" \
+  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"action":"sign","payoutId":"po_4c8a…","redirectUri":"https://app.example.com/hevn/callback"}'
+```
 
-    signature = key.sign_payload(payout["approval"]["payload"])
-    receipt = northwind.post(f"/payouts/{payout['id']}/confirm", {"signature": signature})
-    ```
+```python Python
+session = hevn.post("/connect/sessions", {
+    "action": "sign",
+    "payoutId": payout["id"],
+    "redirectUri": "https://app.example.com/hevn/callback",
+})
+```
 
-    ```javascript Node
-    if (payout.debit.amount !== order.usdcTotal || payout.debit.token !== "USDC") {
-      throw new DebitDrift(payout.id, payout.debit);
-    }
-    const signature = key.signPayload(payout.approval.payload);
-    const receipt = await northwind.post(`/payouts/${payout.id}/confirm`, { signature });
-    ```
+```javascript Node
+const session = await hevn.post("/connect/sessions", {
+  action: "sign",
+  payoutId: payout.id,
+  redirectUri: "https://app.example.com/hevn/callback",
+});
+```
 
-    ```go Go
-    if payout.Str("debit.amount") != order.USDCTotal || payout.Str("debit.token") != "USDC" {
-    	return fmt.Errorf("debit drift on %s", payout.Str("id"))
-    }
-    signature, err := key.SignPayload(payout.Str("approval.payload"))
-    receipt, err := northwind.Post("/payouts/"+payout.Str("id")+"/confirm",
-    	hevn.Body{"signature": signature})
-    ```
-    </CodeGroup>
+```go Go
+session, err := api.Post("/connect/sessions", hevn.Body{
+	"action":      "sign",
+	"payoutId":    payout.Str("id"),
+	"redirectUri": "https://app.example.com/hevn/callback",
+})
+```
+</CodeGroup>
 
-    ```json Response — 200
-    { "id": "po_4c8a…", "kind": "fiat", "status": "settled",
-      "transactionHash": "0x4f1c…" }
-    ```
+The session is created with your own token and no `X-Hevn-Account`. In the window the holder signs in, sees the amount, the contact's name and your product's name, and their own wallet signs the debit. Your callback page receives `status=submitted` and `payout=po_…`; read the payout from your server for anything you act on.
 
-    Three answers are possible, and all three are terminal for the call:
+Two things are different from a payout you sign yourself:
 
-    | Status | Body | What it means |
-    | --- | --- | --- |
-    | `200` | `status: "settled"`, `transactionHash` | The debit landed on chain and the payout is with the partner. |
-    | `200` | `status: "failed"`, `transactionHash`, `failure.code` | The operation reverted on chain. Nothing moved. Book it again with `POST /dapi/v1/payouts` and the same `Idempotency-Key`. |
-    | `202` | `status: "submitted"`, `pollUrl` | Sent, no receipt yet. Read `pollUrl` or confirm again — both are safe. |
+- **There is no approval window to race.** The window session lives for about ten minutes. Open it right after you book: a routed payout's price expires with its quote, and the window then answers `unsupported`.
+- **A declined or abandoned window changes nothing.** The payout stays `awaitingSignature` and nothing moved. Create a new `sign` session to ask again; the payout is the same `po_…`.
 
-    `publicKey` is optional in the confirm body and only skips a key scan: HEVN verifies your signature locally, against the payload it stored, before it consumes anything. A wrong signature never burns the approval.
+## Track it to completion
 
-    Confirm needs the `payout:sign` scope. A key without it answers `403 forbidden` with `details.requiredScope`, before the signature is read and before anything is consumed — see [Developer key](/whitelabel/developer-key#scopes).
-  </Step>
+`GET /dapi/v1/payouts/{payoutId}` answers for the whole lifecycle, bank and wallet alike, and it is the route a `pollUrl` names. `contact` on the read is the snapshot fixed when the payout was booked, not a live read of the contact record.
 
-  <Step title="Track it to completion">
-    `GET /dapi/v1/payouts/{payoutId}` answers for the whole lifecycle, bank and wallet alike, and it is the route a `pollUrl` names. `contact` on the read is the snapshot fixed when the payout was booked, not a live read of the contact record.
+```json Response — 200
+{ "id": "po_4c8a…", "kind": "fiat", "status": "settled",
+  "quote": { "fromAmount": "500.00", "fromCurrency": "USD", "sourceAccount": "USDC",
+             "toAmount": "459.31", "toCurrency": "EUR", "rate": "0.9247" },
+  "transactionHash": "0x4f1c…", "transactionId": "txn_9e4…",
+  "contact": { "contactId": "ct_3K9…", "name": "Ardenne Fabrication SARL" },
+  "paymentReference": "INV-2026-114",
+  "createdAt": "2026-09-17T10:04:11Z", "settledAt": "2026-09-17T10:04:39Z" }
+```
 
-    ```json Response — 200
-    { "id": "po_4c8a…", "kind": "fiat", "status": "settled",
-      "quote": { "fromAmount": "500.00", "fromCurrency": "USD", "sourceAccount": "USDC",
-                 "toAmount": "459.31", "toCurrency": "EUR", "rate": "0.9247" },
-      "transactionHash": "0x4f1c…", "transactionId": "txn_9e4…",
-      "contact": { "contactId": "ct_3K9…", "name": "Ardenne Fabrication SARL" },
-      "paymentReference": "INV-2026-114",
-      "createdAt": "2026-09-17T10:04:11Z", "settledAt": "2026-09-17T10:04:39Z" }
-    ```
+| `status` | Meaning |
+| --- | --- |
+| `awaitingSignature` | Booked and priced. Nobody has signed it yet and nothing has moved. |
+| `submitted` | The funding operation was sent, or the partner is holding the transfer for a question (see `attention` below). |
+| `settled` | The debit landed and the partner accepted the payout. Delivery to the beneficiary's bank follows the rail's own clock. |
+| `failed` | The operation reverted, or the partner refused or canceled the transfer. `failure.code` says which. |
+| `refunded` | The partner sent the money back. It returns to the client's wallet. |
 
-    | `status` | Meaning |
-    | --- | --- |
-    | `awaitingSignature` | Booked and priced. The approval is open and nothing has moved. |
-    | `submitted` | The funding operation was sent, or the partner is holding the transfer for a question (see `attention` below). |
-    | `settled` | The debit landed and the partner accepted the payout. Delivery to the beneficiary's bank follows the rail's own clock. |
-    | `failed` | The operation reverted, or the partner refused or canceled the transfer. `failure.code` says which. |
-    | `refunded` | The partner sent the money back. It returns to the client's wallet. |
+`transactionId` appears once the payout is projected into the client's ledger; read it with `GET /dapi/v1/transactions/{transactionId}` ([Balances and transactions](/whitelabel/balances-and-transactions)). `attention: {"kind": "rfi", "url": …}` means the partner is holding the transfer pending an information request — the payout is not lost, and nothing anyone signs will move it until the request is answered.
 
-    `transactionId` appears once the payout is projected into the client's ledger; read it with `GET /dapi/v1/transactions/{transactionId}` ([Balances and transactions](/whitelabel/balances-and-transactions)). `attention: {"kind": "rfi", "url": …}` means the partner is holding the transfer pending an information request — the payout is not lost, and nothing you sign will move it until the request is answered.
+<PollSnippet />
 
-    <PollSnippet />
-  </Step>
-</Steps>
+## Pay from your own account
+
+A payout from your integrator account — no `X-Hevn-Account`, or your own `cl_…` in it — is signed by your developer key. Name the key in `publicKey`, and the response carries the approval to sign:
+
+<CodeGroup>
+```bash cURL
+curl -s -X POST "$HEVN_API/payouts" \
+  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+  -H "Idempotency-Key: treasury-2026-09-17" \
+  -H "Content-Type: application/json" \
+  -d '{"contactId":"ct_3K9…","amount":"500.00",
+       "publicKey":"'"$HEVN_PUBLIC_KEY"'","paymentReference":"INV-2026-114"}'
+```
+
+```python Python
+payout = hevn.post("/payouts", {
+    "contactId": contact["id"],
+    "amount": "500.00",
+    "publicKey": key.public_key,
+    "paymentReference": "INV-2026-114",
+}, idempotency_key="treasury-2026-09-17")
+```
+
+```javascript Node
+const payout = await hevn.post("/payouts", {
+  contactId: contact.id,
+  amount: "500.00",
+  publicKey: key.publicKey,
+  paymentReference: "INV-2026-114",
+}, { idempotencyKey: "treasury-2026-09-17" });
+```
+
+```go Go
+payout, err := api.Post("/payouts", hevn.Body{
+	"contactId":        contact.Str("id"),
+	"amount":           "500.00",
+	"publicKey":        key.PublicKey,
+	"paymentReference": "INV-2026-114",
+}, hevn.IdempotencyKey("treasury-2026-09-17"))
+```
+</CodeGroup>
+
+```json Response — 201, Location: /dapi/v1/payouts/po_7e1b…
+{
+  "id": "po_7e1b…",
+  "kind": "fiat",
+  "status": "awaitingSignature",
+  "idempotencyKey": "treasury-2026-09-17",
+  "quote": { "fromAmount": "500.00", "fromCurrency": "USD", "sourceAccount": "USDC",
+             "toAmount": "459.31", "toCurrency": "EUR",
+             "rate": "0.9247", "feeAmount": "1.00", "feeCurrency": "USD",
+             "expiresAt": "2026-09-17T10:06:11Z" },
+  "authorization": "debit",
+  "approval": { "id": "…", "payload": "eyJ…", "expiresAt": "2026-09-17T10:06:10Z" },
+  "debit": { "address": "0x8f3b…", "amount": "500.00", "amountAtomic": "500000000",
+             "token": "USDC", "chainId": 8453 },
+  "contact": { "contactId": "ct_3K9…", "name": "Ardenne Fabrication SARL" }
+}
+```
+
+`publicKey` is required here, and it is a real choice while you rotate keys, which is why it is on the opening call and not on confirm. Leaving it out answers `422 validation_failed` with `details.field = "publicKey"`.
+
+`debit` is not an echo of your request. It is decoded out of the [operation you are about to sign](/whitelabel/signing): `address` is the funding address for this payout, `amount` and `amountAtomic` are what will leave your wallet, in `token` on chain `chainId`. Compare it against your own record and raise if it drifted — this is the one cross-check a signer has.
+
+<SignPayloadSnippet />
+
+Then confirm. The body is the signature over the **decoded** `approval.payload` bytes:
+
+<CodeGroup>
+```python Python
+if payout["debit"]["amount"] != order.usdc_total or payout["debit"]["token"] != "USDC":
+    raise DebitDrift(payout["id"], payout["debit"])
+
+signature = key.sign_payload(payout["approval"]["payload"])
+receipt = hevn.post(f"/payouts/{payout['id']}/confirm", {"signature": signature})
+```
+
+```javascript Node
+if (payout.debit.amount !== order.usdcTotal || payout.debit.token !== "USDC") {
+  throw new DebitDrift(payout.id, payout.debit);
+}
+const signature = key.signPayload(payout.approval.payload);
+const receipt = await hevn.post(`/payouts/${payout.id}/confirm`, { signature });
+```
+
+```go Go
+if payout.Str("debit.amount") != order.USDCTotal || payout.Str("debit.token") != "USDC" {
+	return fmt.Errorf("debit drift on %s", payout.Str("id"))
+}
+signature, err := key.SignPayload(payout.Str("approval.payload"))
+receipt, err := api.Post("/payouts/"+payout.Str("id")+"/confirm",
+	hevn.Body{"signature": signature})
+```
+</CodeGroup>
+
+```json Response — 200
+{ "id": "po_7e1b…", "kind": "fiat", "status": "settled",
+  "transactionHash": "0x4f1c…" }
+```
+
+Three answers are possible, and all three are terminal for the call:
+
+| Status | Body | What it means |
+| --- | --- | --- |
+| `200` | `status: "settled"`, `transactionHash` | The debit landed on chain and the payout is with the partner. |
+| `200` | `status: "failed"`, `transactionHash`, `failure.code` | The operation reverted on chain. Nothing moved. Book it again with `POST /dapi/v1/payouts` and the same `Idempotency-Key`. |
+| `202` | `status: "submitted"`, `pollUrl` | Sent, no receipt yet. Read `pollUrl` or confirm again — both are safe. |
+
+`publicKey` is optional in the confirm body and only skips a key scan: HEVN verifies your signature locally, against the payload it stored, before it consumes anything. A wrong signature never burns the approval. Confirming a client's payout answers `403 account_not_controlled`: a client's payout is never yours to sign.
 
 ## Pay a wallet instead of a bank
 
-There is one payout resource, and one mechanism behind it: every payout is a quote. `POST /dapi/v1/payouts` reads the contact and quotes it — a bank contact through a partner, a wallet contact on Base directly, a wallet contact on another chain across chains. Same body, same `approval.payload`, same confirm route, same `GET /dapi/v1/payouts/{payoutId}`.
+There is one payout resource, and one mechanism behind it: every payout is a quote. `POST /dapi/v1/payouts` reads the contact and quotes it — a bank contact through a partner, a wallet contact on Base directly, a wallet contact on another chain across chains. Same body, same `sign` session for a client, same `GET /dapi/v1/payouts/{payoutId}`.
 
 <CodeGroup>
 ```python Python
 payout = northwind.post("/payouts", {
     "contactId": "ct_9a…",
     "amount": "1.50",
-    "publicKey": key.public_key,
 }, idempotency_key="payout-A-1187-onchain")
 
-signature = key.sign_payload(payout["approval"]["payload"])
-receipt = northwind.confirm_until_settled(f"/payouts/{payout['id']}/confirm", signature)
+session = hevn.post("/connect/sessions", {
+    "action": "sign", "payoutId": payout["id"],
+    "redirectUri": "https://app.example.com/hevn/callback",
+})
 ```
 
 ```javascript Node
 const payout = await northwind.post("/payouts", {
   contactId: "ct_9a…",
   amount: "1.50",
-  publicKey: key.publicKey,
 }, { idempotencyKey: "payout-A-1187-onchain" });
 
-const signature = key.signPayload(payout.approval.payload);
-const receipt = await northwind.confirmUntilSettled(`/payouts/${payout.id}/confirm`, signature);
+const session = await hevn.post("/connect/sessions", {
+  action: "sign", payoutId: payout.id,
+  redirectUri: "https://app.example.com/hevn/callback",
+});
 ```
 
 ```go Go
 payout, err := northwind.Post("/payouts", hevn.Body{
 	"contactId": "ct_9a…",
 	"amount":    "1.50",
-	"publicKey": key.PublicKey,
 }, hevn.IdempotencyKey("payout-A-1187-onchain"))
 
-signature, err := key.SignPayload(payout.Str("approval.payload"))
-receipt, err := northwind.ConfirmUntilSettled("/payouts/"+payout.Str("id")+"/confirm", signature)
+session, err := api.Post("/connect/sessions", hevn.Body{
+	"action": "sign", "payoutId": payout.Str("id"),
+	"redirectUri": "https://app.example.com/hevn/callback",
+})
 ```
 </CodeGroup>
 
@@ -390,9 +496,7 @@ A wallet contact needs no postal address on file — the chain is the address. *
   "idempotencyKey": "payout-A-1187-onchain",
   "quote": { "fromAmount": "1.50", "fromCurrency": "USDC", "sourceAccount": "USDC",
              "toAmount": "1.50", "toCurrency": "USDC" },
-  "approval": { "id": "…", "payload": "eyJ…", "expiresAt": "2026-09-17T10:06:10Z" },
-  "debit": { "address": "0x7c1d…", "amount": "1.50", "amountAtomic": "1500000",
-             "token": "USDC", "chainId": 8453 },
+  "authorization": "client",
   "contact": { "contactId": "ct_9a…", "name": "Ardenne treasury",
                "address": "0x7c1d…", "chainId": "base", "token": "USDC" }
 }
@@ -402,7 +506,7 @@ A wallet contact needs no postal address on file — the chain is the address. *
 
 **`quote` carries no `rate`, no `feeAmount` and no `expiresAt`.** Nothing is converted and no partner priced anything, so those fields are absent rather than filled with `1` and `0`. `fromAmount` and `toAmount` are the same number because they are the same money.
 
-**`debit.address` is the contact's address**, not a funding address. There is no conversion and no intermediary, so the address decoded out of the operation is the address the USDC lands on. Compare it against the contact you meant to pay before you sign — same habit, same reason.
+**The debit pays the contact's address directly**, not a funding address. There is no conversion and no intermediary. On a payout from [your own account](#pay-from-your-own-account) that shows as `debit.address` equal to `contact.address`: compare it against the contact you meant to pay before you sign — same habit, same reason. For a client, the holder sees the contact in the window before their wallet signs.
 
 Both statements hold for a Base-and-USDC contact. A routed payout is the other shape.
 
@@ -420,17 +524,15 @@ When the contact is on another chain, or expects another token, the balance cann
              "feeAmount": "0.0077", "feeCurrency": "USD",
              "expiresAt": "2026-09-17T10:06:11Z",
              "fromChainId": "base", "toChainId": "arb" },
-  "approval": { "id": "…", "payload": "eyJ…", "expiresAt": "2026-09-17T10:06:10Z" },
-  "debit": { "address": "0x9b41…", "amount": "1.50", "amountAtomic": "1500000",
-             "token": "USDC", "chainId": 8453 },
+  "authorization": "client",
   "contact": { "contactId": "ct_9a…", "name": "Ardenne treasury",
                "address": "0x7c1d…", "chainId": "arb", "token": "USDC" }
 }
 ```
 
-**`quote` names both ends of the route.** `fromChainId` is the network the debit leaves, `toChainId` the network the contact receives on, and `feeAmount` is the route's cost in `USD`. `rate` stays absent — a route is not a currency conversion. The quote expires, so `expiresAt` is present here and the confirm has to land inside it.
+**`quote` names both ends of the route.** `fromChainId` is the network the debit leaves, `toChainId` the network the contact receives on, and `feeAmount` is the route's cost in `USD`. `rate` stays absent — a route is not a currency conversion. The quote expires, so `expiresAt` is present here and the signature has to land inside it — open the sign-in window as soon as the payout is booked.
 
-**`debit.address` is the route's one-time deposit address**, not the contact's. The same rule as a bank payout applies: check `amount`, `amountAtomic` and `token` against your own record before you sign, and check `contact.address` against the contact you meant to pay.
+**The debit pays the route's one-time deposit address**, not the contact's. On a payout from your own account that is `debit.address`, and the same rule as a bank payout applies: check `amount`, `amountAtomic` and `token` against your own record before you sign, and check `contact.address` against the contact you meant to pay.
 
 Routing has to be available for the account. When it is not, booking answers `409 payout_not_fundable` and the fix is a contact the balance can pay directly.
 
@@ -438,27 +540,30 @@ Routing has to be available for the account. When it is not, booking answers `40
 
 Two refusals belong to this route alone: `400` when the address resolves to the client's own wallet — a payout cannot pay the account that sends it — and `409 insufficient_funds` when the balance does not cover the amount (there is no fiat leg to absorb it).
 
-A confirmed wallet payout carries `transactionHash`, and the durable record is the client's ledger: the row shows up with `isIncome: false` and `type: "crypto"` — or `internal`, when the address belongs to another HEVN account. Read it through `GET /dapi/v1/transactions` ([Balances and transactions](/whitelabel/balances-and-transactions#walk-the-ledger)).
+A settled wallet payout carries `transactionHash`, and the durable record is the client's ledger: the row shows up with `isIncome: false` and `type: "crypto"` — or `internal`, when the address belongs to another HEVN account. Read it through `GET /dapi/v1/transactions` ([Balances and transactions](/whitelabel/balances-and-transactions#walk-the-ledger)).
 
 ## Pay out of the custodial balance
 
-A client that holds a custodial dollar balance can pay a beneficiary straight out of it. Send
-`"sourceAccount": "FDIC_USD"` and nothing leaves the client's wallet: the partner bank debits the
-account it already holds for the client, so the payout is authorized by a signature over its own
-terms rather than by a debit.
+An account that holds a custodial dollar balance can pay a beneficiary straight out of it. Send
+`"sourceAccount": "FDIC_USD"` and nothing leaves the wallet: the partner bank debits the account it
+already holds, so the payout is authorized by a signature over its own terms rather than by a debit.
+
+This works from your own account today. A client's holder cannot approve such a payout in the sign-in
+window yet, so booking one for a client is refused: `409 payout_not_fundable` with
+`details.reason = "holder_signature_unsupported"`. Pay a client's beneficiaries from `USDC` or `EURC`
+on its wallet.
 
 <CodeGroup>
 ```bash cURL
 curl -s -X POST "$HEVN_API/payouts" \
   -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
-  -H "X-Hevn-Account: $HEVN_CLIENT_ID" \
   -H "Idempotency-Key: payout-A-1188" \
   -H "Content-Type: application/json" \
   -d '{"contactId":"ct_3K9…","amount":"500.00","sourceAccount":"FDIC_USD","publicKey":"'$HEVN_PUBLIC_KEY'"}'
 ```
 
 ```python Python
-payout = northwind.post("/payouts", {
+payout = hevn.post("/payouts", {
     "contactId": "ct_3K9…",
     "amount": "500.00",
     "sourceAccount": "FDIC_USD",
@@ -466,11 +571,11 @@ payout = northwind.post("/payouts", {
 }, idempotency_key="payout-A-1188")
 
 signature = key.sign_payload(payout["approval"]["payload"])
-receipt = northwind.confirm_until_settled(f"/payouts/{payout['id']}/confirm", signature)
+receipt = hevn.confirm_until_settled(f"/payouts/{payout['id']}/confirm", signature)
 ```
 
 ```javascript Node
-const payout = await northwind.post("/payouts", {
+const payout = await hevn.post("/payouts", {
   contactId: "ct_3K9…",
   amount: "500.00",
   sourceAccount: "FDIC_USD",
@@ -478,11 +583,11 @@ const payout = await northwind.post("/payouts", {
 }, { idempotencyKey: "payout-A-1188" });
 
 const signature = key.signPayload(payout.approval.payload);
-const receipt = await northwind.confirmUntilSettled(`/payouts/${payout.id}/confirm`, signature);
+const receipt = await hevn.confirmUntilSettled(`/payouts/${payout.id}/confirm`, signature);
 ```
 
 ```go Go
-payout, err := northwind.Post("/payouts", hevn.Body{
+payout, err := api.Post("/payouts", hevn.Body{
 	"contactId":     "ct_3K9…",
 	"amount":        "500.00",
 	"sourceAccount": "FDIC_USD",
@@ -490,7 +595,7 @@ payout, err := northwind.Post("/payouts", hevn.Body{
 }, hevn.IdempotencyKey("payout-A-1188"))
 
 signature, err := key.SignPayload(payout.Str("approval.payload"))
-receipt, err := northwind.ConfirmUntilSettled("/payouts/"+payout.Str("id")+"/confirm", signature)
+receipt, err := api.ConfirmUntilSettled("/payouts/"+payout.Str("id")+"/confirm", signature)
 ```
 </CodeGroup>
 
@@ -512,12 +617,12 @@ What you check is the `quote` — `sourceAccount` is `FDIC_USD`, and `fromCurren
 that is the balance's own currency — and everything after it is unchanged: sign `approval.payload`,
 post it to the same confirm route, poll the same read. Two rules are specific to this source:
 
-- The client has to hold the account. Without one, the call answers `422 account_unavailable`.
+- The account has to hold the balance. Without one, the call answers `422 account_unavailable`.
 - The beneficiary has to be reachable from the rail that holds the balance. A `bankId` on another
   rail is `422 account_not_supported` — the balance is where it is, and HEVN will not silently pay
   from somewhere else.
 
-To move that balance onto the client's wallet instead of paying someone with it, use
+To move that balance onto your wallet instead of paying someone with it, use
 [Swaps](/whitelabel/swaps).
 
 ## Retries and idempotency
@@ -526,7 +631,7 @@ To move that balance onto the client's wallet instead of paying someone with it,
 
 <IdempotencySnippet />
 
-- **Same key, same terms** → `200` with `Idempotency-Replayed: true`, the same `po_…`, the agreed price, and a **fresh approval** if the previous one expired. One recovery path for a lost response and for an expired approval alike.
+- **Same key, same terms** → `200` with `Idempotency-Replayed: true`, the same `po_…` and the agreed price. On your own account it carries a **fresh approval** if the previous one expired — one recovery path for a lost response and for an expired approval alike. For a client it carries `authorization: "client"` again; create a new `sign` session if the holder has not approved it yet.
 - **Same key, different terms** → `409 idempotency_key_reused` with `details.payoutId`. Contact, account, pinned side and amount all have to match.
 - **No key at all** → HEVN derives one from the request and echoes it as `idempotencyKey`. Inside its window a retry replays instead of paying twice; outside it, two payouts happen. An explicit key holds far longer; [Limits](/whitelabel/reference/limits#idempotency) has both windows.
 
@@ -547,12 +652,12 @@ Booking refusals arrive at `POST /dapi/v1/payouts` and are about the contact, th
 | `contact_payment_details_invalid` | 422 | The partner refused the saved account identifiers. Repair the contact with `PATCH /dapi/v1/contacts/{contactId}`. |
 | `invalid_request` | 400 | The route refused these terms and `message` says which — below the route's minimum, a direction it cannot price, account details the method does not satisfy. Fix the input and call again with the same key. |
 | `validation_failed` | 422 | The body itself is wrong: both `amount` and `amountTo`, neither of them, more precision than the asset allows, or a key the schema does not know. `details.fields` names each one. |
-| `payout_not_fundable` | 409 | Booked, but the route cannot be funded with a developer key. Re-quote with a new key on a rail that can. |
+| `payout_not_fundable` | 409 | Booked, but it cannot be funded this way. With `details.reason = "holder_signature_unsupported"`, a client's holder cannot approve this kind of payout in the sign-in window — pay from `USDC` or `EURC` instead. Otherwise re-quote with a new key on a rail that can be funded. |
 | `provider_unavailable` | 503 | The partner is down. Retry with the same key. |
 
 A `400` or `422` lands before anything is booked, so the same key stays free for the corrected request.
 
-Funding refusals arrive at `confirm`, and each has exactly one correct response:
+Funding refusals arrive at `confirm` on a payout from your own account, and each has exactly one correct response. A client's payout is funded by its holder in the window, so none of these reach you for it; read the payout instead.
 
 | `code` | Status | What to do |
 | --- | --- | --- |
@@ -560,8 +665,9 @@ Funding refusals arrive at `confirm`, and each has exactly one correct response:
 | `funding_in_progress` | 409 | Wait, then confirm again. An attempt is still in flight. |
 | `funding_attempt_expired` | 409 | The approval expired. Re-open with `POST /dapi/v1/payouts` and the same key, then sign the new payload. |
 | `payment_slot_consumed` | 409 | An operation for this payout already landed on chain, and a landed operation — settled or reverted — spends the slot for good. Read the payout: `settled` needs nothing, `failed` needs a new payout under a new key. |
-| `insufficient_funds` | 409 | The client's balance does not cover the debit. `details.available` and `details.required` are in atomic units. Fund the wallet and confirm again. |
+| `insufficient_funds` | 409 | The wallet's balance does not cover the debit. `details.available` and `details.required` are in atomic units. Fund the wallet and confirm again. |
 | `bundler_rejected`, `bundler_unavailable` | 503 | Chain infrastructure. Confirm again with backoff. |
+| `account_not_controlled` | 403 | The payout is a client's. Its holder signs it in the [sign-in window](#approve-it-in-the-sign-in-window); never confirm it with your key. |
 | anything else | — | Stop. Take it to support with the `X-Request-ID` of the response. |
 
 That policy is one function, shared by every payout and by escrow actions, and stated once under [Retrying a confirm](/whitelabel/signing#retrying-a-confirm):

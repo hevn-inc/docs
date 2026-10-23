@@ -34,7 +34,9 @@ Two consequences worth designing for: a payroll run of 500 payouts is 1,000 writ
 | Access token | 60 minutes | `401 token_expired` — re-mint with `POST /dapi/v1/auth/refresh` |
 | Refresh token | 60 days | log in again |
 | Payout or payin price | at most 2 minutes | `409 quote_expired` |
-| Payout and transfer approval | 120 seconds | `409 funding_attempt_expired` — re-open with the same key |
+| Payout and transfer approval, on your own account | 120 seconds | `409 funding_attempt_expired` — re-open with the same key |
+| Sign-in window session | about 10 minutes, until `expiresAt` | the window shows the link as expired; create a new session |
+| Link code from the window | 5 minutes | `410 link_code_expired` on `POST /dapi/v1/clients/link` — start a new sign-in |
 | Escrow action approval | 60 seconds | `410 approval_expired` on confirm — prepare the action again with the same key |
 | Escrow on-chain refresh | one chain read per 15 seconds per deal | extra `POST /dapi/v1/escrow/{escrowId}/sync` calls answer the stored projection |
 | Escrow deal windows | `approveWithin` 1h, `holdFor` 14d, `refundableFor` 90d by default, each from the end of the previous one | the action leaves `availableActions` |
@@ -54,7 +56,7 @@ The key is scoped to `(your account, the operation)`. The same string on two ope
 | `POST /dapi/v1/escrow/{escrowId}/actions` | the action. The raw key is the address in the confirm URL. |
 | `POST /dapi/v1/sandbox/deposits`, `/payins/{payinId}/complete`, `/payouts/{payoutId}/status` | the emulated credit or status move. |
 | `POST /dapi/v1/contacts`, `PATCH`, `DELETE /dapi/v1/contacts/{contactId}` | nothing: a contact is deduplicated by its own account details. |
-| `POST /dapi/v1/clients`, `POST /dapi/v1/banks`, `PUT /dapi/v1/client/kyb`, `POST /dapi/v1/client/kyb/complete`, `POST /dapi/v1/payins`, `POST /dapi/v1/payins/{payinId}/instructions` | nothing: each is identified by its own natural key — the email, the rail, the client, the payin. Sending a key is harmless. |
+| `POST /dapi/v1/clients/link`, `POST /dapi/v1/banks`, `PUT /dapi/v1/client/kyb`, `POST /dapi/v1/client/kyb/complete`, `POST /dapi/v1/payins`, `POST /dapi/v1/payins/{payinId}/instructions` | nothing: each is identified by its own natural key — the linked account, the rail, the client, the payin. Sending a key is harmless. |
 
 Send no key and the server derives one from the request itself, echoes it as `idempotencyKey`, and you can pin that value from then on. A derived key replays for **2 hours**; an explicit key replays for **7 days**. That is why two genuinely distinct payouts of the same amount, minutes apart, both need explicit keys.
 
@@ -71,6 +73,8 @@ A response that replayed a create answers `200` with `Idempotency-Replayed: true
 | `purpose` | 64 characters |
 | `documentIds` on a payout | 10 |
 | `publicKey` on a payout | 512 characters |
+| `redirectUri` on a sign-in window session | 2,048 characters |
+| Allowed sites in the sign-in window | 20 origins |
 | `signature` | 2,048 characters |
 | Escrow duration | `^\d{1,4}[smhd]$` — up to 9999 seconds, minutes, hours or days |
 | `publicKey` on a developer key | 4,096 characters |
@@ -78,17 +82,16 @@ A response that replayed a create answers `200` with `Idempotency-Replayed: true
 
 There is no `offset` anywhere. Walk a list by passing `nextCursor` back as `cursor` until it is absent.
 
-The two developer-key caps are the only ones you cannot raise by calling again: the allowlist and the scopes are frozen
-when the key is created, so a network the allowlist does not cover needs a second key, not an edit. The `publicKey` cap
+The two developer-key caps are the only ones you cannot raise by calling again: the allowlist is frozen when the key
+is created, so a network the allowlist does not cover needs a second key, not an edit. The `publicKey` cap
 there is the DER-encoded public half, which is a different field from the 512-character `publicKey` a payout carries.
 
 ## Sandbox
 
-The sandbox runs on shared testnet infrastructure — one faucet account, one gas budget — so it caps what a single integrator can create and move. None of these limits exist in production. See [Sandbox](/whitelabel/sandbox#limits).
+The sandbox runs on shared testnet infrastructure — one faucet account, one gas budget — so it caps what a single integrator can move. None of these limits exist in production. See [Sandbox](/whitelabel/sandbox#limits).
 
 | Limit | Value | Refusal |
 | --- | --- | --- |
-| Clients per integrator | `5`; failed, rejected and canceled requests do not count | `403 sandbox_client_limit_reached`, with `details.limit` and `details.clients` |
 | One payout | at most `1` of the debited account | `422 sandbox_amount_limit_exceeded`, `details.operation = "payout"` |
 | One escrow | `maxAmount` at most `1` | `422 sandbox_amount_limit_exceeded`, `details.operation = "escrow"` |
 | Smallest emulated credit | `0.10` of the token | `422 amount_below_minimum` |

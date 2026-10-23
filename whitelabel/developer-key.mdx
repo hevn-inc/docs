@@ -1,36 +1,33 @@
 ---
 title: "Developer key"
-description: "Create a P-256 key in the app with its IP allowlist and its scopes, load it on your server, and rotate it without downtime."
+description: "Create a P-256 key in the app with its IP allowlist, load it on your server, and rotate it without downtime."
 ---
 
 Your backend holds one credential: a P-256 private key. HEVN stores only the public half. That key
-logs you in to `/dapi/v1` and signs every payment.
+logs you in to `/dapi/v1` and signs the payments that leave your own integrator account. It never
+signs for a client: a client's holder approves their own payouts in the
+[sign-in window](/whitelabel/sign-in-with-hevn#approve-a-payout).
 
 ## Create it in the app
 
 Keys are created in the HEVN app — [`https://sandbox.gethevn.com`](https://sandbox.gethevn.com), or
 [`https://app.gethevn.com`](https://app.gethevn.com) in production — under **Settings → Partner
-program → Developer keys**. Nothing in this API creates one. The key is what authorizes money from
-every wallet you control, so creating it takes a browser session of your own, never a token this API
-minted.
+program → Developer**. Nothing in this API creates one. The key opens a session that reaches every
+client linked to you, and it authorizes money from your own wallet, so creating it takes a browser session of your own,
+never a token this API minted.
 
-Creation asks for two things, and both are frozen the moment the key exists:
-
-| What you set | What it is |
-| --- | --- |
-| **IP allowlist** | The source addresses the key may be used from — 1 to 64 IPv4 addresses, IPv6 addresses or CIDR networks |
-| **Scopes** | Which `/dapi/v1` routes a session from this key may call |
-
-There is no edit and no `PATCH`. A new egress range, or one more scope, means a new key.
+Creation asks for one thing, the **IP allowlist**: the source addresses the key may be used from, 1
+to 64 IPv4 addresses, IPv6 addresses or CIDR networks. It is frozen the moment the key exists. There
+is no edit and no `PATCH`; a new egress range means a new key.
 
 The browser generates the keypair and shows you the private half **once**. Save it then: HEVN never
 holds it and cannot show it again. Write it to a file with mode `0600` on the machine that will use
 it, out of images, repositories and logs.
 
-The app adds the public half to your account's signer in the same action, so there is nothing else to
-wire up. One key covers every client — a client's wallet is deployed with your signer already
-attached, so no per-client setup exists. An account can hold up to **five** keys at once, which is
-what makes a rotation possible without downtime.
+The app adds the public half to your own account's signer in the same action, so there is nothing
+else to wire up. One key covers every client linked to you, because what it does for a client is
+authenticate your backend, not sign. An account can hold up to **five** keys at once, which is what
+makes a rotation possible without downtime.
 
 ## What the key is
 
@@ -48,44 +45,24 @@ what makes a rotation possible without downtime.
   base64-encode. The details are in [Signing](/whitelabel/signing#signature-format).
 </Warning>
 
-## Scopes
+## What a session from the key may do
 
-A scope names one class of signing right. You choose them when the key is created and they never
-change afterwards.
+Every `/dapi/v1` route is open to a session from any of your keys. What the key may **sign** is
+narrower, and it is fixed by whose wallet it is:
 
-| Scope | What a session from the key may call |
+| Operation | Who signs |
 | --- | --- |
-| `payout:sign` | `POST /dapi/v1/payouts/{payoutId}/confirm` |
-| `escrow:sign` | `POST /dapi/v1/escrow/{escrowId}/actions/{idempotencyKey}/confirm` |
-| `swap:sign` | `POST /dapi/v1/swaps/{swapId}/confirm` |
-| `recipient:write` | `POST /dapi/v1/contacts`, `PATCH /dapi/v1/contacts/{contactId}`, `DELETE /dapi/v1/contacts/{contactId}` |
+| A payout or swap from your integrator account | Your developer key, co-signed by HEVN — [Signing](/whitelabel/signing) |
+| An operator action on an escrow deal you run | Your developer key, co-signed by HEVN — [Escrow actions](/whitelabel/escrow-actions) |
+| A payout for a client | The client's holder, in the [sign-in window](/whitelabel/sign-in-with-hevn#approve-a-payout). Nothing for your key to sign |
 
-Those are the only four values. Everything else on `/dapi/v1` — reading a balance, booking a payout,
-opening a rail, filing KYB, walking the ledger — is open to any platform session, so scopes gate the
-confirm step and the contact book rather than the API.
-
-A route whose scope the key does not hold answers `403 forbidden` with two fields: `details.requiredScope`
-is the scope the route wants, `details.scope` is what the key actually holds. Nothing is prepared and
-nothing is signed.
-
-```json
-{
-  "error": {
-    "code": "forbidden",
-    "message": "This developer key may not perform this operation.",
-    "details": { "requiredScope": "payout:sign", "scope": ["recipient:write"] }
-  }
-}
-```
-
-Choose by what the deployment does. A service that books payouts and confirms them needs
-`payout:sign` and nothing else; the job that maintains the contact book needs `recipient:write` and
-cannot move money with it.
+A confirm that would have your key sign for a client's wallet answers `403 account_not_controlled`.
+Nothing is prepared and nothing is signed.
 
 <Warning>
-  A scope limits which routes the key's session may call. It does **not** cap how much money a
-  permitted route may move. A key holding `payout:sign` can confirm a payout of any size, from any
-  client wallet you control. Amount and approval controls are yours to build — see
+  The key caps nothing by amount. Whatever reaches your server with the key can spend all of your own
+  wallet, and read and configure every client linked to you. Approval controls on your side are
+  yours to build — see
   [Accounts and control](/whitelabel/accounts-and-control#what-this-means-for-your-product).
 </Warning>
 
@@ -135,9 +112,9 @@ Once you are authenticated the refusals are specific, because by then HEVN knows
 | Status | `code` | Cause |
 | --- | --- | --- |
 | 403 | `forbidden` | The key behind this session was deleted, or the request came from an address outside its allowlist. Every `/dapi/v1` request re-checks both |
-| 403 | `forbidden`, with `details.requiredScope` | The key does not hold the scope this route needs. `details.scope` lists what it does hold |
 | 403 | `forbidden`, `details.reason = "developerSessionRequired"` | The bearer is not a platform access token — an ordinary API token, a refresh token, or a token with no key behind it |
 | 403 | `key_not_registered` | The `publicKey` on a payment is not one of this account's keys |
+| 403 | `account_not_controlled` | The operation would sign for a wallet your key does not control — a client's |
 | 409 | `signer_not_attached` | The signer exists but is not attached to the wallet being spent from |
 | 400 | `signature_invalid` | Wrong bytes or wrong encoding — see [Signing](/whitelabel/signing#signature-format) |
 
@@ -150,8 +127,7 @@ while both are live.
 
 <Steps>
   <Step title="Create the second key">
-    In the app, with the same scopes and an allowlist covering the hosts that will use it. Save the
-    private half. Nothing changes for running code.
+    In the app, with an allowlist covering the hosts that will use it. Save the private half. Nothing changes for running code.
   </Step>
   <Step title="Switch your servers">
     Deploy the new key file. Payments start carrying the new `publicKey`. An approval is bound to your
@@ -177,10 +153,11 @@ while both are live.
   repositories and logs.
 - One key per environment, and one per deployment if you can — the `publicKey` on each payment tells
   you which one signed.
-- Give each key the narrowest scopes and the narrowest allowlist its job allows, and create the
-  replacement before you move traffic to a new range.
-- Never sign in a browser. The key can spend from every client balance you control; a browser is the
-  wrong place for it.
+- Give each key the narrowest allowlist its job allows, and create the replacement before you move
+  traffic to a new range.
+- Never sign in a browser. The key can spend your own balance and act on every client linked to you;
+  a browser is the wrong place for it. The browser's part is the
+  [sign-in window](/whitelabel/sign-in-with-hevn), which needs no key at all.
 - Rehearse the roll before you need it. A rotation you have never run is not a control.
 
 <Card title="Next: Sessions" icon="ticket" href="/whitelabel/sessions">
