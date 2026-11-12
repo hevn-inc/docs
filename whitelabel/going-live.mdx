@@ -21,7 +21,7 @@ flowchart TB
         PC["Base · real partners<br/>reviewed rails · reviewed KYB · no /dapi/v1/sandbox/*"]
         PA --- PB --- PC
     end
-    Sandbox -. "nothing crosses: developer keys and their allowlists,<br/>sign-in window settings, clients, tokens, rail ids, contacts, escrow deals" .-> Production
+    Sandbox -. "nothing crosses: developer keys and their allowlists,<br/>sign-in window settings, clients, tokens, contacts, escrow deals" .-> Production
 ```
 
 <EnvSnippet />
@@ -43,10 +43,10 @@ Confirm all three the same way you would in the sandbox: link one client, read `
 | Re-create in production | Why |
 | --- | --- |
 | The developer key | Keys belong to one environment. Create a fresh one in the production app, with the **production** egress IPs in its allowlist. The sandbox key, and the sandbox allowlist, are both unknown in production. |
-| The sign-in window | Title, logo, colours and **Allowed sites** are per environment. Add your production origins in the production app; a sandbox origin there answers `403 redirect_uri_not_allowed`. |
+| The sign-in window | **Allowed sites** and the window's look are per environment. Add your production origins in the production app, and ask HEVN to brand the production window; a sandbox origin there answers `403 redirect_uri_not_allowed`. |
 | Every client | A `cl_…` from the sandbox does not exist in production, and neither does anything hanging off it: KYB, rails, contacts, escrow deals. Your customers link again, in production. |
 | Tokens | Access and refresh tokens are environment-scoped. |
-| Rail ids | Rail ids are opaque strings you copy from `GET /dapi/v1/banks`. Never hardcode one you saw in the sandbox; read them per client, per environment. |
+| Virtual accounts | Product codes (`eu`, `us`, …) are the same everywhere, but which products a client can request and the rail behind each one differ. Read `GET /dapi/v1/banks` per client, per environment, and never store the `rail` string. |
 | Idempotency keys | Keys are scoped to your account and the environment. A key that replayed a sandbox payout means nothing in production. |
 
 Keep both sets of credentials loadable at once and choose by `HEVN_API`: a deploy that points a production key at the sandbox host fails at login with `401 invalid_credentials`, and nothing in that refusal says you swapped a variable.
@@ -75,7 +75,7 @@ Every one of those is the same fix: a poller with backoff and a deadline, keyed 
 Refusals your sandbox runs never produced, because the emulator never argues:
 
 - **`422 contact_payment_details_invalid`** — the receiving bank does not recognise the beneficiary. Usually the name. Correct the contact with `PATCH /dapi/v1/contacts/{contactId}` and book again.
-- **`422 rail_requirements_unmet` and `422 phone_required`** — a rail wants something the client has not given yet. `GET /dapi/v1/banks/{rail}/requirements` lists it.
+- **A virtual account that stays `preparing`** — the sandbox opens one as soon as nothing blocks it; production waits for the partner's review, for hours to days. Read `blockers[]` on `GET /dapi/v1/banks/{product}`: an empty list means the wait is the partner's, not yours.
 - **`422 amount_below_minimum` and `422 amount_above_maximum`** — real rail minimums replace the sandbox's `0.10`.
 - **`attention: {"kind": "rfi"}` on a payout** — the partner is holding the transfer pending a question. Nothing anyone signs moves it until the question is answered.
 - **`503 provider_unavailable`** — a partner is down. Retry with backoff; do not re-book.

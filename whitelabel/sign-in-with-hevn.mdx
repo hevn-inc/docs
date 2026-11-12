@@ -1,9 +1,9 @@
 ---
 title: "Sign in with HEVN"
-description: "Link your customer's own HEVN account to your integrator account through a HEVN-hosted popup, and let them approve their own payouts in the same window."
+description: "Link your customer's own HEVN account to your integrator account through a HEVN-hosted popup, and let them approve their own payouts and verify their identity in the same window."
 ---
 
-Sign in with HEVN is how a client comes to exist. Your customer signs in with Google in a HEVN-hosted popup on your site, allows your product to act on the account, and your backend exchanges the code that comes back for a `cl_…` id. The same popup is where the account holder later approves each payout you book for them.
+Sign in with HEVN is how a client comes to exist. Your customer signs in to a HEVN-hosted popup on your site — with Google, or with a one-time code sent to an email you pass — and your backend exchanges the code that comes back for a `cl_…` id. Signing in through your session is the consent: there is no separate screen to allow access. The same popup is where the account holder later approves each payout you book for them and, for an individual, verifies their identity.
 
 ```mermaid
 sequenceDiagram
@@ -18,7 +18,7 @@ sequenceDiagram
     Note over S: remember state in an HttpOnly cookie
     S-->>B: url
     B->>W: navigate the popup to url
-    Note over W: signs out any HEVN session,<br/>Google sign-in, consent
+    Note over W: signs out any HEVN session,<br/>Google or email-code sign-in
     W->>B: redirectUri?code=…&state=… (your callback page)
     Note over B: callback page hands the result<br/>to your page and closes the popup
     B->>S: code, state
@@ -28,7 +28,7 @@ sequenceDiagram
     Note over S: keep cl_… in your own session, never in the browser
 ```
 
-The window takes nothing from your page but the session URL your server got from HEVN. It shows no HEVN product screens: a sign-in, one consent screen, and, for a payout, the terms being approved.
+The window takes nothing from your page but the session URL your server got from HEVN, and optionally the email to sign in with. It shows no HEVN product screens: a sign-in, then, for a payout, the terms being approved, or, for a verification, the identity check.
 
 ## Before you start
 
@@ -38,17 +38,9 @@ The window takes nothing from your page but the session URL your server got from
 
 ## Configure the window
 
-The **Sign-in window** card holds everything about how the popup looks and where it may return. Nothing about the window is configurable from the API or from the session URL: a page that opens the popup cannot restyle it, retitle it or redirect it.
+The **Sign-in window** card holds one setting: **Allowed sites**, up to 20 origins the window may return to — `https://host`, or `http://localhost:<port>` and `http://127.0.0.1:<port>` for development, with no path and no query. With none, no session can be created. Removing an allowed site also stops every session already issued for it: the window refuses to open a session whose `redirectUri` is no longer on the list.
 
-| Setting | What it takes | Without it |
-| --- | --- | --- |
-| **Title** | Plain text, up to 60 characters. The window's heading and browser-tab title | HEVN's own headings |
-| **Logo URL** | An `https://` image address | HEVN's logo |
-| **Background**, **Accent** | `#rgb` or `#rrggbb`. Accent colours the main button | HEVN's colours |
-| **Theme** | **Auto**, **Light** or **Dark** | Follows the viewer's system |
-| **Allowed sites** | Up to 20 origins: `https://host`, or `http://localhost:<port>` and `http://127.0.0.1:<port>` for development. No path, no query | No session can be created |
-
-The card shows a preview of the consent screen as you edit. Removing an allowed site also stops every session already issued for it: the window refuses to open a session whose `redirectUri` is no longer on the list.
+How the window looks — its title, logo, colours and theme — is set by HEVN on request; ask HEVN support. Nothing about the window is configurable from the API or from the session URL: a page that opens the popup cannot restyle it, retitle it or redirect it.
 
 ## Link an account
 
@@ -118,7 +110,7 @@ session, err := api.Post("/connect/sessions", hevn.Body{
 ```
 
 <ParamField body="action" type="string" required>
-  `link` asks the account holder to connect their account. `sign` asks them to approve one payout — see [Approve a payout](#approve-a-payout).
+  `link` asks the account holder to connect their account. `sign` asks them to approve one payout — see [Approve a payout](#approve-a-payout). `verify` asks a linked individual to verify their identity — see [Verify an individual](#verify-an-individual).
 </ParamField>
 
 <ParamField body="redirectUri" type="string" required>
@@ -126,10 +118,14 @@ session, err := api.Post("/connect/sessions", hevn.Body{
 </ParamField>
 
 <ParamField body="payoutId" type="string">
-  The `po_…` to approve. Required for `sign`, refused for `link`.
+  The `po_…` to approve. Required for `sign`, refused otherwise.
 </ParamField>
 
-`url` opens the window and lives for about ten minutes, until `expiresAt`. HEVN signs it, and it is bound to your integrator account, the action, the payout, the `redirectUri` and a one-time nonce. `state` is that nonce: the window sends it back on `redirectUri` with the result, and nothing else ties the result to this session. Give `url` to the browser and keep `state` on your side.
+<ParamField body="clientId" type="string">
+  The `cl_…` whose holder verifies their identity. Required for `verify`, refused otherwise.
+</ParamField>
+
+`url` opens the window and lives for about ten minutes, until `expiresAt`. HEVN signs it, and it is bound to your integrator account, the action, the payout or client, the `redirectUri` and a one-time nonce. `state` is that nonce: the window sends it back on `redirectUri` with the result, and nothing else ties the result to this session. Give `url` to the browser and keep `state` on your side.
 
 ### 3. Bind the session to this browser
 
@@ -147,6 +143,18 @@ app.post("/hevn/link/start", async (req, res) => {
   res.json({ url: session.url });
 });
 ```
+
+### Sign in with an email you already know
+
+When your product already knows the customer's email, add it to the session URL as `login_hint` before you navigate the popup:
+
+```javascript Browser
+const opened = new URL(url);
+opened.searchParams.set("login_hint", "jane@acme.example");
+popup.location.href = opened.toString();
+```
+
+The window then sends a one-time code to that address and signs in with it; the holder cannot change the address in the window. Without `login_hint` the window offers Google and email sign-in. `login_hint` only chooses how the holder signs in — it is not part of the signed session, so never treat it as proof of who signed in. `POST /dapi/v1/clients/link` answers the account that actually did.
 
 ### 4. Exchange the code
 
@@ -200,7 +208,7 @@ The answer is the [client record](/whitelabel/clients). Store `id` against your 
 
 ## The callback page
 
-The window finishes by navigating to `redirectUri` with the result in the query string: `code` or `error` for a link, `status`, `payout` and `reference` or `error` for a payout, and `state` on every one. The callback page posts that query to the page that opened the popup over a `BroadcastChannel`, then closes the window.
+The window finishes by navigating to `redirectUri` with the result in the query string: `code` or `error` for a link, `status`, `payout` and `reference` or `error` for a payout, `status` or `error` for a verification, and `state` on every one. The callback page posts that query to the page that opened the popup over a `BroadcastChannel`, then closes the window.
 
 ```html callback.html
 <!doctype html>
@@ -248,16 +256,16 @@ The result does not travel through `window.opener`. Google's sign-in cuts the po
 
 ## Who can be linked
 
-Only an account created in the sign-in window can be linked. The window signs out any HEVN session in that browser before every `link` sign-in, so the holder always chooses the Google account explicitly, and:
+Only an account created in the sign-in window can be linked. The window signs out any HEVN session in that browser before every `link` sign-in, so the holder always chooses the account explicitly, and:
 
 | The person signing in | What happens |
 | --- | --- |
-| Has no HEVN account | The sign-in creates one, they allow access, and the window returns a `code`. |
+| Has no HEVN account | The sign-in creates one and the window returns a `code`. |
 | Already linked to **you** through an earlier sign-in | They sign in again and the window returns a new `code` for the same client. This is how a returning customer logs in to your product. |
 | Already has a HEVN account of their own | The window refuses with `already_registered` and offers to open HEVN instead. An account someone already uses directly can never be handed to an integrator. |
 | Is linked to another integrator | The window refuses with `already_linked`. |
 
-The consent screen names your product — the **Title** you configured, or your account's name — and the origin of `redirectUri`, and says what you get: you can see balances, open accounts and prepare transfers, and the holder approves every transfer themselves in this window.
+The window names your product and says what signing in gives you: you can see balances, open accounts and prepare transfers, and the holder approves every transfer themselves in this window.
 
 ## Approve a payout
 
@@ -304,6 +312,65 @@ In the window the holder signs in — a HEVN session already open in that browse
 
 The redirect is a hint, never the record. Read `GET /dapi/v1/payouts/{payoutId}` with the client in `X-Hevn-Account` and follow it to `settled` like any other payout — see [Payouts](/whitelabel/payouts#approve-it-in-the-sign-in-window).
 
+## Verify an individual
+
+A linked individual verifies their own identity, in this window, after signing in to their own account. You never receive a verification link: whoever opens one submits documents onto that account, so it stays with the holder. A business client verifies through [Onboarding](/whitelabel/onboarding) instead.
+
+You need it when a virtual account the client requested waits on `verification_required` ([Virtual accounts](/whitelabel/virtual-accounts#what-still-blocks-it)). Create a `verify` session for the client and open the popup exactly as for a link:
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST "$HEVN_API/connect/sessions" \
+  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"action":"verify","clientId":"cl_7YQ2Kf3mN8","redirectUri":"https://app.example.com/hevn/callback"}'
+```
+
+```python Python
+session = hevn.post("/connect/sessions", {
+    "action": "verify",
+    "clientId": client_id,
+    "redirectUri": "https://app.example.com/hevn/callback",
+})
+```
+
+```javascript Node
+const session = await hevn.post("/connect/sessions", {
+  action: "verify",
+  clientId,
+  redirectUri: "https://app.example.com/hevn/callback",
+});
+```
+
+```go Go
+session, err := api.Post("/connect/sessions", hevn.Body{
+	"action":      "verify",
+	"clientId":    clientID,
+	"redirectUri": "https://app.example.com/hevn/callback",
+})
+```
+
+</CodeGroup>
+
+The client must be linked to you, or the session is refused with `404 client_not_found` — the same answer for an id that does not exist. A business client answers `409 verification_not_applicable`. A client that is already verified is not refused: the window says so and returns `status=approved`.
+
+In the window the holder signs in, and must sign in to that same account — any other answers `account_mismatch`. The identity check runs inside the window. When the holder finishes or closes it, the callback receives `status`:
+
+| `status` | Meaning |
+| --- | --- |
+| `approved` | Verified. |
+| `inReview` | Submitted and being reviewed. |
+| `actionRequired` | Something is still missing; open a new `verify` session when the holder is ready. |
+| `rejected` | Refused. |
+| `notStarted` | The holder left before submitting anything. |
+
+The redirect is a hint, never the record. Read `GET /dapi/v1/client` with the client in `X-Hevn-Account`: `verifiedAt` is set once the identity is verified, and stays absent until then. A review can take a while after the window closes, so poll the client or `GET /dapi/v1/banks/{product}` — the `verification_required` blocker goes away and the virtual account moves on by itself.
+
+<Note>
+  In the sandbox the window runs against a test verification provider, so the whole flow works with test documents. For automated tests, `POST /dapi/v1/sandbox/kyb/status` with `{"status": "approved"}` verifies an individual client directly — see [Sandbox](/whitelabel/sandbox#decide-a-kyb-application).
+</Note>
+
 ## Errors
 
 Refusals come from two places. Your server sees the API's; your callback page sees the window's, as `error` on the redirect.
@@ -311,15 +378,17 @@ Refusals come from two places. Your server sees the API's; your callback page se
 | Where | `code` | Cause | What to do |
 | --- | --- | --- | --- |
 | `POST /connect/sessions` | `403 redirect_uri_not_allowed` | The origin of `redirectUri` is not under **Allowed sites** | Add the origin in the **Sign-in window** card, or fix the URL |
-| `POST /connect/sessions` | `422 validation_failed` | `redirectUri` is not `https://` (or local `http://`), carries a fragment, or `payoutId` is missing for `sign` or present for `link` | Fix the body |
+| `POST /connect/sessions` | `422 validation_failed` | `redirectUri` is not `https://` (or local `http://`), carries a fragment, `payoutId` is missing for `sign` or present otherwise, or `clientId` is missing for `verify` or present otherwise | Fix the body |
+| `POST /connect/sessions` | `404 client_not_found`, `409 verification_not_applicable` | A `verify` session for a client that is not linked to you, or that is a business | Verify a business through [Onboarding](/whitelabel/onboarding) |
 | `POST /connect/sessions` | `404 payout_not_found`, `409 payout_not_awaiting_signature` | A `sign` session for a payout that is not a linked client's, or that no longer waits for a signature | Read the payout before you open the window |
 | `POST /connect/sessions`, `POST /clients/link` | `403 client_creation_not_enabled` | Your integrator account is not active | Ask HEVN — see [Going live](/whitelabel/going-live#what-hevn-must-enable) |
 | `POST /clients/link` | `400 link_code_invalid` | The code is malformed, was issued for another integrator, or the account is gone | Start a new sign-in |
 | `POST /clients/link` | `410 link_code_expired` | The code is older than five minutes | Start a new sign-in |
 | `POST /clients/link` | `409 client_already_linked` | The account is already connected to another integrator, or can no longer be connected to you | Nothing to retry. Tell your customer |
-| Callback | `access_denied` | The holder chose **Deny** on the consent screen | Let them try again when they are ready |
+| Callback | `access_denied` | The holder cancelled in the window | Let them try again when they are ready |
 | Callback | `already_registered` | The Google account already has a HEVN account of its own | It cannot be linked. Ask your customer to sign in with another Google account |
 | Callback | `already_linked` | The account is connected to another integrator | Nothing to retry |
+| Callback | `account_mismatch` | A `verify` session where the holder signed in to a different account than the session's client | Ask the holder to sign in with the account they linked |
 | Callback | `not_found` | The signed-in holder does not own the payout, or it is not linked to you — usually the wrong Google account | Ask the holder to sign in with the account they linked |
 | Callback | `unsupported` | This payout cannot be approved in the window | Book a payout the window can fund — see [Payouts](/whitelabel/payouts#approve-it-in-the-sign-in-window) |
 | Callback | `expired` | The session ran out while the holder was in the window | Create a new session |

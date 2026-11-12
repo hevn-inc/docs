@@ -9,7 +9,7 @@ A client account belongs to its holder. You can operate it — verify it, open i
 flowchart TB
     DK["Your developer key<br/>private half on your server"]
     IA["Your integrator account<br/>your own Base smart wallet"]
-    H["Account holder<br/>signs in with Google in the sign-in window"]
+    H["Account holder<br/>signs in to the sign-in window"]
     HK["Holder's own key<br/>the only signer on the client wallet"]
     CA["Client account<br/>profile, KYB, rails, contacts"]
     W["Client's Base smart wallet<br/>the balance lives here"]
@@ -28,7 +28,7 @@ The wallet is the money. `baseSmartWallet` on the client record is where deposit
 
 ## Who can spend
 
-The client's smart wallet is owned by the holder's own key, an embedded wallet behind their Google sign-in whose key never exists outside [Privy's key management](/general/privy-wallets). It is the self-serve model from the [General](/general/what-is-hevn) tab, unchanged: nothing leaves the wallet without that key's signature.
+The client's smart wallet is owned by the holder's own key, an embedded wallet behind their own sign-in whose key never exists outside [Privy's key management](/general/privy-wallets). It is the self-serve model from the [General](/general/what-is-hevn) tab, unchanged: nothing leaves the wallet without that key's signature.
 
 So a payout for a client is two parties' work:
 

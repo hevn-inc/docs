@@ -85,8 +85,8 @@ The client needs an **active rail** in the currency the payer sends — see [Vir
 
     - **`amount` or `amountTo`, exactly one.** `amount` is what the payer sends in `currency`; `amountTo` is what should land on the wallet, and HEVN grosses the payer's side up to reach it.
     - **`rail` or `originChainId`, exactly one.** `rail` prices money arriving over a payment method; `originChainId` prices money arriving on a chain. Sending both, or neither, is refused.
-    - **`rail` here is a payment *method*** — `sepa`, `ach`, `swift`, `fedwire`, `pix`, … — not the rail id you opened with `POST /dapi/v1/banks`. The two are different vocabularies; [Rails](/whitelabel/reference/rails) lists both.
-    - **`destinationAccount`** is the account the payin is delivered into, `USDC` (the default) or `EURC`. It has to be an account one of the client's matching rails settles into; when it is not, the call refuses with the pairs that work (see below). Money arriving over a rail always lands on the wallet, so `FDIC_USD` is refused here with `422 account_not_supported`.
+    - **`rail` here is a payment *method*** — `sepa`, `ach`, `swift`, `fedwire`, `pix`, … — not the product you requested with `POST /dapi/v1/banks`. The two are different vocabularies; [Rails](/whitelabel/reference/rails) lists both.
+    - **`destinationAccount`** is the account the payin is delivered into, `USDC` (the default) or `EURC`. It has to be an account one of the client's matching rails settles into; when it is not, the call refuses with the pairs that work (see below). Money arriving over a rail always lands on the wallet, so `FDIC_USD` and `FDIC_EUR` are refused here with `422 account_not_supported`.
 
     The price holds until `expiresAt`. Read it; do not cache a quote.
   </Step>
@@ -194,9 +194,9 @@ That is why quoted bank payins suit payers who copy the instructions exactly. Wh
 
 This is the quoted arm of crypto-in. The unquoted arm — send straight to the wallet, no call at all — is further down.
 
-## What a rail converts at
+## What a virtual account converts at
 
-`GET /dapi/v1/banks/{rail}/rate` answers `{currency, rate, fixedFee, fixedFeeCurrency}` — the indicative price of a deposit over that rail. On a rail the client has not opened, only `currency` comes back. Use it to show a rate in your own UI before the payer commits to an amount. It is indicative: `POST /dapi/v1/payins` returns the number you are held to.
+`GET /dapi/v1/banks/{product}/rate` answers `{currency, rate, fixedFee, fixedFeeCurrency}` — the indicative price of a deposit over that product's rail. On a product the client has not requested, only `currency` comes back. Use it to show a rate in your own UI before the payer commits to an amount. It is indicative: `POST /dapi/v1/payins` returns the number you are held to.
 
 ## When the payer has to be named
 

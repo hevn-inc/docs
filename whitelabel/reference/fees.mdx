@@ -19,7 +19,7 @@ Every price in this API is one of two things, and they are never interchangeable
 | | **Declared** | **Quoted** |
 | --- | --- | --- |
 | What it is | A rate published on a rail or a capability, before any payment exists | The terms of one specific payment |
-| Where it comes from | `GET /dapi/v1/banks`, `GET /dapi/v1/banks/{rail}/rate`, `GET /dapi/v1/contacts/{contactId}/capabilities`, `POST /dapi/v1/payouts/preview`, `GET /dapi/v1/rates` | The `quote` on a `POST /dapi/v1/payins` or `POST /dapi/v1/payouts` response |
+| Where it comes from | `GET /dapi/v1/banks`, `GET /dapi/v1/banks/{product}/rate`, `GET /dapi/v1/contacts/{contactId}/capabilities`, `POST /dapi/v1/payouts/preview`, `GET /dapi/v1/rates` | The `quote` on a `POST /dapi/v1/payins` or `POST /dapi/v1/payouts` response |
 | What it is for | Showing your customer a number before they commit to an amount | Charging them |
 | Does it bind | **No.** It is indicative and can move | **Yes.** It is what settles, until `expiresAt` |
 
@@ -30,18 +30,19 @@ bill from it later.
 
 ### On a rail
 
-A rail record from `GET /dapi/v1/banks` carries `feeBps` — HEVN's deposit fee for that rail in basis
+A record from `GET /dapi/v1/banks` carries `feeBps` — HEVN's deposit fee for that product in basis
 points, a whole number, taken out of the converted amount. `100` is one per cent, so `25` is 0.25%.
+It comes from the client's plan, so two clients can read different values for the same product.
 It carries `minimumDeposit` too: the smallest amount the partner will accept over that rail, in the
 rail's own currency. Anything under it is returned by the bank, not refused by us.
 
-`GET /dapi/v1/banks/{rail}/rate` is the indicative price of a deposit over one rail:
+`GET /dapi/v1/banks/{product}/rate` is the indicative price of a deposit over one product:
 
 ```json
 { "currency": "EUR", "rate": "…", "fixedFee": "…", "fixedFeeCurrency": "EUR" }
 ```
 
-On a rail the client has not opened, only `currency` comes back.
+On a product the client has not requested, only `currency` comes back.
 
 ### On a contact
 
@@ -139,5 +140,5 @@ between them is the whole cost of that movement, whatever it was made of.
 [Balances and transactions](/whitelabel/balances-and-transactions).
 
 <Card title="Next: Rails and payment methods" icon="arrow-right" href="/whitelabel/reference/rails">
-  What each method needs, which currencies the deposit rails carry, and how a rail id is put together.
+  What each method needs, which currencies the deposit products carry, and what a product is.
 </Card>

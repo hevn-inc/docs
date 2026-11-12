@@ -149,6 +149,7 @@ are deliberately absent from `/dapi/v1`.
 | `link_code_expired` | 410 | The code is older than five minutes. Start a new sign-in. |
 | `client_already_linked` | 409 | The account is already connected to another integrator, or can no longer be connected to you. |
 | `client_not_found` | 404 | Unknown client id, or not one of yours. |
+| `verification_not_applicable` | 409 | A `verify` sign-in window session for a business client. A business verifies through `PUT /dapi/v1/client/kyb`. |
 | `profile_locked` | 409 | The field is frozen after verification. `details.fields` names them. |
 
 The sign-in window's own refusals — `access_denied`, `already_registered`, `already_linked`, `not_found`, `unsupported`, `expired` and `failed` — are not error slugs. They arrive as `error` on your callback page; [Sign in with HEVN](/whitelabel/sign-in-with-hevn#errors) has what each one means.
@@ -157,10 +158,8 @@ The sign-in window's own refusals — `access_denied`, `already_registered`, `al
 
 | Slug | Status | What to do |
 | --- | --- | --- |
-| `rail_not_found` | 404 | No such rail id. Copy one from `GET /dapi/v1/banks`. |
-| `rail_not_available` | 403 | The rail is not offered to this client. |
-| `rail_requirements_unmet` | 422 | Something the rail needs is missing. `GET /dapi/v1/banks/{rail}/requirements` lists it. |
-| `phone_required` | 422 | The client has no phone number. `PATCH /dapi/v1/client` with one, and the client's id in `X-Hevn-Account`, then open the rail. |
+| `rail_not_found` | 404 | No such virtual account — a `bnk_…` id that is unknown or not this client's. |
+| `rail_not_available` | 403 | Nothing can serve this product for this client — its residency, its type or no partner in that region. `details.product` names it. What still blocks a product that *is* available is never a refusal: it is `blockers[]` on the record ([Virtual accounts](/whitelabel/virtual-accounts#what-still-blocks-it)). |
 | `payin_not_available` | 422 | This client cannot be paid in that currency over that method. `details.options` lists the pairs that work. |
 | `payin_expired` | 410 | The price no longer holds. Quote the payin again. |
 | `payin_not_found` | 404 | Unknown payin id, or one belonging to another client. |
@@ -174,6 +173,7 @@ Booking a payout — to a bank account or to a wallet — and the contacts it pa
 | --- | --- | --- |
 | `contact_details_invalid` | 422 | The contact's account details or address are incomplete for the method, at create or update time. `details.fields` names them. |
 | `contact_in_use` | 409 | A payout still references this contact. It cannot be deleted. |
+| `transfer_policy_denied` | 403 | The account's own transfer policy refuses this payout — for example, the holder has paused outgoing transfers. `message` says which rule. Nothing to retry until the holder changes it. |
 | `contact_not_payable` | 409 | The contact cannot be paid on this rail. `details.blockers` is the same array `capabilities` returns — the codes are listed under [Contact blockers](#contact-blockers). |
 | `contact_payment_details_invalid` | 422 | The partner refused the contact's payment details — most often a beneficiary name the bank does not recognise. Correct the contact and book again. Not to be confused with `contact_details_invalid` above, which is our own refusal of an incomplete contact body. |
 | `amount_below_minimum` | 422 | Below the route's minimum. `POST /dapi/v1/payouts/preview` reports it as `minAmount`. |
@@ -213,7 +213,7 @@ slugs, and they never appear as `error.code`.
 | `contact_holder_type_unsupported` | The partner does not pay this holder type — a company where only people are paid, or the reverse. |
 | `account_type_unsupported` | The partner cannot pay an account of this shape at all. |
 | `routing_unresolved` | The identifiers do not resolve to a route the partner recognises. |
-| `receiving_account_unavailable` | The client has no active account to send from. Open a rail first. |
+| `receiving_account_unavailable` | The client has no active account to send from. Request a virtual account first. |
 | `payment_method_unavailable` | None of the client's accounts sends over this method. |
 | `currency_mismatch` | The account holds one currency and the transfer is in another. |
 | `transfer_feature_disabled` | This transfer kind is switched off on the sending account. |
@@ -253,6 +253,7 @@ These arrive at `POST /dapi/v1/payouts/{payoutId}/confirm`; two of them — `quo
 | Slug | Status | What to do |
 | --- | --- | --- |
 | `kyb_incomplete` | 422 | The submission was completed with gaps. `GET /dapi/v1/client/kyb` lists `missing[]`. |
+| `kyb_documents_processing` | 409 | Some uploaded documents are still being read. `details.documents` lists their ids. Complete again in a few seconds. |
 | `kyb_roster_conflict` | 409 | The people on file conflict with this write — usually a person removed while still owning shares. |
 | `kyb_subject_conflict` | 409 | The subject conflicts with the verification data already on file. |
 | `document_not_found` | 404 | Unknown `doc_…` id for this client. |

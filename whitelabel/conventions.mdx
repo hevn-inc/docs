@@ -52,9 +52,9 @@ Do not parse them, derive them or assume a length. An id of the wrong kind in a 
 is `400 invalid_id` with the expected prefix in `details`; in a path it is that resource's own `404`,
 so an id from another namespace is never confirmable.
 
-Rail ids — `sepa_named-bank_a`, a stand-in for a real one — are the exception that proves the rule:
-they are opaque strings you copy from `GET /dapi/v1/banks`, they carry no prefix, and their shape is
-not a contract. See [Rails](/whitelabel/reference/rails).
+Products — `eu`, `us`, `uk` — are the exception that proves the rule: they are fixed region codes, not
+ids, and they key a client's virtual account in `POST /dapi/v1/banks` and in the path. The `rail`
+string next to them is informational and never a key. See [Rails](/whitelabel/reference/rails).
 
 ## Casing
 

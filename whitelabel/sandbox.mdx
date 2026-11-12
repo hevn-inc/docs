@@ -37,7 +37,7 @@ None of these routes exist in production; there they answer `404`.
 
 Being an integrator that may link clients, and being allowed to operate escrow, are flags on your account, and nothing in the API sets them — in the sandbox as in production, HEVN does. There is no self-enrolment call. Until the first is on, `POST /dapi/v1/connect/sessions` answers `403 client_creation_not_enabled`; a session that comes back with a `url` is the cheapest confirmation that it is.
 
-Clients are linked through [Sign in with HEVN](/whitelabel/sign-in-with-hevn) here too, with real Google sign-ins. Each test client needs a Google account that has no HEVN sandbox account of its own, and your test page's origin — `http://localhost:<port>` works — under **Allowed sites** in the sandbox app.
+Clients are linked through [Sign in with HEVN](/whitelabel/sign-in-with-hevn) here too, with real sign-ins — Google, or a one-time code to an email you pass as `login_hint`. Each test client needs a Google account or an email address that has no HEVN sandbox account of its own, and your test page's origin — `http://localhost:<port>` works — under **Allowed sites** in the sandbox app.
 
 ## Read the faucet account
 

@@ -32,10 +32,11 @@ the balance: `GET /dapi/v1/client/balance`, with the client's id
 in `X-Hevn-Account`, reads it on chain, one row per account the client holds, and no HEVN database holds an
 authoritative copy.
 
-Two accounts sit there, each named after the stablecoin it holds: **`USDC`** and **`EURC`**. A
-third, **`FDIC_USD`**, is not on the wallet at all — it is a virtual account a partner bank holds for
-the client in dollars. Which account a rail settles into is the rail's `destinationAccount`, fixed
-when the rail is opened and reported next to its `supportedAccounts`; per deposit,
+Two accounts sit there, each named after the stablecoin it holds: **`USDC`** and **`EURC`**. Two
+more, **`FDIC_USD`** and **`FDIC_EUR`**, are not on the wallet at all — they are virtual accounts a
+partner bank holds for the client in dollars and in euros. Which account a virtual account settles into
+is its `destinationAccount`, fixed by the rail HEVN picked for the product and reported next to its
+`supportedAccounts`; per deposit,
 `POST /dapi/v1/payins` takes the `destinationAccount` you want that arrival delivered in. Moving
 money between two of a client's own accounts is its own resource — see [Swaps](/whitelabel/swaps).
 

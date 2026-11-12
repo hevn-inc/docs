@@ -1,13 +1,13 @@
 ---
 title: "Rails and payment methods"
-description: "What each payment method needs, which currencies the deposit rails carry, and how a rail id is put together."
+description: "What each payment method needs, which products a client can request, and the currency each one carries."
 ---
 
-Rail ids are opaque strings you copy from `GET /dapi/v1/banks`. This page is what they mean and what each payment method needs.
+A virtual account is requested by **product** — a region code such as `eu` or `us` — and HEVN picks the rail behind it. This page is what each product carries and what each payment method needs.
 
 ## What each method needs
 
-A payment method is defined by the identifiers it routes on. The same matrix governs both directions: the `requisites.fields` you read off an open rail, and the `fields` you send when you save a contact.
+A payment method is defined by the identifiers it routes on. The same matrix governs both directions: the `requisites.fields` you read off an active virtual account, and the `fields` you send when you save a contact.
 
 `+` means every group is required. `or` means any one of the alternatives in that group.
 
@@ -82,46 +82,38 @@ These do not open as deposit rails; they are destinations you can save as contac
 
 Alongside the identifiers, every requisite and every contact carries a `holder`: `type` (`individual` or `business`) with `firstName` and `lastName`, or `businessName`. Some methods route on the name alone and ignore the account identifiers for matching; the identifiers are still required.
 
-## Deposit-rail coverage
+## Products
 
-These are the methods a client can hold a rail in, and the currency each one settles from. A payer wires that currency; the client's wallet is credited in a stablecoin.
+These are the products a client can request with `POST /dapi/v1/banks`, the methods its payers use, and the currency each one settles from. A payer wires that currency; the client's wallet is credited in a stablecoin.
 
-| Method | Currency | Region |
-| --- | --- | --- |
-| `ach` | USD | United States |
-| `fedwire` | USD | United States |
-| `swift` | USD | International |
-| `sepa` | EUR | Euro area |
-| `ukfps` | GBP | United Kingdom |
-| `uaefts` | AED | United Arab Emirates |
-| `pix` | BRL | Brazil |
-| `spei` | MXN | Mexico |
-| `npp` | AUD | Australia |
-| `nip` | NGN | Nigeria |
-| `breb` | COP | Colombia |
-| `pse` | COP | Colombia |
-| `transfers_3_0` | ARS | Argentina |
+| `product` | Methods | Currency | Region |
+| --- | --- | --- | --- |
+| `us` | `ach`, `fedwire` | USD | United States |
+| `swift` | `swift` | USD | International |
+| `eu` | `sepa` | EUR | Euro area |
+| `uk` | `ukfps` | GBP | United Kingdom |
+| `uae` | `uaefts` | AED | United Arab Emirates |
+| `br` | `pix` | BRL | Brazil |
+| `mx` | `spei` | MXN | Mexico |
+| `co` | `breb` | COP | Colombia |
+| `au` | `npp` | AUD | Australia |
+| `ng` | `nip` | NGN | Nigeria |
 
-`GET /dapi/v1/banks` is authoritative and narrower: it returns only the rails a given client may hold, after its residency is taken into account. Read `currency` and `method` off that response rather than deriving them from this table.
+`GET /dapi/v1/banks` is authoritative and narrower: it returns only the products a given client can request, after its residency and legal form are taken into account. Read `currency` and `method` off that response rather than deriving them from this table. The `product` enum in the API reference lists more codes than this table; a code with no rail behind it for a client is simply absent from that client's list, and requesting it answers `403 rail_not_available`.
 
-## Rail ids
+The product is the key: the same code in every environment, and the one you send, store and put in the path. `rail` on the record names the route HEVN chose behind it. It is informational and can change while the record is `preparing` — compare nothing against it and never show it to your customers.
 
-An id usually reads `{method}_{named|pooled}-{bank}` — the ids written this way on these pages, `sepa_named-bank_a` and `ach_named-bank_b`, stand in for the real ones — though a few carry no bank segment at all (`wire_named`). Two parts matter:
-
-- **`named`** — the client's own legal name is on the account. Payers see the client; nothing else is needed for the money to be attributed.
-- **`pooled`** — one partner account serves many clients, and each deposit is attributed by the `paymentReference` on the account details. The payer must quote it.
-
-The bank segment is the partner behind the rail and is not something to branch on. Treat the whole id as opaque: compare it for equality, store it, copy it into `POST /dapi/v1/banks`, and never parse it or show it to your customers. Ids are per environment — one you hardcoded in the sandbox does not exist in production.
+A named account is opened in the client's own legal name, so payers see the client and nothing else is needed for the money to be attributed. A pooled account is one partner account serving many clients; its account details carry a `paymentReference`, and each deposit is attributed by it, so the payer must quote it.
 
 ## Accounts a rail settles into
 
-`supportedAccounts` on a rail record is which of the client's accounts that rail can deliver into, named as `USDC` or `EURC`.
+`supportedAccounts` on a virtual account is which of the client's accounts its rail can deliver into, named as `USDC` or `EURC`, and `railCurrency` is what the rail delivers.
 
-A rail's token is fixed when the rail is opened, so choosing the token means choosing the rail id: rails that can deliver either token ship as a pair of ids, one per token, with the EURC variant's id ending in `_eurc`. `destinationAccount` on the record echoes what the open rail delivers.
+The token is fixed by the rail, and HEVN picks the rail for the product, so it is not something you choose when you request. `destinationAccount` on the record echoes what the active account delivers.
 
 Per deposit the choice is on the money-in call: `POST /dapi/v1/payins` takes a `destinationAccount`, and a token no rail of the client's settles into answers `422 payin_not_available` with `details.options[]` listing the pairs that do.
 
-`feeBps` on the rail record is HEVN's deposit fee in basis points for that rail. It is a whole number: `25` is 0.25%.
+`feeBps` on the record is HEVN's deposit fee in basis points for that product, from the client's plan. It is a whole number: `25` is 0.25%.
 
 ## Chain codes
 

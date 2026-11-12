@@ -61,7 +61,7 @@ on your own account.
 ## The accounts
 
 Both sides are named from one vocabulary, the same one the balance reads back and a payout's
-`sourceAccount` takes. `USDC` and `EURC` are the stablecoins on the wallet; `FDIC_USD` is dollars a
+`sourceAccount` takes. `USDC` and `EURC` are the stablecoins on the wallet; `FDIC_USD` and `FDIC_EUR` are dollars and euros a
 partner bank holds for the account:
 
 | Account | Where the money is | Currency |
@@ -69,10 +69,11 @@ partner bank holds for the account:
 | `USDC` | the account's Base smart wallet | USD |
 | `EURC` | the same smart wallet | EUR |
 | `FDIC_USD` | a virtual account a partner bank holds for the account | USD |
+| `FDIC_EUR` | a virtual account a partner bank holds for the account | EUR |
 
 The two sides must differ, and both must be accounts the owner actually holds. An account it does
 not hold is `422 account_unavailable` — an account with no custodial virtual account cannot name
-`FDIC_USD`. A pair nothing can serve right now is `422 swap_route_unavailable`.
+`FDIC_USD` or `FDIC_EUR`. A pair nothing can serve right now is `422 swap_route_unavailable`.
 
 ```mermaid
 stateDiagram-v2

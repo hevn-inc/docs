@@ -25,11 +25,12 @@ one thing reads as a second thing.
 
 ### The money-in chain
 
-Three levels, three names. Do not collapse them.
+Four levels, four names. Do not collapse them.
 
 | Term | What it is | Never call it |
 | --- | --- | --- |
-| **rail** | A bank route a client can request, identified by an opaque id from `GET /dapi/v1/banks` | "channel", "corridor", "payment method" (a method is one property of a rail) |
+| **product** | A region a client can request a virtual account in — `eu`, `us`, `uk`, `swift`, … The key of `POST /dapi/v1/banks` and `/banks/{product}` | "region code", "market", "rail" |
+| **rail** | The bank route HEVN picks behind a product. Informational on the wire (`rail` on the record); never a key | "channel", "corridor", "payment method" (a method is one property of a rail) |
 | **virtual account** | The opened rail — a `bnk_…` record in the client's own legal name | "bank account" (that is the beneficiary's, at the other end), "requisites" |
 | **account details** | What the payer needs in order to wire money: IBAN, account and routing number, PIX key | "requisites", "credentials", "banking info" |
 
@@ -59,7 +60,7 @@ Do not write "end user", "sub-account", "merchant" or "tenant".
 | **quote** | The priced terms of one payin or payout | "estimate", "rate" |
 | **approval** | The bytes HEVN builds for the integrator to sign | "transaction", "payload" on its own |
 | **settlement token** | The stablecoin a rail delivers — USDC or EURC | "coin", "asset" |
-| **account** | One of `USDC`, `EURC`, `FDIC_USD` — what every `sourceAccount`, `destinationAccount` and balance row names | "wallet"; and do not call `FDIC_USD` a token |
+| **account** | One of `USDC`, `EURC`, `FDIC_USD`, `FDIC_EUR` — what every `sourceAccount`, `destinationAccount` and balance row names | "wallet"; and do not call `FDIC_USD` or `FDIC_EUR` a token |
 | **swap** | A move between two accounts the same client owns. The `swp_…` resource | "conversion", "exchange", "transfer" |
 
 "Recipient" is not used anywhere. It is ambiguous between the contact, the

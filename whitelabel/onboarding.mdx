@@ -386,16 +386,9 @@ The keys are the part after the slot prefix, and a nested one keeps its dot: `ad
   These keys are the one **snake_case** corner of the API. They are the extractor's own field names, not request fields, so `registration_number` is right here and `registrationNumber` is refused.
 </Warning>
 
-## Two phone numbers, two jobs
+## Two phone numbers
 
-The phone on the account and the phone in the document are different fields with different readers, and mixing them up is the single most common reason a rail refuses to open.
-
-| Field | Written by | Read by |
-| --- | --- | --- |
-| Account phone | `PATCH /dapi/v1/client` | The rail requirements check. A company with no account phone reports the `phone_required` blocker on every rail. |
-| `company.phone` | `PUT /dapi/v1/client/kyb` | The KYB gate. Either phone satisfies it. |
-
-Set the account phone right after you link the client and this never comes up.
+The phone on the account and the phone in the document are different fields. `company.phone`, written with `PUT /dapi/v1/client/kyb`, is what the KYB gate reads; the account phone, written with `PATCH /dapi/v1/client`, satisfies the same gate when the document has none. Neither one blocks a virtual account on its own.
 
 ## Complex ownership
 

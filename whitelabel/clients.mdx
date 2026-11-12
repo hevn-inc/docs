@@ -89,6 +89,8 @@ There is one id to store. `cl_7YQ2Kf3mN8` is what you put in `X-Hevn-Account`: t
 
 `kybStatus` follows the client's verification from here on — `notStarted`, then `pending`, `approved`, `rfi` or `rejected` — and `kybApplicationId` names the latest submission behind it. [Onboarding](/whitelabel/onboarding) owns that vocabulary; this row is where you read it without a second call.
 
+`verifiedAt` is the one verdict for both kinds of client: when a business passed KYB, or when an individual verified their identity in the [sign-in window](/whitelabel/sign-in-with-hevn#verify-an-individual). It is absent until then. An individual has no `kybStatus` progress to follow — `verifiedAt` is the field to poll.
+
 A `failed` client answers with a `failure` object whose `code` is `provisioning_failed`, `request_rejected` or `request_canceled`. Contact support with the client id.
 
 ## List your clients

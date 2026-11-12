@@ -16,7 +16,7 @@ Every field of the KYB document, with its accepted values. The document is the b
 | `country` | ISO 3166-1 alpha-2 | yes | The jurisdiction of incorporation. Widens the required document slots. |
 | `registrationNumber` | string, 1–200 | no | The company number in its own register. |
 | `taxId` | string, 1–200 | US only | A US company owes its EIN as `XX-XXXXXXX`. A value that is not in that shape counts as missing. |
-| `phone` | E.164 | yes | Satisfied by the account phone as well — see [onboarding](/whitelabel/onboarding#two-phone-numbers-two-jobs). |
+| `phone` | E.164 | yes | Satisfied by the account phone as well — see [onboarding](/whitelabel/onboarding#two-phone-numbers). |
 | `email` | string, 1–200 | no | A compliance mailbox. HEVN does not write to it. |
 | `address` | object | yes | See below. |
 | `entityType` | enum | yes | |
@@ -46,6 +46,10 @@ None of these appears in `missing[]`. All of them are read by a reviewer.
 | `publicListed` | boolean | Whether the company is listed. |
 | `institutionalInvestors` | boolean | Whether institutional investors fund or own it. |
 | `isRegulated` | boolean | Whether it holds a licence or sits under a regulator. |
+| `regulatoryLicenseType` | string, 1–200 | The licence it holds, in words — for example `Electronic Money Institution`. Some partner banks need it when `isRegulated` is `true`. |
+| `regulatorCountry` | ISO 3166-1 alpha-2 | Country of the authority that licenses it. Some partner banks need it when `isRegulated` is `true`. |
+| `verifiesCustomerIdentity` | boolean | Whether it verifies the identity of its own customers. Some partner banks need it when `isRegulated` is `true`. |
+| `hasTransactionMonitoring` | boolean | Whether it monitors its customers' transactions. Some partner banks need it when `isRegulated` is `true`. |
 | `estimatedAnnualRevenue` | decimal, ≥ 0 | Annual revenue in USD. |
 | `revenueCovers` | enum | How much of operating expense that revenue covers. |
 | `txPerMonth` | enum | Expected transaction count per month. |

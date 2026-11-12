@@ -1,85 +1,47 @@
 ---
 title: "Virtual accounts"
-description: "Check what a rail still needs, open a virtual account for a client, read the account details its payers wire to, and know when it is payable."
+description: "Request a virtual account for a client by product, read what still stands in its way, read the account details its payers wire to, and know when it is payable."
 ---
 
 import ActingAsSnippet from "/snippets/acting-as.mdx";
 
-A **rail** is a bank route you can request for one client. Opening it gives that client a **virtual account** — a `bnk_…` record in the client's own legal name — and the virtual account publishes **account details**: the IBAN, the account and routing number or the PIX key its payers wire to. Money that arrives there is converted **by the partner bank** and delivered to the client's wallet.
+A **product** is a region a client can be paid in — `eu`, `us`, `uk`, `swift`, `br`, … — and it is what you ask for. HEVN picks the **rail** behind it: the bank route that serves that product for this client. Asking gives the client a **virtual account** — a `bnk_…` record in the client's own legal name — and the virtual account publishes **account details**: the IBAN, the account and routing number or the PIX key its payers wire to. Money that arrives there is converted **by the partner bank** and delivered to the client's wallet.
 
-Three levels, three names, and they stay put for the rest of these guides: the rail is the route you ask for, the virtual account is what you get, the account details are what you hand the payer. On the wire the details arrive in a field called `requisites`.
+The product is the key you use; the rail is informational; the virtual account is what you get; the account details are what you hand the payer. On the wire the details arrive in a field called `requisites`.
 
-Opening one is two calls — ask what it needs, then ask for it. The rail id in both comes from `GET /dapi/v1/banks`, which you read first:
-
-<CodeGroup>
-
-```bash cURL
-export HEVN_RAIL=$(curl -s "$HEVN_API/banks" \
-  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" -H "X-Hevn-Account: $HEVN_CLIENT_ID" \
-  | jq -r '.rails[] | select(.currency == "EUR" and .method == "sepa") | .rail' | head -1)
-```
-
-```python Python
-northwind = hevn.acting_as(CLIENT_ID)
-rail = next(r["rail"] for r in northwind.get("/banks")["rails"]
-            if r["currency"] == "EUR" and r["method"] == "sepa")
-```
-
-```javascript Node
-const northwind = hevn.actingAs(clientId);
-const { rails } = await northwind.get("/banks");
-const { rail } = rails.find((r) => r.currency === "EUR" && r.method === "sepa");
-```
-
-```go Go
-northwind := api.ActingAs(clientID)
-catalogue, err := northwind.Get("/banks")
-rail := ""
-for _, entry := range catalogue.List("rails") {
-	if entry.Str("currency") == "EUR" && entry.Str("method") == "sepa" {
-		rail = entry.Str("rail")
-		break
-	}
-}
-```
-
-</CodeGroup>
+Requesting one is a single call. It never refuses because something is missing — the record is created and tells you what it still waits for:
 
 <CodeGroup>
 
 ```bash cURL
-curl "$HEVN_API/banks/$HEVN_RAIL/requirements" \
-  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
-  -H "X-Hevn-Account: $HEVN_CLIENT_ID"
-
 curl -X POST "$HEVN_API/banks" \
   -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
   -H "X-Hevn-Account: $HEVN_CLIENT_ID" \
   -H "Content-Type: application/json" \
-  -d "{\"rail\":\"$HEVN_RAIL\"}"
+  -d '{"product":"eu"}'
 ```
 
 ```python Python
 northwind = hevn.acting_as(CLIENT_ID)
 
-needs = northwind.get(f"/banks/{rail}/requirements")
-if needs["available"]:
-    bank = northwind.post("/banks", {"rail": rail})
+bank = northwind.post("/banks", {"product": "eu"})
+for blocker in bank.get("blockers", []):
+    print(blocker["code"], blocker["message"])
 ```
 
 ```javascript Node
 const northwind = hevn.actingAs(clientId);
 
-const needs = await northwind.get(`/banks/${rail}/requirements`);
-const bank = needs.available ? await northwind.post("/banks", { rail }) : null;
+const bank = await northwind.post("/banks", { product: "eu" });
+for (const blocker of bank.blockers ?? []) console.log(blocker.code, blocker.message);
 ```
 
 ```go Go
 northwind := api.ActingAs(clientID)
 
-needs, err := northwind.Get("/banks/" + rail + "/requirements")
-if needs.Bool("available") {
-	bank, err = northwind.Post("/banks", hevn.Body{"rail": rail})
+bank, err := northwind.Post("/banks", hevn.Body{"product": "eu"})
+for _, blocker := range bank.List("blockers") {
+	fmt.Println(blocker.Str("code"), blocker.Str("message"))
 }
 ```
 
@@ -101,25 +63,25 @@ stateDiagram-v2
     active --> closed
 
     note right of preparing
-        Requested, under review, or approved with no
-        account details published yet. Not payable.
+        Requested, waiting on a blocker, under review,
+        or approved with no account details yet. Not payable.
     end note
     note right of active
         Account details present. Payable.
     end note
 ```
 
-A rail is payable when `status` is `active`. That is the whole rule — `active` is only reported once the account details exist, so there is no second condition to check and no client-side branch to write. A rail you have not opened has no `status` at all.
+A virtual account is payable when `status` is `active`. That is the whole rule — `active` is only reported once the account details exist, so there is no second condition to check and no client-side branch to write. A product you have not requested has no `status` at all.
 
 `suspended` is the partner pausing the account; money already in flight still settles, new payments do not start. `closed` is terminal.
 
 <Note>
-  In production a rail is opened by review, not by your call. `POST /dapi/v1/banks` answers `201` with `status: "preparing"` and the rail becomes `active` when the partner publishes the account details — hours to days, depending on the rail and the client's jurisdiction. In the sandbox that review is emulated and the rail activates at once.
+  In production a virtual account is opened by review, not by your call. `POST /dapi/v1/banks` answers `201` with `status: "preparing"` and the record becomes `active` when the partner publishes the account details — hours to days, depending on the product and the client's jurisdiction. In the sandbox that review is emulated and the record activates as soon as nothing blocks it.
 </Note>
 
-## Find the rail
+## What the client can request
 
-Rail ids are opaque strings. You copy them out of `GET /dapi/v1/banks`, which returns the rails this client may be paid over and which of them are already open:
+`GET /dapi/v1/banks` returns one record per product this client can be paid in — the ones already requested, with their status, and the ones still open to it:
 
 <CodeGroup>
 
@@ -147,16 +109,20 @@ catalogue, err := northwind.Get("/banks")
 {
   "rails": [
     {
-      "rail": "sepa_named-bank_a",
+      "product": "eu",
+      "rail": "sepa-eur-usdc-kappa",
       "currency": "EUR",
+      "railCurrency": "USDC",
       "method": "sepa",
       "opened": false,
       "feeBps": 25,
       "supportedAccounts": ["USDC"]
     },
     {
-      "rail": "ach_named-bank_b",
+      "product": "us",
+      "rail": "ach-usd-usdc-sigma",
       "currency": "USD",
+      "railCurrency": "USDC",
       "method": "ach",
       "opened": true,
       "status": "active",
@@ -171,64 +137,63 @@ catalogue, err := northwind.Get("/banks")
 }
 ```
 
-The list is the client's own catalogue: rails closed to its residency are not in it. Pick by `currency` and `method`, never by parsing the id — what each method means and which currency it carries is in the [rail reference](/whitelabel/reference/rails). `GET /dapi/v1/banks/{rail}` returns one record in the same shape.
+The list is the client's own catalogue: a product nothing can serve for this client — its residency, its type, or no partner in that region — is not in it. `GET /dapi/v1/banks/{product}` returns one record in the same shape.
 
-<Note>
-  The rail ids printed on this page stand in for real ones. Ids differ per environment and per partner, and the only correct source is the `GET /dapi/v1/banks` you just ran for this client — which is why every call above takes `$HEVN_RAIL` rather than a literal.
-</Note>
+`product` is the key: it is what you send, what the path takes and what `Location` points at, and it is the same in every environment. `rail` names the route HEVN chose behind it. It is informational — do not store it, branch on it or show it — and it can change while a record is still `preparing`, when HEVN re-routes the request to another partner. The products and the methods behind them are in the [rail reference](/whitelabel/reference/rails).
 
-## What the requirements read tells you
+## Request it
 
-`GET /dapi/v1/banks/{rail}/requirements` opens nothing, writes nothing and calls no partner. It answers with the gaps that would refuse an opening:
+```json
+{ "product": "eu" }
+```
+
+`201 Created`, `Location: /dapi/v1/banks/eu`, body is the record with `status: "preparing"`. A virtual account is a singleton per client and product, so requesting one twice is safe: the second call answers `200` with `Idempotency-Replayed: true` and the same record, whether the first one is still preparing or already active. `Idempotency-Key` is accepted and unnecessary here.
+
+Two refusals are worth branching on: `403 rail_not_available` with `details.product` means nothing can serve this product for this client, and `422 validation_failed` means the product code is not one HEVN knows. The rest are in the [error reference](/whitelabel/reference/errors).
+
+Request products one at a time — a client that needs EUR and USD is two calls.
+
+## What still blocks it
+
+A record that is `preparing` carries `blockers[]`: everything that stands between the request and active account details. Nothing on this list refuses the request — the record waits, and moves on its own once the blocker clears.
 
 ```json
 {
-  "rail": "sepa_named-bank_a",
+  "product": "eu",
+  "rail": "sepa-eur-usdc-kappa",
   "currency": "EUR",
   "method": "sepa",
-  "available": false,
+  "opened": true,
+  "status": "preparing",
+  "id": "bnk_4Tq9Wd",
   "blockers": [
     {
-      "code": "phone_required",
-      "field": "phone",
-      "message": "The client needs a phone number before this rail can open."
+      "code": "kyb_required",
+      "field": "kyb",
+      "message": "The client's business verification has to be completed before this account can open."
     }
-  ],
-  "requires": { "phone": true, "address": false, "kyb": false },
-  "kybStatus": "approved",
-  "kycStatus": "notStarted"
+  ]
 }
 ```
 
-`available` is `true` exactly when `blockers` is empty. There are three blockers, and each one has a single fix:
+There are three, and each has a single fix:
 
 | `code` | Cleared by |
 | --- | --- |
-| `phone_required` | A phone number on the account — `PATCH /dapi/v1/client` with the id in `X-Hevn-Account`. The phone inside the KYB document does not clear it. |
-| `address_required` | A complete `company.address` in the [KYB document](/whitelabel/onboarding). Only some rails ask for it. |
-| `kyb_required` | A KYB document that reads `ready: true`. Approval is not required to open the rail; it is required for the rail to go `active`. |
+| `kyb_required` | A business client's KYB application reaching `approved` — see [Onboarding](/whitelabel/onboarding). |
+| `verification_required` | A linked individual verifying their identity. Open a `verify` session for the client in the [sign-in window](/whitelabel/sign-in-with-hevn#verify-an-individual); the holder verifies there, never through you. |
+| `terms_required` | The client accepting the partner bank's terms. `url` is the page the client opens to accept them. |
 
-Which blockers a rail can report differs by rail, so read this route rather than assuming. `kycStatus` is the partner's own review state for this client on this rail — `notStarted`, `requested`, `incorporating`, `pending`, `underReview`, `documentRequested`, `approved` or `rejected`.
-
-## Open it
-
-```json
-{ "rail": "sepa_named-bank_a" }
-```
-
-`201 Created`, `Location: /dapi/v1/banks/sepa_named-bank_a`, body is the rail record with `status: "preparing"`. A rail is a singleton per client, so opening one twice is safe: the second call answers `200` with `Idempotency-Replayed: true` and the same record, whether the first one is still preparing or already active. `Idempotency-Key` is accepted and unnecessary here.
-
-Three refusals are worth branching on: `422 rail_requirements_unmet` carries `details.blockers` in the shape above, `404 rail_not_found` means the id is unknown or hidden, and `403 rail_not_available` means this client may not hold this rail. The rest are in the [error reference](/whitelabel/reference/errors).
-
-Open rails one at a time — a client that needs EUR and USD is two calls.
+`message` is safe to show your customer as is. `url` is present only when there is a page the client itself opens; `verification_required` on a linked individual never carries one, because the sign-in window needs your `redirectUri`. Re-read the record rather than tracking blockers yourself: `GET /dapi/v1/banks/{product}` answers what is left.
 
 ## Read the account details
 
-Once the rail is `active`, its record carries the details a payer needs. They are in the client's own legal name — that is what "named" means in a rail id:
+Once the record is `active`, it carries the details a payer needs. They are in the client's own legal name:
 
 ```json
 {
-  "rail": "sepa_named-bank_a",
+  "product": "eu",
+  "rail": "sepa-eur-usdc-kappa",
   "currency": "EUR",
   "method": "sepa",
   "opened": true,
@@ -245,29 +210,23 @@ Once the rail is `active`, its record carries the details a payer needs. They ar
 }
 ```
 
-`fields` carries only the identifiers this method uses — an IBAN for SEPA, an account and routing number for ACH, and so on; the full matrix is in the [rail reference](/whitelabel/reference/rails). The shape is `RailRequisitesView` on a rail and `ContactPaymentAccountView` on a [contact](/whitelabel/payouts#save-a-contact); both carry the same `fields`, `holder` and `bankName`.
+`fields` carries only the identifiers this method uses — an IBAN for SEPA, an account and routing number for ACH, and so on; the full matrix is in the [rail reference](/whitelabel/reference/rails). The shape is `RailRequisitesView` on a virtual account and `ContactPaymentAccountView` on a [contact](/whitelabel/payouts#save-a-contact); both carry the same `fields`, `holder` and `bankName`.
 
-`id` is the `bnk_…` a statement or a transaction filter refers to. Store it alongside the rail id.
+`id` is the `bnk_…` a statement or a transaction filter refers to. Store it alongside the product.
 
-Two numbers travel with the record. `minimumDeposit` is the smallest amount the partner will accept over this rail, in the rail's own currency; anything under it is returned by the bank, not by us. `feeBps` is HEVN's deposit fee in basis points — `25` is 0.25%, taken out of the converted amount.
+Two numbers travel with the record. `minimumDeposit` is the smallest amount the partner will accept, in the product's own currency; anything under it is returned by the bank, not by us. `feeBps` is HEVN's deposit fee in basis points — `25` is 0.25%, taken out of the converted amount. It comes from the client's plan, so two clients can read different values for the same product.
 
 ### What the payer sees
 
-On a `named` rail the partner bank opens the account in the client's own legal name, so the payer's bank shows the client and nothing about HEVN. Hand your customer the `fields`, the `holder` name and `bankName` exactly as they come back, and re-read them before each use rather than caching them — a partner can republish an account.
+On a named account the partner bank opens the account in the client's own legal name, so the payer's bank shows the client and nothing about HEVN. Hand your customer the `fields`, the `holder` name and `bankName` exactly as they come back, and re-read them before each use rather than caching them — a partner can republish an account.
 
-On a `pooled` rail the account belongs to the partner and `paymentReference` is what separates one client's money from another's, so a payment that arrives without it cannot be attributed. Pooled rails suit flows where your product generates the payment instruction; named rails suit flows where a human types it.
+When the account details carry a `paymentReference`, the account is pooled: it belongs to the partner, and the reference is what separates one client's money from another's, so a payment that arrives without it cannot be attributed. Hand the reference over with the rest, every time.
 
 ## Which stablecoin a deposit settles in
 
-`supportedAccounts` on the rail record is what this rail can deliver into the client's wallet, and `destinationAccount` is what it delivers today. Neither is something you set after the fact: **the rail decides, and the rail is fixed when you open it.** A rail that can deliver two tokens ships as two rail ids, one per token, so choosing the token is choosing which rail to open with `POST /dapi/v1/banks` — see [Rails](/whitelabel/reference/rails).
+`railCurrency` is what the rail delivers, `supportedAccounts` is which of the client's accounts it can deliver into, and `destinationAccount` is where it delivers today. None of them is something you set: **the rail decides, and HEVN picks the rail for the product.** Read them back, never cache them.
 
-Read both back, never cache them:
-
-```json
-{ "rail": "sepa_named-bank_a", "supportedAccounts": ["EURC"], "destinationAccount": "EURC" }
-```
-
-The choice that is yours per payment is on the money-in side. `POST /dapi/v1/payins` takes `destinationAccount` and quotes the deposit in it; when no rail of the client's settles into the token you asked for, the refusal carries `details.options[]` with the pairs that do ([Payins](/whitelabel/payins)). Nothing on this page converts an existing balance — `destinationAccount` only ever names where money that has not arrived yet will land. Converting what already arrived is [Swaps](/whitelabel/swaps).
+The choice that is yours per payment is on the money-in side. `POST /dapi/v1/payins` takes `destinationAccount` and quotes the deposit in it; when no virtual account of the client's settles into the account you asked for, the refusal carries `details.options[]` with the pairs that do ([Payins](/whitelabel/payins)). Nothing on this page converts an existing balance — `destinationAccount` only ever names where money that has not arrived yet will land. Converting what already arrived is [Swaps](/whitelabel/swaps).
 
 
 <Card title="Next: Payins" icon="arrow-right" href="/whitelabel/payins">
