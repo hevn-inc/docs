@@ -1,0 +1,83 @@
+---
+title: "Changelog"
+description: "What changed in the whitelabel API, newest first, and what to change on your side."
+---
+
+Changes to `/dapi/v1` and to these guides, newest first. **Breaking** marks a change that makes an integration written against the earlier contract fail; each one says what to change.
+
+<Update label="2026-11-12" description="Guides synced with the API">
+  - The [error reference](/whitelabel/reference/errors) now lists `verification_not_applicable` (409), `kyb_documents_processing` (409, retry the completion in a few seconds) and `transfer_policy_denied` (403, the holder's own policy refuses the payout). It drops `rail_requirements_unmet` and `phone_required`, which the API no longer answers.
+  - [Payins](/whitelabel/payins) explain `singleUse`, the two windows a payin lives through, and what happens when a payer sends the wrong amount, currency or chain.
+  - The [sandbox](/whitelabel/sandbox) accepts any made-up company, people and documents that bring the KYB document to `ready: true`.
+  - The `slot` enum on documents no longer includes `directors_registry` or `list_of_authorized_signatories`.
+  - A contact's `address` is returned with all of its fields.
+</Update>
+
+<Update label="2026-11-10" description="Fees from the client's plan">
+  - `feeBps` on a virtual account comes from the client's plan, so two clients can read different values for the same product. Read it per client; never hardcode it ([Fees](/whitelabel/reference/fees)).
+</Update>
+
+<Update label="2026-11-06" description="Regulated companies">
+  - The KYB document takes `company.regulatoryLicenseType`, `company.regulatorCountry`, `company.verifiesCustomerIdentity` and `company.hasTransactionMonitoring`. Some partner banks need them when `isRegulated` is `true` ([KYB fields](/whitelabel/reference/kyb-fields)).
+</Update>
+
+<Update label="2026-11-04" description="FDIC_EUR account">
+  - A new account, `FDIC_EUR`: euros a partner bank holds for the client, next to `FDIC_USD`. It appears in `GET /dapi/v1/client/balance`, `sourceAccount`, `destinationAccount` and swaps ([Balances and transactions](/whitelabel/balances-and-transactions)). A payin cannot settle into it.
+  - `railCurrency` can read `EUR`.
+</Update>
+
+<Update label="2026-10-30" description="Virtual accounts by product · identity verification">
+  **Breaking: virtual accounts are requested by product.**
+
+  - `POST /dapi/v1/banks` takes `{"product": "eu"}` instead of `{"rail": "…"}`. A product is a region code — `eu`, `us`, `uk`, `swift`, `uae`, `br`, `mx`, `co`, `au`, `ng` — and HEVN picks the rail behind it ([Rails](/whitelabel/reference/rails#products)).
+  - `GET /dapi/v1/banks/{rail}` and `GET /dapi/v1/banks/{rail}/rate` are now `GET /dapi/v1/banks/{product}` and `GET /dapi/v1/banks/{product}/rate`.
+  - `GET /dapi/v1/banks/{rail}/requirements` is removed. A request is never refused for something missing any more: the record is created `preparing` and lists what it waits for in `blockers[]` — `kyb_required`, `verification_required` or `terms_required` ([Virtual accounts](/whitelabel/virtual-accounts#what-still-blocks-it)).
+  - Every record carries `product`. `rail` stays on the record, but it is informational and can change while the record is `preparing`; stop storing it and stop sending it.
+  - A phone number on the account no longer blocks a virtual account.
+
+  To migrate: send `product` instead of `rail`, key your stored records by `product`, replace the requirements read with `blockers[]` on the record, and drop handling for `422 rail_requirements_unmet` and `422 phone_required`.
+
+  **Identity verification for linked individuals.**
+
+  - `POST /dapi/v1/connect/sessions` takes `action: "verify"` with a `clientId`. The holder verifies their identity in the sign-in window; you get the result on the redirect and in `verifiedAt` ([Sign in with HEVN](/whitelabel/sign-in-with-hevn#verify-an-individual)).
+  - The client record carries `verifiedAt`: when a business passed KYB, or when an individual verified their identity ([Clients](/whitelabel/clients)).
+  - In the sandbox, `POST /dapi/v1/sandbox/kyb/status` with `approved` also verifies an individual client.
+</Update>
+
+<Update label="2026-10-26" description="Sign-in window">
+  - Linking issues the code right after the holder signs in. There is no separate consent screen, and the `access_denied` callback now means the holder cancelled.
+  - `login_hint` on the session URL signs the holder in with a one-time code sent to that email; without it the window offers Google and email sign-in.
+  - The window's title, logo, colours and theme are set by HEVN on request. The **Sign-in window** card keeps only **Allowed sites**.
+</Update>
+
+<Update label="2026-10-23" description="Non-custodial clients and Sign in with HEVN">
+  **Breaking: clients are created and owned by your customers.**
+
+  - `POST /dapi/v1/clients` is removed. A client comes from [Sign in with HEVN](/whitelabel/sign-in-with-hevn): `POST /dapi/v1/connect/sessions` with `action: "link"`, the HEVN-hosted window, then `POST /dapi/v1/clients/link` with the code it returns.
+  - The client's wallet is owned by the holder's own key. Your developer key signs only for your own integrator account.
+  - A payout you book for a linked client answers `authorization: "client"`. The holder approves it in the window through a `sign` session; there is no approval for your key.
+  - Developer key scopes are gone.
+
+  To migrate: replace client creation with the sign-in flow, store the `cl_…` from `POST /dapi/v1/clients/link` server-side, and route each client payout through a `sign` session ([Payouts](/whitelabel/payouts#approve-it-in-the-sign-in-window)).
+</Update>
+
+<Update label="2026-10-20" description="Payout quotes name their source">
+  - A payout quote names the account it is paid from in `quote.sourceAccount`. Read the account from it, not from `fromCurrency`: a `FDIC_USD` payout and a `USDC` payout a partner prices in USD both read `fromCurrency: "USD"` ([Payouts](/whitelabel/payouts)).
+  - A SEPA contact requires `bank.bankName`.
+</Update>
+
+<Update label="2026-10-19" description="Sandbox limits and KYB decisions">
+  - Sandbox limits: 5 clients per integrator, at most `1` per payout, escrow and payin credit, and a faucet that sends at most `5`, only to a wallet holding less than `1`. New refusals `sandbox_client_limit_reached`, `sandbox_amount_limit_exceeded` and `sandbox_faucet_balance_too_high` ([Limits](/whitelabel/reference/limits)).
+  - In the sandbox a completed KYB submission waits for you: decide it with `POST /dapi/v1/sandbox/kyb/status` — `approved`, `rfi` or `rejected` ([Sandbox](/whitelabel/sandbox#decide-a-kyb-application)).
+  - Chain errors — `bundler_*` and `user_operation_*` — answer `503`, never `502`. `simulation_failed`, `bundler_unavailable` and `user_operation_unavailable` carry `details.reason`.
+  - Unreadable values in a KYB document arrive as an RFI comment and are answered with `PUT /dapi/v1/documents/{documentId}/content`. `document_fields_missing` is removed; completion refuses only with `kyb_incomplete`.
+  - A phone number is not unique: two clients may share one.
+</Update>
+
+<Update label="2026-09-20" description="Swaps">
+  - [Swaps](/whitelabel/swaps): move money between two accounts the same client owns, with `POST /dapi/v1/swaps/preview`, `POST /dapi/v1/swaps` and a signed confirmation.
+</Update>
+
+<Update label="2026-09-18" description="Whitelabel API">
+  - First release of `/dapi/v1`: developer keys, clients, KYB, virtual accounts, payins, payouts, contacts, the ledger, escrow and the sandbox.
+</Update>

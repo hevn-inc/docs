@@ -140,6 +140,12 @@
               "whitelabel/reference/limits",
               "whitelabel/reference/client"
             ]
+          },
+          {
+            "group": "Changelog",
+            "pages": [
+              "whitelabel/changelog"
+            ]
           }
         ]
       },
