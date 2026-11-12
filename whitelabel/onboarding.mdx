@@ -311,6 +311,10 @@ Poll `GET /dapi/v1/client/kyb`. There is no webhook; `kybStatus` on the [client 
 | `rfi` | The reviewer asked for something. | Read `application.comment`, fix the document, complete again. |
 | `rejected` | The application was refused. | Read `application.comment`. A new attempt needs new facts, not a resubmission. |
 
+<Note>
+  In the sandbox there is no real verification. Any made-up data that brings the document to `ready: true` passes, so generate the company, its people and its papers with mocks and run the whole flow end to end. Nobody at HEVN reviews the submission: it stays `pending` until you decide it yourself with `POST /dapi/v1/sandbox/kyb/status` — `approved`, `rfi` or `rejected` — so every branch in the table above can be exercised ([Sandbox](/whitelabel/sandbox#decide-a-kyb-application)).
+</Note>
+
 The application block is the review's own record:
 
 ```json

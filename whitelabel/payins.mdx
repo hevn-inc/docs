@@ -124,7 +124,9 @@ The client needs an **active rail** in the currency the payer sends — see [Vir
 
     Hand `requisites` to the payer verbatim, **`paymentReference` included** — on a pooled account it is the only thing that attributes the money to this payin.
 
-    `kind` says where the payer acts: `bank_transfer` (use `requisites`), `qr_code` (`qrPayload`), `hosted_page` (`url`), `manual`, or `onchain` (`address`, `chainId` and `memo`). `singleUse: true` means these instructions belong to this payin alone.
+    `kind` says where the payer acts: `bank_transfer` (use `requisites`), `qr_code` (`qrPayload`), `hosted_page` (`url`), `manual`, or `onchain` (`address`, `chainId` and `memo`).
+
+    `singleUse` says whether the account details may receive another payment. Build as if it were always `true`: the instructions belong to this payin, and they are used up once money is sent to them. Never save them, and never show them for a second payment. A partner can answer `false` for a standing account, but the amount, the reference and `expiresAt` still belong to this one payin. The account details meant for repeat payments are the ones on an active rail — see [Unsolicited wires](#unsolicited-wires-to-the-clients-account-details).
 
     Opening the same payin again returns the same instructions — that is the safe retry, not a way to create a second payin. Once the price stops holding it answers `410 payin_expired`; quote again.
   </Step>
@@ -145,6 +147,32 @@ The client needs an **active rail** in the currency the payer sends — see [Vir
     | `refunded` | Returned to the payer. |
   </Step>
 </Steps>
+
+## How long a payin lives
+
+A payin has two windows, and `expiresAt` reports whichever one applies.
+
+| Stage | Window | When it closes |
+| --- | --- | --- |
+| Quoted, not opened | About two minutes | Opening answers `410 payin_expired`. Quote again. |
+| Opened, waiting for the payer | Usually a few hours | Money that arrives later can be returned to the payer. |
+
+If nobody pays, nothing happens: the payin expires and nothing is charged. An unpaid payin never appears in `GET /dapi/v1/transactions`, and there is no route that lists payins. Store `payinId` when you quote; a payin whose id you lost is one you can no longer reach.
+
+Once money arrives, a `pending` income row appears on the ledger. It ends as `success`, `refunded`, or `rfi` when the partner asks about the payment ([Balances and transactions](/whitelabel/balances-and-transactions)).
+
+## When the payer gets it wrong
+
+Quoted instructions are matched on what the payer sends, so a mistake costs time. Money is not lost as long as the currency is right and the reference (or `memo`) is there.
+
+| Mistake | What happens |
+| --- | --- |
+| Bank transfer, right currency and reference, different amount | Usually the amount actually sent is credited. Some partners return it to the payer instead. |
+| Bank transfer, wrong currency or missing reference | The money may not be attributable. Recovering it goes through HEVN support and can take a long time. |
+| On-chain, different amount | Returned to the sender, usually within a few hours. |
+| On-chain, wrong chain or wrong token | Stuck. Recovering it is possible, but slow and handled case by case with HEVN. |
+
+That is why quoted bank payins suit payers who copy the instructions exactly. When a person types account details by hand, the standing account details of an active rail are the safer path.
 
 ## Quote an on-chain transfer
 

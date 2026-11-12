@@ -19,7 +19,7 @@ The sandbox is the same API against one emulated partner on Base Sepolia. Same p
 | Fiat partner | One emulator answers for every rail. It issues checksum-valid account details — `SBOX…` BICs, DE/AE/GB IBANs, ABA routing numbers, a PIX key, an 18-digit SPEI number. |
 | Money in and out | Paid by a shared testnet faucet account on demand, through the routes below. Nothing arrives on its own. |
 | FX | A fixed table: USD 1, EUR 1.08, GBP 1.27, AED 0.2723, and so on, with USDC pegged to USD and EURC to EUR. |
-| Verification | Nothing is checked against a registry or the papers' contents. A submitted KYB application waits for a reviewer as in production, and you are the reviewer: [decide it](#decide-a-kyb-application) yourself. Rails open without a compliance queue. |
+| Verification | Nothing is checked against a registry or the papers' contents. Any made-up company, people and documents that bring the KYB document to `ready: true` will do, so let your coding agent generate them. A submitted KYB application waits for a reviewer as in production, and you are the reviewer: [decide it](#decide-a-kyb-application) yourself. Rails open without a compliance queue. |
 | Background work | Off. Every call projects its own rows before it returns, so there is nothing to wait for that you did not ask for. |
 | Swaps | Not served. The emulated chain has no exchange venue behind it and no custodial dollar balance is issued, so `POST /dapi/v1/swaps` and `POST /dapi/v1/swaps/preview` answer `422 swap_route_unavailable` rather than a quote ([Swaps](/whitelabel/swaps)). |
 | Cards, cross-chain routing | Disabled. They are not part of the whitelabel API. |
@@ -232,7 +232,9 @@ Keep two test payouts more than `0.20` apart in amount: returned money is attrib
 
 ## Limits
 
-The sandbox runs on shared testnet infrastructure — one faucet account, one gas budget — so every integrator gets a small, fixed share of it. Production has none of these limits.
+The sandbox runs on shared testnet infrastructure — one faucet account, one gas budget — so every integrator gets a small, fixed share of it. The tokens are real testnet USDC and EURC, so that every transfer behaves as it does in production, and their free supply is finite. Production has none of these limits.
+
+To test money moving between parties, link two or three clients, fund one from the faucet and pay the others with amounts below `1`.
 
 | Limit | Value | Refusal |
 | --- | --- | --- |
