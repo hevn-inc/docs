@@ -204,9 +204,8 @@
             "pages": [
               "GET /banks",
               "POST /banks",
-              "GET /banks/{rail}",
-              "GET /banks/{rail}/requirements",
-              "GET /banks/{rail}/rate"
+              "GET /banks/{product}",
+              "GET /banks/{product}/rate"
             ]
           },
           {

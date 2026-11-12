@@ -1034,8 +1034,8 @@
         "tags": [
           "escrow"
         ],
-        "summary": "Open an escrow and return the approval to sign",
-        "description": "Create an escrow draft and return the exact approval payload that the authorized developer key must sign. No on-chain action is submitted until the signature is confirmed.",
+        "summary": "Open an escrow and return the payer's approval",
+        "description": "Create an escrow draft and return the payer's approval that funds it. The payer signs it on its own wallet: a developer key cannot, and a payer that owns its wallet is refused with `account_not_controlled` until it can approve in the HEVN sign-in window. No on-chain action is submitted until it is signed.",
         "operationId": "create_escrow_escrow_post",
         "security": [
           {
@@ -2839,8 +2839,8 @@
         "tags": [
           "virtual accounts"
         ],
-        "summary": "Request a rail for this client",
-        "description": "Answers 201 with the rail record the first time, 200 with `Idempotency-Replayed: true` when the rail was already requested or is already active. A rail is a singleton per client, so the server key is the client and the rail.",
+        "summary": "Request a receiving account for a product",
+        "description": "Answers 201 with the account record the first time, 200 with `Idempotency-Replayed: true` when the product was already requested or is already active. A receiving account is a singleton per client and product, so the server key is the client and the product. Unmet prerequisites never refuse the request: the record stays preparing and lists its blockers.",
         "operationId": "open_rail_banks_post",
         "security": [
           {
@@ -2925,14 +2925,14 @@
         }
       }
     },
-    "/banks/{rail}": {
+    "/banks/{product}": {
       "get": {
         "tags": [
           "virtual accounts"
         ],
         "summary": "Retrieve one virtual account",
-        "description": "Retrieve one payment method and, when opened, its receiving details. The rail id is HEVN's stable public value.",
-        "operationId": "read_rail_banks__rail__get",
+        "description": "Retrieve the receiving account of one region product and, when opened, its receiving details. The product is the path key.",
+        "operationId": "read_rail_banks__product__get",
         "security": [
           {
             "HTTPBearer": []
@@ -2940,18 +2940,17 @@
         ],
         "parameters": [
           {
-            "name": "rail",
+            "name": "product",
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string",
-              "description": "Opaque rail id",
+              "$ref": "#/components/schemas/RailProduct",
+              "description": "Region product, for example eu or us",
               "examples": [
-                "wire_named"
-              ],
-              "title": "Rail"
+                "eu"
+              ]
             },
-            "description": "Opaque rail id"
+            "description": "Region product, for example eu or us"
           },
           {
             "name": "X-Hevn-Account",
@@ -2999,88 +2998,14 @@
         }
       }
     },
-    "/banks/{rail}/requirements": {
-      "get": {
-        "tags": [
-          "virtual accounts"
-        ],
-        "summary": "What this client still has to provide before the rail can open",
-        "description": "A pure read: it opens nothing, writes nothing and calls no provider.",
-        "operationId": "read_rail_requirements_banks__rail__requirements_get",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "rail",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "description": "Opaque rail id",
-              "examples": [
-                "wire_named"
-              ],
-              "title": "Rail"
-            },
-            "description": "Opaque rail id"
-          },
-          {
-            "name": "X-Hevn-Account",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself.",
-              "examples": [
-                "cl_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
-              ],
-              "title": "X-Hevn-Account"
-            },
-            "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RailRequirementsView"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Request validation failed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PlatformErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/banks/{rail}/rate": {
+    "/banks/{product}/rate": {
       "get": {
         "tags": [
           "virtual accounts"
         ],
         "summary": "Retrieve the receiving conversion rate",
         "description": "Return the current conversion rate and fixed fee for this receiving payment method. The result is indicative until an incoming transfer is created.",
-        "operationId": "read_rail_rate_banks__rail__rate_get",
+        "operationId": "read_rail_rate_banks__product__rate_get",
         "security": [
           {
             "HTTPBearer": []
@@ -3088,18 +3013,17 @@
         ],
         "parameters": [
           {
-            "name": "rail",
+            "name": "product",
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string",
-              "description": "Opaque rail id",
+              "$ref": "#/components/schemas/RailProduct",
+              "description": "Region product, for example eu or us",
               "examples": [
-                "wire_named"
-              ],
-              "title": "Rail"
+                "eu"
+              ]
             },
-            "description": "Opaque rail id"
+            "description": "Region product, for example eu or us"
           },
           {
             "name": "X-Hevn-Account",
@@ -4917,6 +4841,7 @@
           "RD",
           "USDC_ARB",
           "FDIC_USD",
+          "FDIC_EUR",
           "KYC_CARDS"
         ],
         "title": "AccountKey"
@@ -4956,6 +4881,16 @@
           "client"
         ],
         "title": "AuthorizationKind"
+      },
+      "BalanceAccount": {
+        "type": "string",
+        "enum": [
+          "USDC",
+          "EURC",
+          "RD",
+          "USDC_ARB"
+        ],
+        "title": "BalanceAccount"
       },
       "BankAccountInput": {
         "properties": {
@@ -5061,7 +4996,7 @@
           "intermediaryBank": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/IntermediaryBank"
+                "$ref": "#/components/schemas/IntermediaryBank-Input"
               },
               {
                 "type": "null"
@@ -5312,7 +5247,7 @@
         ],
         "title": "BankAccountInput"
       },
-      "BankAddress": {
+      "BankAddress-Input": {
         "properties": {
           "addressLine1": {
             "type": "string",
@@ -5371,6 +5306,72 @@
         "type": "object",
         "required": [
           "addressLine1"
+        ],
+        "title": "BankAddress"
+      },
+      "BankAddress-Output": {
+        "properties": {
+          "addressLine1": {
+            "type": "string",
+            "title": "Addressline1",
+            "description": "Street name and building number."
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City",
+            "description": "City or locality."
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State",
+            "description": "State, province or administrative area."
+          },
+          "postalCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Postalcode",
+            "description": "Postal or ZIP code."
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country",
+            "description": "ISO 3166-1 alpha-2 country code."
+          }
+        },
+        "type": "object",
+        "required": [
+          "addressLine1",
+          "city",
+          "state",
+          "postalCode",
+          "country"
         ],
         "title": "BankAddress"
       },
@@ -5436,6 +5437,7 @@
         "type": "string",
         "enum": [
           "USD",
+          "EUR",
           "USDC",
           "EURC",
           "RD",
@@ -5925,6 +5927,19 @@
             "title": "Kybapplicationid",
             "description": "Latest immutable business-verification application identifier."
           },
+          "verifiedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verifiedat",
+            "description": "When the account was verified: identity verification for a person, KYB for a business."
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time",
@@ -6009,7 +6024,8 @@
         "type": "string",
         "enum": [
           "link",
-          "sign"
+          "sign",
+          "verify"
         ],
         "title": "ConnectAction"
       },
@@ -6017,7 +6033,7 @@
         "properties": {
           "action": {
             "$ref": "#/components/schemas/ConnectAction",
-            "description": "`link` asks the account holder to connect their account, `sign` to approve one payout."
+            "description": "`link` asks the account holder to connect their account, `sign` to approve one payout, `verify` to verify their identity."
           },
           "payoutId": {
             "anyOf": [
@@ -6034,6 +6050,22 @@
             ],
             "title": "Payoutid",
             "description": "The payout the account holder approves. Required for `sign`, not accepted for `link`."
+          },
+          "clientId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?:cl_)?[A-Za-z0-9._:\\-]{1,216}$",
+                "examples": [
+                  "cl_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clientid",
+            "description": "The connected individual client whose holder verifies their identity. Required for `verify`, not accepted otherwise. The holder must sign in to this account in the window."
           },
           "redirectUri": {
             "type": "string",
@@ -6374,7 +6406,7 @@
           "address": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/UserAddress"
+                "$ref": "#/components/schemas/UserAddress-Input"
               },
               {
                 "type": "null"
@@ -6561,7 +6593,7 @@
             "description": "ISO 4217 currency code accepted by the contact account."
           },
           "fields": {
-            "$ref": "#/components/schemas/RequisiteFields",
+            "$ref": "#/components/schemas/RequisiteFields-Input",
             "description": "Structured destination account details."
           },
           "holder": {
@@ -6583,7 +6615,7 @@
           "bankAddress": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/BankAddress"
+                "$ref": "#/components/schemas/BankAddress-Input"
               },
               {
                 "type": "null"
@@ -6594,7 +6626,7 @@
           "intermediaryBank": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/IntermediaryBank"
+                "$ref": "#/components/schemas/IntermediaryBank-Input"
               },
               {
                 "type": "null"
@@ -6638,7 +6670,7 @@
             "description": "ISO 4217 currency code accepted by the contact account."
           },
           "fields": {
-            "$ref": "#/components/schemas/RequisiteFields",
+            "$ref": "#/components/schemas/RequisiteFields-Output",
             "description": "Structured destination account details."
           },
           "holder": {
@@ -6660,7 +6692,7 @@
           "bankAddress": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/BankAddress"
+                "$ref": "#/components/schemas/BankAddress-Output"
               },
               {
                 "type": "null"
@@ -6671,7 +6703,7 @@
           "intermediaryBank": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/IntermediaryBank"
+                "$ref": "#/components/schemas/IntermediaryBank-Output"
               },
               {
                 "type": "null"
@@ -6781,7 +6813,7 @@
               }
             ],
             "title": "Lastusedat",
-            "description": "UTC timestamp when this contact was last used for a transfer."
+            "description": "UTC timestamp when this contact was last used for a transfer or a successful fiat payout quote."
           },
           "email": {
             "anyOf": [
@@ -6798,7 +6830,7 @@
           "address": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/UserAddress"
+                "$ref": "#/components/schemas/UserAddress-Output"
               },
               {
                 "type": "null"
@@ -6893,7 +6925,7 @@
           "address": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/UserAddress"
+                "$ref": "#/components/schemas/UserAddress-Input"
               },
               {
                 "type": "null"
@@ -6927,7 +6959,7 @@
           "intermediaryBank": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/IntermediaryBank"
+                "$ref": "#/components/schemas/IntermediaryBank-Input"
               },
               {
                 "type": "null"
@@ -6938,7 +6970,7 @@
           "bankAddress": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/BankAddress"
+                "$ref": "#/components/schemas/BankAddress-Input"
               },
               {
                 "type": "null"
@@ -7338,7 +7370,6 @@
           "company_registry_extract",
           "corporate_registry_extract",
           "shareholder_registry",
-          "directors_registry",
           "cap_table",
           "director_structure",
           "proof_of_address",
@@ -7373,7 +7404,6 @@
           "investment_statement",
           "insurance_policy",
           "lease_agreement",
-          "list_of_authorized_signatories",
           "marriage_certificate",
           "national_id",
           "national_id_front",
@@ -8328,7 +8358,7 @@
         ],
         "title": "IntentView"
       },
-      "IntermediaryBank": {
+      "IntermediaryBank-Input": {
         "properties": {
           "bic": {
             "type": "string",
@@ -8350,7 +8380,7 @@
           "address": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/BankAddress"
+                "$ref": "#/components/schemas/BankAddress-Input"
               },
               {
                 "type": "null"
@@ -8377,7 +8407,70 @@
         ],
         "title": "IntermediaryBank"
       },
+      "IntermediaryBank-Output": {
+        "properties": {
+          "bic": {
+            "type": "string",
+            "title": "Bic",
+            "description": "BIC or SWIFT identifier of the intermediary institution."
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Name of the intermediary institution."
+          },
+          "address": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BankAddress-Output"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Postal address of the intermediary institution."
+          },
+          "accountNumber": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accountnumber",
+            "description": "Account number used at the intermediary institution."
+          }
+        },
+        "type": "object",
+        "required": [
+          "bic",
+          "name",
+          "address",
+          "accountNumber"
+        ],
+        "title": "IntermediaryBank"
+      },
       "JsonValue": {},
+      "KybApplicationStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "approved",
+          "rfi",
+          "rejected",
+          "superseded"
+        ],
+        "title": "KybApplicationStatus"
+      },
       "LedgerSyncView": {
         "properties": {
           "syncedAt": {
@@ -9871,6 +9964,7 @@
           "client_already_linked",
           "redirect_uri_not_allowed",
           "payout_not_awaiting_signature",
+          "verification_not_applicable",
           "profile_locked",
           "contact_not_payable",
           "contact_chain_unsupported",
@@ -9908,8 +10002,6 @@
           "receiver_not_a_client",
           "rail_not_found",
           "rail_not_available",
-          "rail_requirements_unmet",
-          "phone_required",
           "payin_not_available",
           "payin_expired",
           "payin_not_found",
@@ -10688,6 +10780,55 @@
             "title": "Isregulated",
             "description": "Whether the business is regulated or licensed."
           },
+          "regulatorCountry": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CountryCode"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "ISO 3166-1 alpha-2 country of the authority that licenses the business. Required by some banking providers when is_regulated is true."
+          },
+          "regulatoryLicenseType": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Regulatorylicensetype",
+            "description": "Type of regulatory license the business holds, e.g. Electronic Money Institution. Required by some banking providers when is_regulated is true."
+          },
+          "verifiesCustomerIdentity": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verifiescustomeridentity",
+            "description": "Whether the business verifies the identity of its own customers. Required by some banking providers when is_regulated is true."
+          },
+          "hasTransactionMonitoring": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hastransactionmonitoring",
+            "description": "Whether the business monitors its customers' transactions. Required by some banking providers when is_regulated is true."
+          },
           "productsServices": {
             "anyOf": [
               {
@@ -11374,6 +11515,54 @@
             ],
             "title": "Isregulated",
             "description": "Whether the business is regulated or licensed."
+          },
+          "regulatorCountry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Regulatorcountry",
+            "description": "ISO 3166-1 alpha-2 country of the authority that licenses the business."
+          },
+          "regulatoryLicenseType": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Regulatorylicensetype",
+            "description": "Type of regulatory license the business holds."
+          },
+          "verifiesCustomerIdentity": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verifiescustomeridentity",
+            "description": "Whether the business verifies the identity of its own customers."
+          },
+          "hasTransactionMonitoring": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hastransactionmonitoring",
+            "description": "Whether the business monitors its customers' transactions."
           },
           "productsServices": {
             "anyOf": [
@@ -12634,6 +12823,18 @@
             "type": "string",
             "title": "Message",
             "description": "Human-readable explanation safe to show to an end user."
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url",
+            "description": "Page the client opens to clear this blocker, when there is one."
           }
         },
         "type": "object",
@@ -12643,21 +12844,6 @@
           "message"
         ],
         "title": "RailBlockerView"
-      },
-      "RailKycStatus": {
-        "type": "string",
-        "enum": [
-          "notStarted",
-          "requested",
-          "incorporating",
-          "pending",
-          "underReview",
-          "rfi",
-          "documentRequested",
-          "approved",
-          "rejected"
-        ],
-        "title": "RailKycStatus"
       },
       "RailListView": {
         "properties": {
@@ -12678,18 +12864,67 @@
       },
       "RailOpenRequest": {
         "properties": {
-          "rail": {
-            "type": "string",
-            "title": "Rail",
-            "description": "Stable rail identifier returned by the virtual-account list operation."
+          "product": {
+            "$ref": "#/components/schemas/RailProduct",
+            "description": "Region product to request."
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "rail"
+          "product"
         ],
         "title": "RailOpenRequest"
+      },
+      "RailProduct": {
+        "type": "string",
+        "enum": [
+          "us",
+          "swift",
+          "eu",
+          "uae",
+          "uk",
+          "br",
+          "mx",
+          "co",
+          "ar",
+          "au",
+          "ng",
+          "ca",
+          "dk",
+          "no",
+          "pl",
+          "tr",
+          "il",
+          "sa",
+          "bo",
+          "cl",
+          "cr",
+          "do",
+          "gt",
+          "hn",
+          "jm",
+          "eg",
+          "sl",
+          "tz",
+          "ug",
+          "waemu",
+          "zm",
+          "bd",
+          "cn",
+          "hk",
+          "in",
+          "id",
+          "jp",
+          "my",
+          "pk",
+          "ph",
+          "kr",
+          "th",
+          "vn",
+          "card"
+        ],
+        "title": "RailProduct"
       },
       "RailRateView": {
         "properties": {
@@ -12743,90 +12978,10 @@
         ],
         "title": "RailRateView"
       },
-      "RailRequirementsView": {
-        "properties": {
-          "rail": {
-            "type": "string",
-            "title": "Rail",
-            "description": "Stable HEVN identifier for this receiving payment method."
-          },
-          "currency": {
-            "type": "string",
-            "title": "Currency",
-            "description": "ISO 4217 fiat currency code received through this payment method."
-          },
-          "method": {
-            "$ref": "#/components/schemas/FiatPaymentType",
-            "description": "Payment network or method represented by this rail."
-          },
-          "available": {
-            "type": "boolean",
-            "title": "Available",
-            "description": "Whether this payment method can currently be requested."
-          },
-          "blockers": {
-            "items": {
-              "$ref": "#/components/schemas/RailBlockerView"
-            },
-            "type": "array",
-            "title": "Blockers",
-            "description": "Reasons this payment method cannot currently be requested."
-          },
-          "requires": {
-            "$ref": "#/components/schemas/RailRequiresView",
-            "description": "Profile and verification work required before opening."
-          },
-          "kybStatus": {
-            "$ref": "#/components/schemas/PlatformKybStatus",
-            "description": "Current business-verification status."
-          },
-          "kycStatus": {
-            "$ref": "#/components/schemas/RailKycStatus",
-            "description": "Current identity-verification status for this payment method."
-          }
-        },
-        "type": "object",
-        "required": [
-          "rail",
-          "currency",
-          "method",
-          "available",
-          "requires",
-          "kybStatus",
-          "kycStatus"
-        ],
-        "title": "RailRequirementsView"
-      },
-      "RailRequiresView": {
-        "properties": {
-          "phone": {
-            "type": "boolean",
-            "title": "Phone",
-            "description": "Whether a phone number must be supplied before this payment method can open."
-          },
-          "address": {
-            "type": "boolean",
-            "title": "Address",
-            "description": "Whether a postal address must be supplied before this payment method can open."
-          },
-          "kyb": {
-            "type": "boolean",
-            "title": "Kyb",
-            "description": "Whether business verification must be completed before this payment method can open."
-          }
-        },
-        "type": "object",
-        "required": [
-          "phone",
-          "address",
-          "kyb"
-        ],
-        "title": "RailRequiresView"
-      },
       "RailRequisitesView": {
         "properties": {
           "fields": {
-            "$ref": "#/components/schemas/RequisiteFields",
+            "$ref": "#/components/schemas/RequisiteFields-Output",
             "description": "Structured receiving details for this payment method."
           },
           "holder": {
@@ -12882,10 +13037,14 @@
       },
       "RailView": {
         "properties": {
+          "product": {
+            "$ref": "#/components/schemas/RailProduct",
+            "description": "Region product this receiving account serves."
+          },
           "rail": {
             "type": "string",
             "title": "Rail",
-            "description": "Stable HEVN identifier for this receiving payment method."
+            "description": "Rail serving this product. Informational; address the account by product."
           },
           "currency": {
             "type": "string",
@@ -12979,10 +13138,19 @@
               }
             ],
             "description": "Receiving details, present after the virtual account becomes active."
+          },
+          "blockers": {
+            "items": {
+              "$ref": "#/components/schemas/RailBlockerView"
+            },
+            "type": "array",
+            "title": "Blockers",
+            "description": "What still stands between this request and active receiving details."
           }
         },
         "type": "object",
         "required": [
+          "product",
           "rail",
           "currency",
           "railCurrency",
@@ -13060,7 +13228,7 @@
         ],
         "title": "RequisiteAccountKind"
       },
-      "RequisiteFields": {
+      "RequisiteFields-Input": {
         "properties": {
           "iban": {
             "anyOf": [
@@ -13196,6 +13364,155 @@
         "type": "object",
         "title": "RequisiteFields"
       },
+      "RequisiteFields-Output": {
+        "properties": {
+          "iban": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Iban",
+            "description": "International account identifier without display separators."
+          },
+          "bic": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bic",
+            "description": "BIC or SWIFT identifier of the destination institution."
+          },
+          "accountNumber": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accountnumber",
+            "description": "Domestic account number."
+          },
+          "routingNumber": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Routingnumber",
+            "description": "Domestic routing or clearing number."
+          },
+          "pixKey": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pixkey",
+            "description": "Brazil PIX destination key."
+          },
+          "pixKeyType": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RequisitePixKeyType"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Type of Brazil PIX key."
+          },
+          "paymentKey": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paymentkey",
+            "description": "Local payment key required by the selected method."
+          },
+          "financialInstitutionId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Financialinstitutionid",
+            "description": "Institution identifier from the method directory."
+          },
+          "branchNumber": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branchnumber",
+            "description": "Destination institution branch identifier."
+          },
+          "accountKind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RequisiteAccountKind"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Checking, savings or equivalent classification."
+          },
+          "phoneNumber": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phonenumber",
+            "description": "Phone number required by the selected local method."
+          }
+        },
+        "type": "object",
+        "required": [
+          "iban",
+          "bic",
+          "accountNumber",
+          "routingNumber",
+          "pixKey",
+          "pixKeyType",
+          "paymentKey",
+          "financialInstitutionId",
+          "branchNumber",
+          "accountKind",
+          "phoneNumber"
+        ],
+        "title": "RequisiteFields"
+      },
       "RequisiteHolder-Input": {
         "properties": {
           "type": {
@@ -13241,7 +13558,7 @@
           "address": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/UserAddress"
+                "$ref": "#/components/schemas/UserAddress-Input"
               },
               {
                 "type": "null"
@@ -13348,7 +13665,7 @@
           "address": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/UserAddress"
+                "$ref": "#/components/schemas/UserAddress-Output"
               },
               {
                 "type": "null"
@@ -13406,7 +13723,15 @@
         },
         "type": "object",
         "required": [
-          "type"
+          "type",
+          "firstName",
+          "lastName",
+          "businessName",
+          "address",
+          "idType",
+          "idNumber",
+          "taxId",
+          "nationality"
         ],
         "title": "RequisiteHolder"
       },
@@ -13462,6 +13787,447 @@
         ],
         "title": "RevenueCoverage",
         "description": "Share of operating expenses covered by current business revenue."
+      },
+      "SandboxCreditResponse": {
+        "properties": {
+          "depositId": {
+            "type": "string",
+            "title": "Depositid",
+            "description": "Stable identifier for the emulated credit."
+          },
+          "status": {
+            "$ref": "#/components/schemas/PayoutStatus",
+            "description": "Current public lifecycle status of the emulated credit."
+          },
+          "token": {
+            "$ref": "#/components/schemas/BalanceAccount",
+            "description": "Digital asset credited after settlement."
+          },
+          "amount": {
+            "type": "string",
+            "title": "Amount",
+            "description": "Source amount supplied to the emulator.",
+            "example": "500.00"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency",
+            "description": "Source currency or digital asset."
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "title": "Idempotencykey",
+            "description": "Caller-supplied key that binds retries to this credit."
+          },
+          "payinId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?:pi_)?[A-Za-z0-9._:\\-]{1,216}$",
+                "examples": [
+                  "pi_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payinid",
+            "description": "Incoming-transfer identifier, when completing a pay-in."
+          },
+          "transactionId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?:txn_)?[A-Za-z0-9._:\\-]{1,216}$",
+                "examples": [
+                  "txn_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transactionid",
+            "description": "Ledger transaction identifier, when created."
+          },
+          "credited": {
+            "anyOf": [
+              {
+                "type": "string",
+                "example": "500.00"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credited",
+            "description": "Amount delivered in the settlement asset."
+          },
+          "fee": {
+            "anyOf": [
+              {
+                "type": "string",
+                "example": "500.00"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fee",
+            "description": "Fee charged by the emulated route."
+          },
+          "feeCurrency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feecurrency",
+            "description": "Currency in which the fee is charged."
+          },
+          "rate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "example": "500.00"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate",
+            "description": "Conversion rate from source to settlement amount."
+          },
+          "txHash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Txhash",
+            "description": "On-chain transaction hash, when applicable."
+          },
+          "pollUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pollurl",
+            "description": "Relative API URL to poll while processing continues."
+          }
+        },
+        "type": "object",
+        "required": [
+          "depositId",
+          "status",
+          "token",
+          "amount",
+          "currency",
+          "idempotencyKey"
+        ],
+        "title": "SandboxCreditResponse"
+      },
+      "SandboxDepositRequest": {
+        "properties": {
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "type": "string",
+            "title": "Amount",
+            "description": "Test amount to credit.",
+            "example": "500.00"
+          },
+          "bankId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?:bnk_)?[A-Za-z0-9._:\\-]{1,216}$",
+                "examples": [
+                  "bnk_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bankid",
+            "description": "Virtual-account identifier for an emulated account transfer."
+          },
+          "token": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BalanceAccount"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Digital asset for an emulated on-chain transfer, on Base."
+          },
+          "remitter": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 140
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remitter",
+            "description": "Originator name reported with the credit."
+          },
+          "paymentReference": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 140
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paymentreference",
+            "description": "Reference reported with the credit."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "amount"
+        ],
+        "title": "SandboxDepositRequest"
+      },
+      "SandboxKybStatusRequest": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/KybApplicationStatus",
+            "description": "The reviewer's decision: `approved`, `rfi` or `rejected`."
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment",
+            "description": "What the reviewer tells the client. Required for `rfi` and `rejected`."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "SandboxKybStatusRequest"
+      },
+      "SandboxPayinCompletionRequest": {
+        "properties": {
+          "remitter": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 140
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remitter",
+            "description": "Originator name reported with the credit."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "SandboxPayinCompletionRequest"
+      },
+      "SandboxPayoutResponse": {
+        "properties": {
+          "payoutId": {
+            "type": "string",
+            "pattern": "^(?:po_)?[A-Za-z0-9._:\\-]{1,216}$",
+            "title": "Payoutid",
+            "description": "Outgoing-transfer identifier updated by the emulator.",
+            "examples": [
+              "po_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/PayoutStatus",
+            "description": "Current public lifecycle status of the outgoing transfer."
+          },
+          "amount": {
+            "type": "string",
+            "title": "Amount",
+            "description": "Transfer amount.",
+            "example": "500.00"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency",
+            "description": "Transfer currency or digital asset."
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "title": "Idempotencykey",
+            "description": "Caller-supplied key that binds retries to this update."
+          },
+          "transactionId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?:txn_)?[A-Za-z0-9._:\\-]{1,216}$",
+                "examples": [
+                  "txn_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transactionid",
+            "description": "Ledger transaction identifier, when created."
+          },
+          "txHash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Txhash",
+            "description": "Settlement transaction hash, when applicable."
+          },
+          "refundTxHash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refundtxhash",
+            "description": "Refund transaction hash, when applicable."
+          }
+        },
+        "type": "object",
+        "required": [
+          "payoutId",
+          "status",
+          "amount",
+          "currency",
+          "idempotencyKey"
+        ],
+        "title": "SandboxPayoutResponse"
+      },
+      "SandboxPayoutStatusRequest": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/PayoutStatus",
+            "description": "Next externally reportable lifecycle status for the emulated transfer."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "SandboxPayoutStatusRequest"
+      },
+      "SandboxTokenBalanceResponse": {
+        "properties": {
+          "token": {
+            "$ref": "#/components/schemas/BalanceAccount",
+            "description": "Supported sandbox digital asset."
+          },
+          "tokenAddress": {
+            "type": "string",
+            "title": "Tokenaddress",
+            "description": "Sandbox token contract address."
+          },
+          "balance": {
+            "type": "string",
+            "title": "Balance",
+            "description": "Amount available for emulated credits.",
+            "example": "500.00"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token",
+          "tokenAddress",
+          "balance"
+        ],
+        "title": "SandboxTokenBalanceResponse"
+      },
+      "SandboxTreasuryResponse": {
+        "properties": {
+          "chainId": {
+            "type": "integer",
+            "title": "Chainid",
+            "description": "Numeric network identifier used by the sandbox treasury."
+          },
+          "address": {
+            "type": "string",
+            "title": "Address",
+            "description": "Sandbox treasury address."
+          },
+          "gasBalance": {
+            "type": "string",
+            "title": "Gasbalance",
+            "description": "Native-asset balance available for transaction fees.",
+            "example": "500.00"
+          },
+          "maxCredit": {
+            "type": "string",
+            "title": "Maxcredit",
+            "description": "Maximum test amount allowed in one credit.",
+            "example": "500.00"
+          },
+          "balances": {
+            "items": {
+              "$ref": "#/components/schemas/SandboxTokenBalanceResponse"
+            },
+            "type": "array",
+            "title": "Balances",
+            "description": "Settlement assets available to the emulator."
+          }
+        },
+        "type": "object",
+        "required": [
+          "chainId",
+          "address",
+          "gasBalance",
+          "maxCredit",
+          "balances"
+        ],
+        "title": "SandboxTreasuryResponse"
       },
       "SessionResponse": {
         "properties": {
@@ -14634,7 +15400,7 @@
         "title": "TransferPolicyResponse",
         "description": "Effective account-level money-movement controls.\n\n``isFrozen`` overrides every permission. When the account is not frozen,\n``recoveryModeActivated`` restricts it to first-party fiat withdrawals.\nThe remaining flags are then evaluated for the requested operation."
       },
-      "UserAddress": {
+      "UserAddress-Input": {
         "properties": {
           "streetAddress": {
             "anyOf": [
@@ -14712,139 +15478,9 @@
         "title": "UserAddress",
         "description": "Provider-neutral postal address used across domain and API schemas."
       },
-      "SandboxTreasuryResponse": {
+      "UserAddress-Output": {
         "properties": {
-          "chainId": {
-            "type": "integer",
-            "title": "Chainid",
-            "description": "Numeric network identifier used by the sandbox treasury."
-          },
-          "address": {
-            "type": "string",
-            "title": "Address",
-            "description": "Sandbox treasury address."
-          },
-          "gasBalance": {
-            "type": "string",
-            "title": "Gasbalance",
-            "description": "Native-asset balance available for transaction fees.",
-            "example": "500.00"
-          },
-          "maxCredit": {
-            "type": "string",
-            "title": "Maxcredit",
-            "description": "Maximum test amount allowed in one credit.",
-            "example": "500.00"
-          },
-          "balances": {
-            "items": {
-              "$ref": "#/components/schemas/SandboxTokenBalanceResponse"
-            },
-            "type": "array",
-            "title": "Balances",
-            "description": "Settlement assets available to the emulator."
-          }
-        },
-        "type": "object",
-        "required": [
-          "chainId",
-          "address",
-          "gasBalance",
-          "maxCredit",
-          "balances"
-        ],
-        "title": "SandboxTreasuryResponse"
-      },
-      "SandboxCreditResponse": {
-        "properties": {
-          "depositId": {
-            "type": "string",
-            "title": "Depositid",
-            "description": "Stable identifier for the emulated credit."
-          },
-          "status": {
-            "$ref": "#/components/schemas/PayoutStatus",
-            "description": "Current public lifecycle status of the emulated credit."
-          },
-          "token": {
-            "$ref": "#/components/schemas/BalanceAccount",
-            "description": "Digital asset credited after settlement."
-          },
-          "amount": {
-            "type": "string",
-            "title": "Amount",
-            "description": "Source amount supplied to the emulator.",
-            "example": "500.00"
-          },
-          "currency": {
-            "type": "string",
-            "title": "Currency",
-            "description": "Source currency or digital asset."
-          },
-          "idempotencyKey": {
-            "type": "string",
-            "title": "Idempotencykey",
-            "description": "Caller-supplied key that binds retries to this credit."
-          },
-          "payinId": {
-            "anyOf": [
-              {
-                "type": "string",
-                "pattern": "^(?:pi_)?[A-Za-z0-9._:\\-]{1,216}$",
-                "examples": [
-                  "pi_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Payinid",
-            "description": "Incoming-transfer identifier, when completing a pay-in."
-          },
-          "transactionId": {
-            "anyOf": [
-              {
-                "type": "string",
-                "pattern": "^(?:txn_)?[A-Za-z0-9._:\\-]{1,216}$",
-                "examples": [
-                  "txn_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Transactionid",
-            "description": "Ledger transaction identifier, when created."
-          },
-          "credited": {
-            "anyOf": [
-              {
-                "type": "string",
-                "example": "500.00"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Credited",
-            "description": "Amount delivered in the settlement asset."
-          },
-          "fee": {
-            "anyOf": [
-              {
-                "type": "string",
-                "example": "500.00"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Fee",
-            "description": "Fee charged by the emulated route."
-          },
-          "feeCurrency": {
+          "streetAddress": {
             "anyOf": [
               {
                 "type": "string"
@@ -14853,23 +15489,10 @@
                 "type": "null"
               }
             ],
-            "title": "Feecurrency",
-            "description": "Currency in which the fee is charged."
+            "title": "Streetaddress",
+            "description": "Street name and building number."
           },
-          "rate": {
-            "anyOf": [
-              {
-                "type": "string",
-                "example": "500.00"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Rate",
-            "description": "Conversion rate from source to settlement amount."
-          },
-          "txHash": {
+          "addressLine2": {
             "anyOf": [
               {
                 "type": "string"
@@ -14878,10 +15501,10 @@
                 "type": "null"
               }
             ],
-            "title": "Txhash",
-            "description": "On-chain transaction hash, when applicable."
+            "title": "Addressline2",
+            "description": "Optional apartment, suite or unit."
           },
-          "pollUrl": {
+          "city": {
             "anyOf": [
               {
                 "type": "string"
@@ -14890,245 +15513,10 @@
                 "type": "null"
               }
             ],
-            "title": "Pollurl",
-            "description": "Relative API URL to poll while processing continues."
-          }
-        },
-        "type": "object",
-        "required": [
-          "depositId",
-          "status",
-          "token",
-          "amount",
-          "currency",
-          "idempotencyKey"
-        ],
-        "title": "SandboxCreditResponse"
-      },
-      "SandboxDepositRequest": {
-        "properties": {
-          "amount": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
-              }
-            ],
-            "type": "string",
-            "title": "Amount",
-            "description": "Test amount to credit.",
-            "example": "500.00"
+            "title": "City",
+            "description": "City or locality."
           },
-          "bankId": {
-            "anyOf": [
-              {
-                "type": "string",
-                "pattern": "^(?:bnk_)?[A-Za-z0-9._:\\-]{1,216}$",
-                "examples": [
-                  "bnk_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Bankid",
-            "description": "Virtual-account identifier for an emulated account transfer."
-          },
-          "token": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BalanceAccount"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Digital asset for an emulated on-chain transfer, on Base."
-          },
-          "remitter": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 140
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Remitter",
-            "description": "Originator name reported with the credit."
-          },
-          "paymentReference": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 140
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Paymentreference",
-            "description": "Reference reported with the credit."
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "amount"
-        ],
-        "title": "SandboxDepositRequest"
-      },
-      "BalanceAccount": {
-        "type": "string",
-        "enum": [
-          "USDC",
-          "EURC",
-          "RD",
-          "USDC_ARB"
-        ],
-        "title": "BalanceAccount"
-      },
-      "SandboxPayinCompletionRequest": {
-        "properties": {
-          "remitter": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 140
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Remitter",
-            "description": "Originator name reported with the credit."
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "title": "SandboxPayinCompletionRequest"
-      },
-      "SandboxPayoutStatusRequest": {
-        "properties": {
-          "status": {
-            "$ref": "#/components/schemas/PayoutStatus",
-            "description": "Next externally reportable lifecycle status for the emulated transfer."
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "status"
-        ],
-        "title": "SandboxPayoutStatusRequest"
-      },
-      "SandboxTokenBalanceResponse": {
-        "properties": {
-          "token": {
-            "$ref": "#/components/schemas/BalanceAccount",
-            "description": "Supported sandbox digital asset."
-          },
-          "tokenAddress": {
-            "type": "string",
-            "title": "Tokenaddress",
-            "description": "Sandbox token contract address."
-          },
-          "balance": {
-            "type": "string",
-            "title": "Balance",
-            "description": "Amount available for emulated credits.",
-            "example": "500.00"
-          }
-        },
-        "type": "object",
-        "required": [
-          "token",
-          "tokenAddress",
-          "balance"
-        ],
-        "title": "SandboxTokenBalanceResponse"
-      },
-      "SandboxKybStatusRequest": {
-        "properties": {
-          "status": {
-            "$ref": "#/components/schemas/KybApplicationStatus",
-            "description": "The reviewer's decision: `approved`, `rfi` or `rejected`."
-          },
-          "comment": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 2000,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Comment",
-            "description": "What the reviewer tells the client. Required for `rfi` and `rejected`."
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "status"
-        ],
-        "title": "SandboxKybStatusRequest"
-      },
-      "SandboxPayoutResponse": {
-        "properties": {
-          "payoutId": {
-            "type": "string",
-            "pattern": "^(?:po_)?[A-Za-z0-9._:\\-]{1,216}$",
-            "title": "Payoutid",
-            "description": "Outgoing-transfer identifier updated by the emulator.",
-            "examples": [
-              "po_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
-            ]
-          },
-          "status": {
-            "$ref": "#/components/schemas/PayoutStatus",
-            "description": "Current public lifecycle status of the outgoing transfer."
-          },
-          "amount": {
-            "type": "string",
-            "title": "Amount",
-            "description": "Transfer amount.",
-            "example": "500.00"
-          },
-          "currency": {
-            "type": "string",
-            "title": "Currency",
-            "description": "Transfer currency or digital asset."
-          },
-          "idempotencyKey": {
-            "type": "string",
-            "title": "Idempotencykey",
-            "description": "Caller-supplied key that binds retries to this update."
-          },
-          "transactionId": {
-            "anyOf": [
-              {
-                "type": "string",
-                "pattern": "^(?:txn_)?[A-Za-z0-9._:\\-]{1,216}$",
-                "examples": [
-                  "txn_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Transactionid",
-            "description": "Ledger transaction identifier, when created."
-          },
-          "txHash": {
+          "state": {
             "anyOf": [
               {
                 "type": "string"
@@ -15137,10 +15525,21 @@
                 "type": "null"
               }
             ],
-            "title": "Txhash",
-            "description": "Settlement transaction hash, when applicable."
+            "title": "State",
+            "description": "State, province or administrative area."
           },
-          "refundTxHash": {
+          "country": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CountryCode"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "ISO 3166-1 alpha-2 country code."
+          },
+          "zip": {
             "anyOf": [
               {
                 "type": "string"
@@ -15149,30 +15548,21 @@
                 "type": "null"
               }
             ],
-            "title": "Refundtxhash",
-            "description": "Refund transaction hash, when applicable."
+            "title": "Zip",
+            "description": "Postal or ZIP code."
           }
         },
         "type": "object",
         "required": [
-          "payoutId",
-          "status",
-          "amount",
-          "currency",
-          "idempotencyKey"
+          "streetAddress",
+          "addressLine2",
+          "city",
+          "state",
+          "country",
+          "zip"
         ],
-        "title": "SandboxPayoutResponse"
-      },
-      "KybApplicationStatus": {
-        "type": "string",
-        "enum": [
-          "pending",
-          "approved",
-          "rfi",
-          "rejected",
-          "superseded"
-        ],
-        "title": "KybApplicationStatus"
+        "title": "UserAddress",
+        "description": "Provider-neutral postal address used across domain and API schemas."
       }
     },
     "securitySchemes": {
