@@ -13,8 +13,8 @@ The site has four tabs, and each one has a different reader:
 | Tab | Reader | What it answers |
 | --- | --- | --- |
 | **General** | anyone evaluating HEVN | How the platform is built, and why HEVN cannot touch the money |
-| **Whitelabel** | a backend engineer integrating HEVN | How to create accounts for your own customers and move their money from code |
 | **Remote Transfers** | an engineer automating their own account | How to let a server or script send USDC from that account with a capped key. Advanced use only |
+| **Whitelabel** | a backend engineer integrating HEVN | How to create accounts for your own customers and move their money from code |
 | **REST API** | the same engineer, mid-integration | The exact contract for every operation |
 
 ## Terminology

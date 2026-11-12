@@ -76,6 +76,19 @@
         ]
       },
       {
+        "tab": "Remote Transfers",
+        "groups": [
+          {
+            "group": "Remote transfers",
+            "pages": [
+              "remote-transfers/overview",
+              "remote-transfers/keys",
+              "remote-transfers/api"
+            ]
+          }
+        ]
+      },
+      {
         "tab": "Whitelabel",
         "groups": [
           {
@@ -145,19 +158,6 @@
             "group": "Changelog",
             "pages": [
               "whitelabel/changelog"
-            ]
-          }
-        ]
-      },
-      {
-        "tab": "Remote Transfers",
-        "groups": [
-          {
-            "group": "Remote transfers",
-            "pages": [
-              "remote-transfers/overview",
-              "remote-transfers/keys",
-              "remote-transfers/api"
             ]
           }
         ]
