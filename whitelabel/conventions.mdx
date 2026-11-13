@@ -1,208 +1,196 @@
 ---
 title: "Conventions"
-description: "The seven rules that hold for every operation: money, ids, casing, idempotency, pagination, status codes and errors."
+description: "Money format, ids, casing, idempotency, pagination, status codes, errors, rate limits and lifetimes on all /dapi/v1 routes."
 ---
 
-Seven rules hold for every operation in this API. Read them once and no endpoint will surprise you.
-
-| Rule | In one line |
-| --- | --- |
-| [Money](#money) | A decimal string in the asset's major unit, never a number |
-| [Ids](#ids) | Prefixed and opaque: `cl_`, `po_`, `pi_`, `txn_`, `ct_`, `bnk_`, `doc_`, `kyb_`, `esc_`, `dk_` |
-| [Casing](#casing) | camelCase everywhere, unknown keys refused, null fields omitted |
-| [`Idempotency-Key`](#idempotency-key) | Accepted on every write, required nowhere |
-| [Pagination](#pagination) | A cursor and a limit; no offset and no total |
-| [Status codes](#status-codes) | `201` creates, `200` replays, `202` polls, and every response has a body |
-| [Errors](#errors) | One envelope; branch on `code`, never on `message` |
+All `/dapi/v1` routes share one format for money, ids, casing, idempotency and pagination, and one set of limits. Send amounts as decimal strings, and send an `Idempotency-Key` with `POST /dapi/v1/payouts` and other writes that book a payment.
 
 ## Money
 
-Every amount on the wire is a **decimal string in the asset's major unit**: `"500.00"`, `"0.9247"`,
-`"1204.500000"`. Not a JSON number, not an atomic-unit integer, never exponent notation.
+An amount is a decimal string in the major unit of the asset: `"500.00"`, `"0.9247"`, `"1204.500000"`. Do not send a fractional JSON number, an atomic-unit integer or exponent notation. Rates use the same format. `feeBps` is an integer number of basis points.
 
-Precision is refused, never rounded. More fractional digits than the asset allows answers
-`422 validation_failed` with `details.fields[0].code = "amount_precision"` — so a rounding error can
-never reach a payment. Rates and fees follow the same rule; `feeBps` is the one exception and is an
-integer number of basis points.
+Precision depends on the route:
 
-Where an operation has two sides, you pin one and HEVN derives the other. Send `amount` to pin what
-leaves the balance or `amountTo` to pin what the beneficiary receives — one of them, never both.
+| Route | Too many digits |
+| --- | --- |
+| Escrow, sandbox credits and payouts | More decimals than the token allows return `422 validation_failed` with `details.fields[0].code = "amount_precision"`. A payout checks `amount` against the source token. |
+| Payins, swaps and payouts | An amount with more than 15 significant digits can return `422 amount_precision_unsupported` with `details.field`. |
 
-<Warning>
-  A decimal arrives in JavaScript and Go as a **string**. A `typeof x === "number"` guard silently
-  skips every amount this API returns; parse with a decimal type, not a float.
-</Warning>
+A payin, swap or payout takes `amount`, the side sent, or `amountTo`, the side received, and not both. HEVN prices the other side.
+
+In JavaScript and Go a decimal arrives as a string, so a `typeof x === "number"` check skips it. Parse with a decimal type.
 
 ## Ids
 
-Every id is prefixed, opaque and safe to store as text:
+An id is a prefixed, opaque string. Store it as text. Do not parse it, derive it or assume a length.
 
-| Prefix | Resource | Prefix | Resource |
-| --- | --- | --- | --- |
-| `cl_` | client (and your own account) | `bnk_` | bank record of an open rail |
-| `po_` | payout, over a bank rail or on chain | `doc_` | document |
-| `pi_` | payin | `kyb_` | KYB application |
-| `txn_` | transaction | `esc_` | escrow deal |
-| `ct_` | contact | `dk_` | developer key |
+| Prefix | Resource |
+| --- | --- |
+| `cl_` | Client, and your integrator account |
+| `po_` | Payout, over a bank rail or on chain |
+| `pi_` | Payin |
+| `swp_` | Swap |
+| `txn_` | Transaction |
+| `ct_` | Contact |
+| `bnk_` | Virtual account |
+| `doc_` | Document |
+| `kyb_` | KYB application |
+| `esc_` | Escrow deal |
+| `dk_` | [Developer key](/whitelabel/authentication#developer-key). Not sent to this API. |
 
-A `dk_…` is the one id you never send to this API: it names a developer key, which is created and
-deleted in the HEVN app ([Developer key](/whitelabel/developer-key)).
-
-Do not parse them, derive them or assume a length. An id of the wrong kind in a body or query field
-is `400 invalid_id` with the expected prefix in `details`; in a path it is that resource's own `404`,
-so an id from another namespace is never confirmable.
-
-Products — `eu`, `us`, `uk` — are the exception that proves the rule: they are fixed region codes, not
-ids, and they key a client's virtual account in `POST /dapi/v1/banks` and in the path. The `rail`
-string next to them is informational and never a key. See [Rails](/whitelabel/reference/rails).
+An id of the wrong kind in a body or query field returns `400 invalid_id`, with the expected prefix in `details`. In a path it returns the `404` of that resource.
 
 ## Casing
 
-**camelCase everywhere**: request bodies, query parameters, response fields and the keys inside
-`error.details`. Two things are deliberately not field names. An `error.code` slug is always
-lowercase `snake_case`. An enum member usually is too — `business_revenue` — but an enum member is a
-literal, not a naming convention: `HighRiskActivity` members are SCREAMING_SNAKE_CASE
-(`MONEY_SERVICES`, `PRECIOUS_METALS_STONES_JEWELRY`), and `FiatTransactionCount` members are the
-ranges they read as (`<10`, `10-50`, `50-200`, `200-1,000`, `1,000+`, punctuation included). Send and
-compare enum values exactly as the spec prints them, and never case-fold them.
+| Item | Rule |
+| --- | --- |
+| Request bodies, query parameters, response fields, keys in `error.details` | camelCase |
+| `error.code` | Lowercase `snake_case` |
+| Enum values | Send them as the spec prints them, without case-folding. Most are `snake_case`, and some are upper case or ranges. |
+| Unknown keys | `422 validation_failed` with `code: "extra_forbidden"` |
+| Null fields | Omitted from responses. A missing key is unset. |
+| Timestamps | RFC 3339 in UTC with a `Z` suffix: `2026-09-17T10:04:11Z` |
 
-Two consequences worth knowing before your first `422`:
+A contact's `address`, and the `fields` and `holder` of a `bank` or `payer` requisite, ignore unknown keys. A misspelt `streetAddress` counts as missing: on a bank contact that needs an address, `POST /dapi/v1/contacts` returns `422 validation_failed`, and the message names the missing keys in `snake_case`.
 
-- **Unknown keys are refused.** A body with a field this version does not define answers
-  `422 validation_failed` with `code: "extra_forbidden"` rather than ignoring it, so a typo cannot
-  silently drop a payment reference. The two nested objects that predate this rule — a contact's
-  `address` and a requisite's `bank`/`payer` block — still ignore a key they do not know, so a
-  misspelt `streetAddress` there resurfaces one step later as `422 contact_details_invalid`
-  naming the field it never received.
-- **Null fields are omitted.** "Absent" and "null" are the same thing; a response never prints
-  `"phone": null`. Treat a missing key as unset.
-
-One corner is not camelCase and cannot be: the keys inside `fields` on
-`PUT /dapi/v1/documents/{documentId}/content` are the extractor's own field names —
-`registration_number`, `address.street_address` — because they are values read off a page rather
-than fields of this API. They are the keys the refusal that asks for them already named. See
-[Onboard a client](/whitelabel/onboarding#fill-a-documents-fields-by-hand).
-
-Timestamps are RFC 3339 in UTC with a `Z` suffix: `2026-09-17T10:04:11Z`.
+The `fields` keys on `PUT /dapi/v1/documents/{documentId}/content` are document field names such as `registration_number` and `address.street_address`. A refusal that requires one of these fields returns its name. See [Fill a document's fields by hand](/whitelabel/clients#fill-a-documents-fields-by-hand).
 
 ## Idempotency-Key
 
-Every write accepts `Idempotency-Key`, matching `^[A-Za-z0-9._:-]{1,128}$`. No operation requires it.
+Every write accepts `Idempotency-Key`, and no route requires it. The value matches `^[A-Za-z0-9._:-]{1,128}$`.
 
-Send one whenever a retry must not become a second payment. Derive it from an id your own system
-owns, and keep it identical across every retry of the same request.
+Derive the key from an id in your system.
 
-import Idempotency from "/snippets/idempotency.mdx";
+<CodeGroup>
 
-<Idempotency />
+```python Python
+key = f"payout-{invoice.id}"  # "payout-INV-2026-114"
+client.post("/payouts", payout, idempotency_key=key)
+```
 
-When you omit it, HEVN derives a fingerprint from the request itself, answers with it as
-`idempotencyKey`, and treats an identical repeat as a replay. The difference is the window: a key you
-chose anchors the request for **7 days**, a derived one for **2 hours** — long enough for a retry,
-short enough that two genuinely separate payments of the same amount both happen.
+```javascript Node
+const key = `payout-${invoice.id}`;
+await client.post("/payouts", payout, { idempotencyKey: key });
+```
 
-A key is scoped to your account and the operation, so two integrators can never collide and the same
-key on `POST /payouts` and `POST /contacts` is not a replay. Reusing one with a different body is
-`409 idempotency_key_reused`, and `details` names the resource the key already belongs to. A
-malformed one is `400 idempotency_key_invalid`.
+```go Go
+key := "payout-" + invoice.ID
+client.Post("/payouts", payout, hevn.IdempotencyKey(key))
+```
+
+</CodeGroup>
+
+<Warning>
+  Do not generate the key in the helper that sends the request, from a clock or at random. Do not change it on a retry. A new key books a second payment.
+</Warning>
+
+| Case | Result |
+| --- | --- |
+| Same key, same request | `200` with `Idempotency-Replayed: true` and the first resource |
+| Same key, different body | `409 idempotency_key_reused`. `details` names the key's resource. |
+| Malformed key | `400 idempotency_key_invalid` |
+| No key | HEVN derives one from the request and returns it as `idempotencyKey`. An identical repeat is a replay. Later retries can send the returned value as `Idempotency-Key`. |
+| Replay window | 7 days for a key you send, 2 hours for a derived key |
+| Scope | Your account and the operation. The same key on `POST /payouts` and `POST /contacts` is not a replay. |
+
+To book two identical payouts within 2 hours, send a different key with each.
+
+| Route under `/dapi/v1` | What the key identifies |
+| --- | --- |
+| `POST /payouts` | The payment. For a bank contact, the booking and its price. For a wallet contact, the key is part of the `po_` id. |
+| `POST /swaps` | The swap |
+| `POST /escrow` | The deal, its resolved windows and its `approve` action. The raw key is returned as `action.idempotencyKey`. |
+| `POST /escrow/{escrowId}/actions` | The action. The raw key is the `{idempotencyKey}` segment of the confirm URL. |
+| `POST /sandbox/deposits`, `/sandbox/payins/{payinId}/complete`, `/sandbox/payouts/{payoutId}/status` | The emulated credit or status change |
+| `POST /contacts`, `PATCH` and `DELETE /contacts/{contactId}` | None. Account details deduplicate a contact. |
+| `POST /clients/link`, `POST /banks`, `PUT /client/kyb`, `POST /client/kyb/complete`, `POST /payins`, `POST /payins/{payinId}/instructions` | None. The linked account, product, client or payin identifies the request. A key sent to these routes is accepted and has no effect. |
 
 ## Why a retry cannot pay twice
 
-Deduplication happens twice, and the two layers answer different questions.
+Each payout has one slot in the paying Base smart wallet: an ERC-4337 nonce derived from the payout. The network accepts one operation per slot.
 
-**Your key deduplicates the request.** `Idempotency-Key` decides whether two HTTP calls are the same
-intent. It is what makes a lost response safe to retry: the second `POST /dapi/v1/payouts` answers
-`200` with `Idempotency-Replayed: true` and the payout the first one booked, rather than booking a
-second one. This layer is ours, it lives in our database, and it is the one you control.
+When the slot is used or an operation is in flight, the call returns `409 already_funded`, `409 payment_slot_consumed` or `409 funding_in_progress`. After `payment_slot_consumed` an operation has landed, possibly reverted, and signing again has no effect. [Retrying a confirm](/whitelabel/signing#retrying-a-confirm) lists the next step for each.
 
-**The chain deduplicates the money.** Every payout owns exactly one slot in its client's smart
-wallet — an ERC-4337 nonce derived from the payout itself, not a counter — and a slot can be spent
-once. Two signatures for one payout are not two payments: the first operation to land takes the slot,
-and the second is rejected by the network itself. You can re-open an expired approval as often as you
-like, sign it twice, or race two processes that both retry; there is one slot, so there is one
-payment.
-
-That is why the refusals read the way they do:
-
-| You see | What actually happened |
-| --- | --- |
-| `Idempotency-Replayed: true` | The request was a duplicate. Nothing new was booked. |
-| `409 already_funded` | The slot was spent by an operation that settled. `details.transactionHash` is the proof. |
-| `409 payment_slot_consumed` | The slot was spent by an operation that landed and reverted. Nothing you sign for this payout can move money; book a new one. |
-| `409 funding_in_progress` | An operation is signed and in flight. Confirm again — that is what resolves it. |
-
-The practical rule stays small: keep the key identical across every retry of one payment, confirm
-until you get a `200`, and never invent a new key to "get past" a refusal. A new key is a new
-payment, a new slot and a second debit — the one thing neither layer can undo.
-
-The same mechanism covers escrow actions and money the client's own app sends: an operation prepared
-by your integration and one prepared in the app for the same payment compete for the same slot
-instead of both landing.
+Escrow actions and payments sent from the HEVN app use the same slots.
 
 ## Pagination
 
-Every list is a cursor page:
+A list returns a cursor page.
 
 ```json
 { "items": [ … ], "nextCursor": "eyJ2IjoiMjAyNi0wOS0xN1QxMDowNDoxMVoiLCJpIjoi…" }
 ```
 
-Pass `limit` (1 to 100, default 50) and `cursor`. Pass back the `nextCursor` you were given, verbatim
-and unparsed; when it is absent you have reached the end. There is no `offset` and no total count
-anywhere, and a cursor that does not belong to the query it is sent to is `400 invalid_cursor`.
+Send `cursor`, the unchanged `nextCursor` of the previous page, until the response omits `nextCursor`.
 
-Aggregates are their own route rather than a field on page one —
-`GET /dapi/v1/transactions/summary` takes the same filters as `GET /dapi/v1/transactions`.
+A cursor sent to a different query returns `400 invalid_cursor`. Lists have no `offset` and no total count. `GET /dapi/v1/transactions/summary` takes the `GET /dapi/v1/transactions` filters and returns totals.
 
 ## Status codes
 
-| Code | When | What to read |
+| Code | When | Read |
 | --- | --- | --- |
-| `200` | A read, an update, or a **replay** of a create | `Idempotency-Replayed: true` marks the replay |
-| `201` | A resource now exists | `Location` points at it |
-| `202` | Accepted, still settling | `status` and `pollUrl` in the body |
-| `4xx` / `5xx` | Refused | the error envelope below |
+| `200` | A read, an update, or a replay of a create | `Idempotency-Replayed: true` on a replay |
+| `201` | A resource was created | `Location` |
+| `202` | Accepted, not final | `status` and `pollUrl` in the body |
+| `4xx`, `5xx` | Refused | The [error envelope](#errors) |
 
-There is no `204`: every response has a body. `Location` and `pollUrl` are paths from the host root
-and already include the `/dapi/v1` prefix. One of them names no resource: a client's `pollUrl` is
-literally `/dapi/v1/client`, so poll it with the `cl_…` you were just given in `X-Hevn-Account` —
-the URL alone identifies nothing.
+No route returns `204`. `Location` and `pollUrl` are paths from the host root, including `/dapi/v1`.
+
+The API sends no webhooks. After a `202`, read `pollUrl` with backoff until `status` is final. See [HTTP client](/whitelabel/reference/client) for the helper and [Rate limits](#rate-limits) for read limits.
+
+A client's `pollUrl` is `/dapi/v1/client`. Poll it with the new `cl_…` in `X-Hevn-Account`.
 
 ## Errors
 
-One envelope, for every refusal, on every route:
-
-```json
-{
-  "error": {
-    "code": "insufficient_funds",
-    "message": "The account's USDC balance does not cover this transfer.",
-    "details": { "available": "3000000", "required": "5000000" }
-  }
-}
-```
-
-`code` is a stable lowercase slug — branch on it. `message` is written for a human reading a log and
-may be reworded at any time. `details` is optional, camelCased, and carries the fields that make the
-refusal actionable: `blockers` on a rail, `fields` on a validation failure, `transactionHash` on a
-payment that already went through, `requestId` on a `5xx` — quote that one to support.
+A refusal returns `{ "error": { "code", "message", "details" } }`. Branch on `code`. The fields, the `details` keys and the full list of codes are in [Errors](/whitelabel/reference/errors).
 
 <Warning>
-  `details` is diagnostic, not part of the money contract: the funding refusals report
-  `available` and `required` in **atomic units** (`"3000000"` is 3 USDC), which is the one place an
-  amount is not a major-unit decimal string. Read them for a log line, not for arithmetic.
+  Funding refusals report `details.available` and `details.required` in atomic units: `"3000000"` is 3 USDC. Do not mix them with major-unit amounts.
 </Warning>
 
-Field-level failures collapse into one shape, so you can render them next to your form inputs:
+## Rate limits
 
-```json
-{ "error": { "code": "validation_failed", "message": "The request body is invalid.",
-  "details": { "fields": [ { "field": "phone", "code": "string_pattern_mismatch", "message": "Use E.164, for example +13125550142." } ] } } }
-```
+A request over a rate limit returns `429 rate_limited` with a `Retry-After` header. Wait that many seconds, then retry.
 
-The whole slug registry, grouped by resource, is in [Errors](/whitelabel/reference/errors); the
-numbers behind every limit are in [Limits](/whitelabel/reference/limits).
+| Window | Limit | Keyed on | Applies to |
+| --- | --- | --- | --- |
+| Writes | 120 per minute | credential | `POST`, `PUT`, `PATCH` and `DELETE` under `/dapi/v1` |
+| Reads | 600 per minute | credential | `GET` under `/dapi/v1` |
+| Login | 20 per 5 minutes | client IP | `POST /dapi/v1/auth/challenge`, `POST /dapi/v1/auth/token` |
+| Login, per email | 10 per 5 minutes | the email in the body | `POST /dapi/v1/auth/challenge` |
+| Login, per challenge | 10 per 5 minutes | `challengeId` | `POST /dapi/v1/auth/token` |
+| Sandbox money | 60 per hour | account | `POST /dapi/v1/sandbox/deposits`, `/payins/{payinId}/complete`, `/payouts/{payoutId}/status` |
 
-<Card title="Next: Signing" icon="pen-tool" href="/whitelabel/signing">
-  Prepare, check, sign, confirm — the one mechanism behind every payment your key signs.
-</Card>
+Requests with different `X-Hevn-Account` values share the write and read counters of one credential.
+
+`POST /dapi/v1/auth/refresh` has no login limit. It counts as a write.
+
+Booking and confirming a signed payout counts as two writes. Poll with backoff ([Status codes](#status-codes)), and read `GET /dapi/v1/transactions` once for the account where you can, not once per client.
+
+A sandbox host may run with the credential and account limits off. Test the `Retry-After` path before you go live. Sandbox amount caps and faucet rules are listed in [Sandbox](/whitelabel/sandbox#limits).
+
+## Lifetimes
+
+| Item | Lifetime | After it ends |
+| --- | --- | --- |
+| Login challenge | Up to 5 minutes, set with `requestExpiry` | `410 challenge_expired` |
+| Access token | 1 hour | `401 token_expired`. Call `POST /dapi/v1/auth/refresh`. |
+| Payout quote | Until `quote.expiresAt` | `410 quote_expired` |
+| Payout approval, on your account | 120 seconds | `409 funding_attempt_expired`, or `410 approval_expired` with `authorization: intent`. Book again with the same `Idempotency-Key` for a new approval. |
+| Swap approval, on your account | 120 seconds | `409 swap_not_confirmable` |
+| Link code from the sign-in window | 5 minutes | `410 link_code_expired` on `POST /dapi/v1/clients/link`. Start a new sign-in. |
+| Escrow action approval | 60 seconds | `410 approval_expired` on confirm. Prepare the action again with the same `Idempotency-Key`. |
+
+Other lifetimes are on the REST API pages: the refresh token on [Exchange a signed login challenge](/api-reference/auth/exchange-a-signed-login-challenge-for-a-session), the sign-in window session on [Create a sign-in window session](/api-reference/accounts/create-a-sign-in-window-session), the payin quote on [Create an incoming transfer quote](/api-reference/transfers/create-an-incoming-transfer-quote), the escrow windows on [Open an escrow](/api-reference/escrow/open-an-escrow-and-return-the-payers-approval) and the escrow chain read on [Reconcile one escrow](/api-reference/escrow/reconcile-one-escrow-with-the-chain). After a sign-in window session expires, create a new one. The replay windows of an `Idempotency-Key` are in [Idempotency-Key](#idempotency-key).
+
+## Setting limits
+
+Field sizes on API requests are on the REST API page of each operation. These limits apply to settings in the HEVN app:
+
+| Setting | Limit |
+| --- | --- |
+| Allowed sites in the sign-in window | 20 origins |
+| `publicKey` on a developer key | 4,096 characters, DER-encoded |
+| IP allowlist on a developer key | 1 to 64 addresses or CIDR networks, fixed when the key is created |
+
+<Card title="Next: Sign in with HEVN" icon="log-in" href="/whitelabel/sign-in-with-hevn" />

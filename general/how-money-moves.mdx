@@ -1,0 +1,52 @@
+---
+title: "How money moves"
+description: "How USDC enters and leaves a HEVN wallet, and which credential authorizes each step."
+---
+
+Money in a HEVN account is USDC in a Base smart wallet. A payin ends when USDC arrives in the wallet, and a payout starts with a transfer the holder's key signs.
+
+## Login and authorization
+
+The holder signs in with Privy by email or Google, and the Privy key signs a challenge message offchain at no gas cost. HEVN checks the signer against the holder's Privy address and issues a short-lived JWT.
+
+| | Platform authorization | Money authorization |
+| --- | --- | --- |
+| Credential | HEVN JWT | Signature from a wallet owner key, or from a [remote transfer key](/remote-transfers/overview) within its onchain allowance |
+| Grants | Contacts, invoices, contracts, account details, verification (KYC and KYB), transaction reports, analytics, balances, team administration | Transfers and any onchain state change |
+| Issued by | HEVN | The signer's key, per operation |
+
+The JWT cannot move money.
+
+## Payins
+
+| Source | Path |
+| --- | --- |
+| Bank transfer | The payer sends fiat to the account details. The partner bank converts it and delivers USDC to the wallet address. |
+| USDC on Base | Send to the wallet address shown in the app. |
+| Other chain or token | Send to a one-time address from a cross-chain quote. See [Cross-chain](#cross-chain). |
+
+The partner bank opens account details (an account number or IBAN) for one holder and links them to that holder's wallet address. A payin is complete when the USDC arrives on Base.
+
+## Fiat payouts
+
+1. Create a payout to a bank beneficiary in the app or through the API. The JWT authorizes this call, which returns a quote and moves no money.
+2. The payout returns a one-time address. The app checks its [signature](/general/security-model#signed-responses) before showing it.
+3. The holder's key signs the USDC transfer from the wallet to that address.
+4. After the USDC arrives, the partner bank pays the beneficiary.
+
+Each one-time address serves one payout. The transfer is public on [Basescan](https://basescan.org).
+
+## Cross-chain
+
+Payins from other chains and payouts to them (BTC, ETH, SOL, USDT on TRON and others) run through the [NEAR Intents 1Click API](https://docs.near-intents.org/integration/distribution-channels/1click-api/about-1click-api).
+
+| Step | Who | What happens |
+| --- | --- | --- |
+| Quote | HEVN | Requests a quote. 1Click returns a one-time address on the origin chain. |
+| Check | The app | Validates the address against the quote before showing it. |
+| Settle | 1Click | Manages the one-time address, settles the swap and delivers the destination asset. |
+| Refund | 1Click | If a swap fails, for example on an expired quote or a mismatched transfer, refunds a payin to the sender's refund address and a payout to the wallet. |
+
+Fees follow the [1Click fee calculation](https://docs.near-intents.org/near-intents/integration/distribution-channels/1click-app-fees-calculation).
+
+<Card title="Next: Security model" icon="arrow-right" href="/general/security-model" />

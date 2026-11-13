@@ -2,14 +2,14 @@
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
   "name": "HEVN",
-  "description": "HEVN documentation: the whitelabel REST API for linking and operating your customers' own accounts, remote transfers for paying from your own account with a capped key, and how the non-custodial platform underneath works.",
+  "description": "HEVN documentation: the whitelabel REST API for linked client accounts, remote transfers with a capped key, and how the wallet and platform fit together.",
   "markdown": {
     "instructions": [
-      "HEVN accounts are non-custodial in both products. Self-serve (the General tab): the person who owns the email holds the only key and signs for themselves. Whitelabel (the Whitelabel and REST API tabs): the integrator's customer creates and owns their account through Sign in with HEVN, a HEVN-hosted popup on the integrator's site; the integrator's backend holds a developer key, operates linked accounts and books their payouts, and the account holder approves every payout in that popup. The developer key signs only for the integrator's own wallet; it never signs a client's money.",
-      "Use HEVN's terms exactly. A rail is a bank route a client can request. A virtual account (bnk_) is an opened rail. Account details are what a payer needs in order to wire money, and arrive in a field named requisites. A client is a customer's own account linked to the integrator through Sign in with HEVN (POST /dapi/v1/connect/sessions, then POST /dapi/v1/clients/link); there is no API call that creates one. The business behind it is the integrator's customer. A contact is a saved destination; a beneficiary is the party at the far end of a fiat payout. Every departure of money is a payout, to a bank account or to a wallet alike.",
-      "Never name a banking partner. Say 'a licensed banking partner'.",
-      "There are no published fee rates, spreads or minimums. Prices come from a quote on a specific payment; direct pricing questions to HEVN rather than inventing numbers.",
-      "The whitelabel API is at /dapi/v1 and takes a developer-key session plus an X-Hevn-Account header. Developer keys have an IP allowlist and no scopes. Remote transfers are at /api/v1/remote_spend_limit and take a remote transfer key (rsl_) in X-Api-Key, bounded by an onchain spend permission the account holder grants. They are different credentials and neither works on the other surface. The HEVN CLI is discontinued."
+      "HEVN is payments software: an API and app over a Base smart wallet. HEVN is not a bank and holds no key to the wallet. Virtual accounts, fiat payins and fiat payouts are provided by partner banks, which hold fiat while it is in transit. Self-serve (the General tab): the person who controls the email signs for the wallet. Whitelabel (the Whitelabel and REST API tabs): the integrator's customer creates an account through Sign in with HEVN, a HEVN-hosted popup on the integrator's site. The integrator's backend holds a developer key, reads linked accounts and books their payouts, and the account holder approves each payout in that popup. The developer key signs for the integrator's wallet and cannot sign for a client's wallet.",
+      "Use HEVN's terms as written. A product is the region a client requests. A rail is the bank route HEVN picks for the product. A virtual account (bnk_) is the record a partner bank opens for a client. Account details are what a payer needs to send a bank transfer, returned in a field named requisites. A client is a customer's account linked to the integrator through Sign in with HEVN (POST /dapi/v1/connect/sessions, then POST /dapi/v1/clients/link). No API call creates one. A contact is a saved destination. A beneficiary is the party that receives a fiat payout. Money leaving an account is a payout, whether it goes to a bank account or to a wallet.",
+      "Do not name a bank, payment institution, card issuer, identity-verification vendor or stablecoin issuer. Say 'the partner bank'. Do not describe HEVN as licensed, regulated or insured.",
+      "HEVN publishes no fee rates, spreads or minimums. Prices come from a quote on a specific payment. Direct pricing questions to HEVN and do not invent numbers.",
+      "The whitelabel API is at /dapi/v1 and takes a developer-key session plus an X-Hevn-Account header. Developer keys have an IP allowlist and no scopes. Remote transfers are at /api/v1/remote_spend_limit and take a remote transfer key (rsl_) in X-Api-Key, bounded by an onchain spend permission the account holder grants. The two credentials are separate and neither works on the other API. The HEVN CLI is discontinued."
     ]
   },
   "colors": {
@@ -47,29 +47,7 @@
             "group": "Overview",
             "pages": [
               "general/what-is-hevn",
-              "general/architecture"
-            ]
-          },
-          {
-            "group": "Keys & wallets",
-            "pages": [
-              "general/privy-wallets",
-              "general/smart-wallets",
-              "general/shared-access"
-            ]
-          },
-          {
-            "group": "Money movement",
-            "pages": [
-              "general/deposits-and-payouts",
-              "general/cross-chain"
-            ]
-          },
-          {
-            "group": "Security",
-            "pages": [
-              "general/authentication",
-              "general/trust-assumptions",
+              "general/how-money-moves",
               "general/security-model"
             ]
           }
@@ -81,9 +59,7 @@
           {
             "group": "Remote transfers",
             "pages": [
-              "remote-transfers/overview",
-              "remote-transfers/keys",
-              "remote-transfers/api"
+              "remote-transfers/overview"
             ]
           }
         ]
@@ -95,19 +71,15 @@
             "group": "Start here",
             "pages": [
               "whitelabel/overview",
-              "whitelabel/use-cases",
-              "whitelabel/how-money-moves",
               "whitelabel/quickstart"
             ]
           },
           {
             "group": "Core concepts",
             "pages": [
-              "whitelabel/accounts-and-control",
-              "whitelabel/developer-key",
-              "whitelabel/sessions",
-              "whitelabel/conventions",
-              "whitelabel/signing"
+              "whitelabel/authentication",
+              "whitelabel/signing",
+              "whitelabel/conventions"
             ]
           },
           {
@@ -115,7 +87,6 @@
             "pages": [
               "whitelabel/sign-in-with-hevn",
               "whitelabel/clients",
-              "whitelabel/onboarding",
               "whitelabel/virtual-accounts"
             ]
           },
@@ -125,32 +96,21 @@
               "whitelabel/payins",
               "whitelabel/payouts",
               "whitelabel/swaps",
-              "whitelabel/balances-and-transactions"
-            ]
-          },
-          {
-            "group": "Escrow",
-            "pages": [
-              "whitelabel/escrow",
-              "whitelabel/escrow-actions"
+              "whitelabel/balances-and-transactions",
+              "whitelabel/escrow"
             ]
           },
           {
             "group": "Ship it",
             "pages": [
-              "whitelabel/sandbox",
-              "whitelabel/going-live"
+              "whitelabel/sandbox"
             ]
           },
           {
             "group": "Reference",
             "pages": [
-              "whitelabel/reference/coverage",
-              "whitelabel/reference/fees",
               "whitelabel/reference/rails",
-              "whitelabel/reference/kyb-fields",
               "whitelabel/reference/errors",
-              "whitelabel/reference/limits",
               "whitelabel/reference/client"
             ]
           },
@@ -168,8 +128,7 @@
           {
             "group": "Overview",
             "pages": [
-              "api-reference/overview",
-              "api-reference/authentication"
+              "api-reference/overview"
             ]
           },
           {
@@ -262,7 +221,16 @@
               "GET /transactions",
               "GET /transactions/{transactionId}",
               "GET /transactions/summary",
-              "GET /transactions/export"
+              "GET /transactions/export",
+              "POST /transactions/sync"
+            ]
+          },
+          {
+            "group": "Catalog",
+            "openapi": "openapi.json",
+            "pages": [
+              "GET /chains",
+              "GET /rates"
             ]
           },
           {
@@ -283,6 +251,7 @@
             "pages": [
               "GET /sandbox/treasury",
               "POST /sandbox/deposits",
+              "POST /sandbox/kyb/status",
               "POST /sandbox/payins/{payinId}/complete",
               "POST /sandbox/payouts/{payoutId}/status"
             ]
@@ -334,12 +303,8 @@
       "destination": "/general/what-is-hevn"
     },
     {
-      "source": "/whitelabel/authentication",
-      "destination": "/whitelabel/sessions"
-    },
-    {
       "source": "/whitelabel/workspaces",
-      "destination": "/whitelabel/sessions"
+      "destination": "/whitelabel/authentication#sessions"
     },
     {
       "source": "/whitelabel/client-profile",
@@ -347,11 +312,11 @@
     },
     {
       "source": "/whitelabel/kyb",
-      "destination": "/whitelabel/onboarding"
+      "destination": "/whitelabel/clients#write-the-document"
     },
     {
       "source": "/whitelabel/accounts-and-custody",
-      "destination": "/whitelabel/accounts-and-control"
+      "destination": "/whitelabel/overview#accounts-and-control"
     },
     {
       "source": "/whitelabel/errors",
@@ -368,6 +333,98 @@
     {
       "source": "/whitelabel/bank-accounts",
       "destination": "/whitelabel/virtual-accounts"
+    },
+    {
+      "source": "/general/authentication",
+      "destination": "/general/how-money-moves#login-and-authorization"
+    },
+    {
+      "source": "/general/cross-chain",
+      "destination": "/general/how-money-moves#cross-chain"
+    },
+    {
+      "source": "/general/trust-assumptions",
+      "destination": "/general/security-model#dependencies"
+    },
+    {
+      "source": "/remote-transfers/keys",
+      "destination": "/remote-transfers/overview"
+    },
+    {
+      "source": "/whitelabel/use-cases",
+      "destination": "/whitelabel/overview"
+    },
+    {
+      "source": "/whitelabel/reference/coverage",
+      "destination": "/whitelabel/reference/rails"
+    },
+    {
+      "source": "/api-reference/authentication",
+      "destination": "/whitelabel/authentication"
+    },
+    {
+      "source": "/whitelabel/how-money-moves",
+      "destination": "/whitelabel/overview#how-money-moves"
+    },
+    {
+      "source": "/whitelabel/accounts-and-control",
+      "destination": "/whitelabel/overview#accounts-and-control"
+    },
+    {
+      "source": "/whitelabel/developer-key",
+      "destination": "/whitelabel/authentication#developer-key"
+    },
+    {
+      "source": "/whitelabel/sessions",
+      "destination": "/whitelabel/authentication#sessions"
+    },
+    {
+      "source": "/whitelabel/reference/limits",
+      "destination": "/whitelabel/conventions#rate-limits"
+    },
+    {
+      "source": "/whitelabel/onboarding",
+      "destination": "/whitelabel/clients#write-the-document"
+    },
+    {
+      "source": "/whitelabel/escrow-actions",
+      "destination": "/whitelabel/escrow#the-matrix"
+    },
+    {
+      "source": "/whitelabel/going-live",
+      "destination": "/whitelabel/sandbox#go-live"
+    },
+    {
+      "source": "/whitelabel/reference/fees",
+      "destination": "/whitelabel/reference/rails#fees"
+    },
+    {
+      "source": "/general/architecture",
+      "destination": "/general/what-is-hevn#account-structure"
+    },
+    {
+      "source": "/general/deposits-and-payouts",
+      "destination": "/general/how-money-moves#payins"
+    },
+    {
+      "source": "/general/privy-wallets",
+      "destination": "/general/security-model#keys-and-privy"
+    },
+    {
+      "source": "/general/smart-wallets",
+      "destination": "/general/security-model#smart-wallet"
+    },
+    {
+      "source": "/general/shared-access",
+      "destination": "/general/security-model#shared-access"
+    },
+    {
+      "source": "/remote-transfers/api",
+      "destination": "/remote-transfers/overview#call-the-routes"
+    },
+    {
+      "source": "/whitelabel/reference/kyb-fields",
+      "destination": "/whitelabel/clients#write-the-document"
     }
   ]
 }

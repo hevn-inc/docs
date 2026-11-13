@@ -1,41 +1,27 @@
 ---
 title: "Payins"
-description: "Quote incoming fiat, hand the payer instructions, and watch it settle onto the client's wallet."
+description: "Quote an incoming payment, give the payer instructions, and follow it to settlement on the client's wallet."
 ---
 
-import ActingAsSnippet from "/snippets/acting-as.mdx";
-import PollSnippet from "/snippets/poll.mdx";
-import SandboxCapsSnippet from "/snippets/sandbox-caps.mdx";
+A payin is an arrival of money on a client's wallet, recorded as an income row on the ledger. To fix the rate and fee before the payer pays, quote it with `POST /dapi/v1/payins`.
 
-Money arrives four ways: a quoted deposit you priced, a quoted on-chain transfer you priced, an unsolicited wire to account details that are already live, or crypto sent straight to the wallet. All four end as one income row on the client's ledger.
-
-| Shape | What you call | What the payer needs |
+| Shape | Call | Payer needs |
 | --- | --- | --- |
-| **Quoted deposit** | `POST /dapi/v1/payins` with `rail`, then `POST /dapi/v1/payins/{payinId}/instructions` | The instructions that quote returns, payment reference included |
-| **Quoted on-chain transfer** | `POST /dapi/v1/payins` with `originChainId`, then the same instructions call | The `address`, `chainId` and `memo` the instructions return |
-| **Unsolicited wire** | Nothing — the account details stay live | The `requisites` on the client's active rail from `GET /dapi/v1/banks` |
-| **Crypto** | Nothing | The client's `baseSmartWallet` address |
+| Quoted bank payin | `POST /dapi/v1/payins` with `rail` | The instructions, with `paymentReference` |
+| Quoted on-chain transfer | `POST /dapi/v1/payins` with `originChainId` | `address`, `chainId` and `memo` |
+| Unsolicited wire | None | `requisites` of an active virtual account |
+| Direct crypto | None | `baseSmartWallet` |
 
-Quote a payin when you need the rate and the fee pinned before the payer pays, and when you want their transfer attributed to one order. Take an unquoted path when the client publishes its own details and reconciles afterwards.
+Send `X-Hevn-Account` on each route ([Acting as a client](/whitelabel/authentication#acting-as-a-client)).
 
-```mermaid
-flowchart LR
-    Q["POST /dapi/v1/payins<br/>price the deposit"] --> I["POST /dapi/v1/payins/pi_2b7/instructions<br/>what the payer needs"]
-    I --> W["Payer wires"]
-    W --> C["Partner converts"]
-    C --> B["Client's wallet credited<br/>+ income row"]
-    W -.->|"sandbox"| S["POST /dapi/v1/sandbox/payins/pi_2b7/complete"]
-    S --> C
-```
+## Quote a bank payin
 
-<ActingAsSnippet />
-
-## Quote a deposit
-
-The client needs an **active rail** in the currency the payer sends — see [Virtual accounts](/whitelabel/virtual-accounts).
+The client needs an active [virtual account](/whitelabel/virtual-accounts) in the payer's currency.
 
 <Steps>
-  <Step title="Price the deposit">
+  <Step title="Create the quote">
+    Call `POST /dapi/v1/payins`.
+
     <CodeGroup>
     ```bash cURL
     curl -s -X POST "$HEVN_API/payins" \
@@ -46,7 +32,7 @@ The client needs an **active rail** in the currency the payer sends — see [Vir
     ```
 
     ```python Python
-    payin = northwind.post("/payins", {
+    payin = client.post("/payins", {
         "amount": "2000.00",
         "currency": "EUR",
         "rail": "sepa",
@@ -55,7 +41,7 @@ The client needs an **active rail** in the currency the payer sends — see [Vir
     ```
 
     ```javascript Node
-    const payin = await northwind.post("/payins", {
+    const payin = await client.post("/payins", {
       amount: "2000.00",
       currency: "EUR",
       rail: "sepa",
@@ -64,7 +50,7 @@ The client needs an **active rail** in the currency the payer sends — see [Vir
     ```
 
     ```go Go
-    payin, err := northwind.Post("/payins", hevn.Body{
+    payin, err := client.Post("/payins", hevn.Body{
     	"amount":          "2000.00",
     	"currency":        "EUR",
     	"rail":            "sepa",
@@ -73,25 +59,19 @@ The client needs an **active rail** in the currency the payer sends — see [Vir
     ```
     </CodeGroup>
 
-    ```json Response — 201, Location: /dapi/v1/payins/pi_2b7…
+    ```json Response: 201, Location: /dapi/v1/payins/pi_2b7…
     { "id": "pi_2b7…", "status": "pending", "rail": "sepa",
-      "quote": { "amount": "2000.00", "currency": "EUR",
-                 "settlementAmount": "1989.50", "destinationAccount": "EURC",
-                 "feeAmount": "10.50", "feeCurrency": "EUR", "rate": "1.0000" },
-      "expiresAt": "2026-09-17T10:06:11Z", "createdAt": "2026-09-17T10:04:11Z" }
+      "quote": { "settlementAmount": "1989.50", "feeAmount": "10.50",
+                 "feeCurrency": "EUR", "rate": "1.0000", … },
+      "expiresAt": "2026-09-17T10:06:11Z", … }
     ```
 
-    Four decisions:
-
-    - **`amount` or `amountTo`, exactly one.** `amount` is what the payer sends in `currency`; `amountTo` is what should land on the wallet, and HEVN grosses the payer's side up to reach it.
-    - **`rail` or `originChainId`, exactly one.** `rail` prices money arriving over a payment method; `originChainId` prices money arriving on a chain. Sending both, or neither, is refused.
-    - **`rail` here is a payment *method*** — `sepa`, `ach`, `swift`, `fedwire`, `pix`, … — not the product you requested with `POST /dapi/v1/banks`. The two are different vocabularies; [Rails](/whitelabel/reference/rails) lists both.
-    - **`destinationAccount`** is the account the payin is delivered into, `USDC` (the default) or `EURC`. It has to be an account one of the client's matching rails settles into; when it is not, the call refuses with the pairs that work (see below). Money arriving over a rail always lands on the wallet, so `FDIC_USD` and `FDIC_EUR` are refused here with `422 account_not_supported`.
-
-    The price holds until `expiresAt`. Read it; do not cache a quote.
+    Field rules are in [Create an incoming transfer quote](/api-reference/transfers/create-an-incoming-transfer-quote). Payment methods are listed in [Rails](/whitelabel/reference/rails#what-each-method-needs).
   </Step>
 
-  <Step title="Open it and read the instructions">
+  <Step title="Request the instructions">
+    Call `POST /dapi/v1/payins/{payinId}/instructions`.
+
     <CodeGroup>
     ```bash cURL
     curl -s -X POST "$HEVN_API/payins/pi_2b7…/instructions" \
@@ -101,176 +81,117 @@ The client needs an **active rail** in the currency the payer sends — see [Vir
     ```
 
     ```python Python
-    instructions = northwind.post(f"/payins/{payin['id']}/instructions", {})
+    instructions = client.post(f"/payins/{payin['id']}/instructions", {})
     ```
 
     ```javascript Node
-    const instructions = await northwind.post(`/payins/${payin.id}/instructions`, {});
+    const instructions = await client.post(`/payins/${payin.id}/instructions`, {});
     ```
 
     ```go Go
-    instructions, err := northwind.Post("/payins/"+payin.Str("id")+"/instructions", hevn.Body{})
+    instructions, err := client.Post("/payins/"+payin.Str("id")+"/instructions", hevn.Body{})
     ```
     </CodeGroup>
 
-    ```json Response — 200
+    ```json Response: 200
     { "payinId": "pi_2b7…", "kind": "bank_transfer",
       "amount": "2000.00", "currency": "EUR",
       "paymentReference": "HEVN-7QF3K2", "singleUse": true,
-      "requisites": { "fields": { "iban": "MT84…", "bic": "BANKMTMT" },
-                      "holder": { "type": "business", "businessName": "Northwind Trading Ltd" },
-                      "bankName": "Bank A", "state": "active" } }
+      "requisites": { "fields": { "iban": "DE89…", "bic": "BANKDEFFXXX" }, … } }
     ```
 
-    Hand `requisites` to the payer verbatim, **`paymentReference` included** — on a pooled account it is the only thing that attributes the money to this payin.
-
-    `kind` says where the payer acts: `bank_transfer` (use `requisites`), `qr_code` (`qrPayload`), `hosted_page` (`url`), `manual`, or `onchain` (`address`, `chainId` and `memo`).
-
-    `singleUse` says whether the account details may receive another payment. Build as if it were always `true`: the instructions belong to this payin, and they are used up once money is sent to them. Never save them, and never show them for a second payment. A partner can answer `false` for a standing account, but the amount, the reference and `expiresAt` still belong to this one payin. The account details meant for repeat payments are the ones on an active rail — see [Unsolicited wires](#unsolicited-wires-to-the-clients-account-details).
-
-    Opening the same payin again returns the same instructions — that is the safe retry, not a way to create a second payin. Once the price stops holding it answers `410 payin_expired`; quote again.
-  </Step>
-
-  <Step title="Watch it settle">
-    `GET /dapi/v1/payins/{payinId}` carries the payin through its whole life. Settlement is driven by the partner's own reports, so poll it rather than waiting on a response.
-
-    <PollSnippet />
-
-    | `status` | Meaning |
-    | --- | --- |
-    | `pending` | Priced. Nothing has arrived. |
-    | `awaitingFunds` | Open, instructions issued, waiting for the payer. |
-    | `processing` | The partner has the money and is converting it. |
-    | `inReview` | Held pending an information request about the payment. |
-    | `completed` | Settled. The tokens are on the client's wallet. |
-    | `failed`, `canceled` | It will not arrive. Quote again. |
-    | `refunded` | Returned to the payer. |
+    Do not reuse the instructions for a second payment. Fields are in [Open the incoming transfer](/api-reference/transfers/open-the-incoming-transfer-and-retrieve-funding-instructions).
   </Step>
 </Steps>
 
-## How long a payin lives
+## Statuses
 
-A payin has two windows, and `expiresAt` reports whichever one applies.
+Poll `GET /dapi/v1/payins/{payinId}` until the status is final ([Status codes](/whitelabel/conventions#status-codes)).
 
-| Stage | Window | When it closes |
+| `status` | Meaning | Next |
 | --- | --- | --- |
-| Quoted, not opened | About two minutes | Opening answers `410 payin_expired`. Quote again. |
-| Opened, waiting for the payer | Usually a few hours | Money that arrives later can be returned to the payer. |
+| `pending` | Quoted. No money has arrived. A `rail` quote holds for 2 minutes at most. | Request the instructions before `expiresAt`. After it, the call returns `410 payin_expired`. |
+| `awaitingFunds` | Instructions issued. The partner bank sets `expiresAt`. | Wait for the payer. Money that arrives after `expiresAt` can be returned to the payer. |
+| `processing` | The partner bank has the money and is converting it. | Keep polling. |
+| `inReview` | Held for an information request about the payment. | Keep polling. |
+| `completed` | The tokens are on the client's wallet. | n/a |
+| `failed`, `canceled` | The money will not arrive. | Quote again. |
+| `refunded` | Returned to the payer. | n/a |
 
-If nobody pays, nothing happens: the payin expires and nothing is charged. An unpaid payin never appears in `GET /dapi/v1/transactions`, and there is no route that lists payins. Store `payinId` when you quote; a payin whose id you lost is one you can no longer reach.
+An unpaid payin expires without a charge and has no ledger row. No route lists payins, so store `payinId` when you quote.
 
-Once money arrives, a `pending` income row appears on the ledger. It ends as `success`, `refunded`, or `rfi` when the partner asks about the payment ([Balances and transactions](/whitelabel/balances-and-transactions)).
+Once money arrives, a `pending` income row appears on the [ledger](/whitelabel/balances-and-transactions). It shows `rfi` while the partner bank asks about the payment and ends as `success` or `refunded`.
 
-## When the payer gets it wrong
+## Payer mistakes
 
-Quoted instructions are matched on what the payer sends, so a mistake costs time. Money is not lost as long as the currency is right and the reference (or `memo`) is there.
-
-| Mistake | What happens |
+| Mistake | Result |
 | --- | --- |
-| Bank transfer, right currency and reference, different amount | Usually the amount actually sent is credited. Some partners return it to the payer instead. |
-| Bank transfer, wrong currency or missing reference | The money may not be attributable. Recovering it goes through HEVN support and can take a long time. |
-| On-chain, different amount | Returned to the sender, usually within a few hours. |
-| On-chain, wrong chain or wrong token | Stuck. Recovering it is possible, but slow and handled case by case with HEVN. |
+| Bank transfer, different amount, right currency and reference | The amount sent is usually credited. The partner bank may return it instead. |
+| Bank transfer, wrong currency or missing reference | The money may not be attributable. Recovery goes through HEVN support and is slow. |
+| On-chain, different amount | Returned to the sender. |
+| On-chain, wrong chain or token | The money does not arrive. Recovery is handled case by case with HEVN and is slow. |
 
-That is why quoted bank payins suit payers who copy the instructions exactly. When a person types account details by hand, the standing account details of an active rail are the safer path.
+For a payer who types the details by hand, use [unsolicited wires](#unsolicited-wires-to-the-clients-account-details).
 
 ## Quote an on-chain transfer
 
-`originChainId` in place of `rail` prices money arriving on a chain instead of through a bank. The body is otherwise the same call:
+Send `originChainId` in place of `rail`.
 
 ```json
 { "amount": "2000.00", "currency": "USDC", "originChainId": "arb", "destinationAccount": "USDC" }
 ```
 
-`PayinView` then carries `originChainId` — the network the payer funds from — and `destinationChainId`, the network the payin settles on. Open it with the same `POST /dapi/v1/payins/{payinId}/instructions`, and the instructions answer `kind: "onchain"` with the three fields a sender needs:
+The instructions call returns:
 
-```json Response — 200
-{ "payinId": "pi_5d3…", "kind": "onchain",
-  "amount": "2000.00", "currency": "USDC", "singleUse": true,
-  "address": "0x9b41…", "chainId": "arb", "memo": null }
+```json Response: 200
+{ "kind": "onchain", "address": "0x9b41…", "chainId": "arb", "memo": null, … }
 ```
 
-`memo` is the destination tag some networks route on. When it is present it is as load-bearing as a `paymentReference` — a transfer that omits it cannot be attributed. `ChainCode` is the same vocabulary a wallet contact uses; `base`, `arb`, `sol` and the rest are listed on the [rail reference](/whitelabel/reference/rails).
+Give the payer `memo` when it is set. Chain values are in [Chain codes](/whitelabel/reference/rails#chain-codes).
 
-This is the quoted arm of crypto-in. The unquoted arm — send straight to the wallet, no call at all — is further down.
+## Payer details
 
-## What a virtual account converts at
-
-`GET /dapi/v1/banks/{product}/rate` answers `{currency, rate, fixedFee, fixedFeeCurrency}` — the indicative price of a deposit over that product's rail. On a product the client has not requested, only `currency` comes back. Use it to show a rate in your own UI before the payer commits to an amount. It is indicative: `POST /dapi/v1/payins` returns the number you are held to.
-
-## When the payer has to be named
-
-Some rails require the payer's own account so the receiving bank can check the sender. `POST /dapi/v1/payins/{payinId}/instructions` takes it:
+Some rails require the payer's account. Send it as `payer` on the instructions call.
 
 ```json
 { "payer": { "method": "sepa",
              "requisites": { "method": "sepa", "currency": "EUR",
-                             "fields": { "iban": "DE89370400440532013000", "bic": "COBADEFFXXX" },
+                             "fields": { "iban": "DE89370400440532013000", "bic": "BANKDEFFXXX" },
                              "holder": { "type": "business", "businessName": "Payer GmbH" } } } }
 ```
 
-`payer.requisites.method` has to equal `payer.method`. When a rail needs the payer and you omit it, the call answers `400 invalid_request` and names the fields it wants in `message` — that refusal carries no `details`. `details.options[].payerRequired` on a refused quote is the part you can branch on, and it tells you in advance which pairs demand a payer.
+`details.options[].payerRequired` on a refused quote shows which pairs need a payer.
 
-## When a pair cannot be paid
+## Refusals
 
-A currency and method the client cannot be paid in answers `422 payin_not_available`, and `details.options` carries every pair that **can** — each with `rail`, `currency`, `available`, `minAmount`, `maxAmount`, `feeBps`, `fixedFee`, `payerRequired` and `destinationAccounts`. Read the options rather than pre-flighting: the refusal is the capability catalogue.
+| Error | Next |
+| --- | --- |
+| `422 payin_not_available` | Quote again with a pair from `details.options[]`. Each option has `rail`, `currency`, `available`, `minAmount`, `maxAmount`, `feeBps`, `fixedFee`, `payerRequired` and `destinationAccounts`. |
+| `400 invalid_request` | Send `payer` with the identifiers in `details.fields`. |
+| `410 payin_expired` | Quote again. |
 
-`410 payin_expired` and `404 payin_not_found` are the other two you will meet; both carry `details.payinId`. [Errors](/whitelabel/reference/errors#rails-and-payins) has the rest.
+Other codes are in [Errors](/whitelabel/reference/errors#rails-and-payins). Indicative rates are in [Fees](/whitelabel/reference/rails#fees).
 
 ## Unsolicited wires to the client's account details
 
-An active rail's account details stay live between payments. Anyone can wire to them with no quote and no API call from you.
+A payer can send to an active virtual account at any time. Give the payer its [account details](/whitelabel/virtual-accounts#account-details) from `GET /dapi/v1/banks`, with `paymentReference` when one is set.
 
-1. Read `requisites` for the active rail from `GET /dapi/v1/banks`.
-2. Give the payer the fields it carries, plus `paymentReference` when one is set.
-3. The deposit lands as an income row on `GET /dapi/v1/transactions`, carrying `remitter` where the partner reports the sender, `paymentReference`, and the receiving account details.
+The income row from `GET /dapi/v1/transactions` has `paymentReference`, the receiving account details and `remitter`.
 
 <Note>
-  Some partners report no sender at all. When `remitter` is absent on a settled deposit, the sender cannot be recovered from the API — treat it as unknown rather than retrying.
+  `remitter` is set when the partner bank reports the sender. When it is absent on a settled row, the API cannot return the sender.
 </Note>
 
-## Crypto straight to the wallet
+## Direct crypto
 
-The client's smart wallet is an ordinary address on Base. Read it from `GET /dapi/v1/client/balance` — with the client id in `X-Hevn-Account` — as `baseSmartWallet` and publish it; anything sent there is the client's. Nothing is quoted on this path, and there is no payin record: use the quoted on-chain arm above when you need a price or an attributed transfer.
+Read `baseSmartWallet` from `GET /dapi/v1/client/balance` and give the address to the payer.
 
 <Warning>
-  Only **USDC and EURC on Base** are tracked. Other tokens, and the same tokens on other chains, sit at the address without ever becoming a balance or a transaction.
+  HEVN tracks USDC and EURC on Base. Other tokens, and these tokens on other chains, do not become a balance or a transaction.
 </Warning>
 
-## In the sandbox
+## Sandbox
 
-The partner is emulated, so a quoted payin waits forever until you complete it yourself. One call does what the payer would have done:
+A quoted payin does not settle until you call the route in [Settle a payin](/whitelabel/sandbox#settle-a-payin). For the unquoted shapes, see [Mint money](/whitelabel/sandbox#mint-money).
 
-<CodeGroup>
-
-```bash cURL
-curl -s -X POST "$HEVN_API/sandbox/payins/pi_2b7f14c0a9/complete" \
-  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
-  -H "X-Hevn-Account: $HEVN_CLIENT_ID" \
-  -H "Content-Type: application/json" \
-  -d '{"remitter":"Payer GmbH"}'
-```
-
-```python Python
-settled = northwind.post(f"/sandbox/payins/{payin['id']}/complete", {"remitter": "Payer GmbH"})
-```
-
-```javascript Node
-const settled = await northwind.post(`/sandbox/payins/${payin.id}/complete`,
-  { remitter: "Payer GmbH" });
-```
-
-```go Go
-settled, err := northwind.Post("/sandbox/payins/"+payin.Str("id")+"/complete",
-	hevn.Body{"remitter": "Payer GmbH"})
-```
-
-</CodeGroup>
-
-`POST /dapi/v1/sandbox/deposits` covers the other two unquoted shapes: with `bankId` it emulates an unsolicited wire to that rail, without one it credits the smart wallet with tokens. Both are in [Sandbox](/whitelabel/sandbox#mint-money).
-
-<SandboxCapsSnippet />
-
-<Card title="Next: Payouts" icon="arrow-right" href="/whitelabel/payouts">
-  Money out: price and book a bank payout in one call, sign it in the next.
-</Card>
+<Card title="Next: Payouts" icon="arrow-right" href="/whitelabel/payouts" />

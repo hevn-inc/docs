@@ -1,140 +1,174 @@
 ---
-title: "Rails and payment methods"
-description: "What each payment method needs, which products a client can request, and the currency each one carries."
+title: "Rails and fees"
+description: "Products, payment methods with their currencies and identifiers, chain codes, and where each fee and rate is returned."
 ---
 
-A virtual account is requested by **product** — a region code such as `eu` or `us` — and HEVN picks the rail behind it. This page is what each product carries and what each payment method needs.
+A payment method is the bank network a payin or payout uses, named by a value such as `sepa` or `ach`. Read what one client can use with `GET /dapi/v1/banks`, and what one contact can receive with `GET /dapi/v1/contacts/{contactId}/capabilities`.
 
-## What each method needs
-
-A payment method is defined by the identifiers it routes on. The same matrix governs both directions: the `requisites.fields` you read off an active virtual account, and the `fields` you send when you save a contact.
-
-`+` means every group is required. `or` means any one of the alternatives in that group.
-
-| Method | Identifiers |
-| --- | --- |
-| `sepa` | `iban` |
-| `swift` | `accountNumber` or `iban` + `bic` |
-| `ach` | `accountNumber` + `routingNumber` |
-| `fedwire` | `accountNumber` + `routingNumber` |
-| `ukfps` | `accountNumber` + `routingNumber` |
-| `uaefts` | `iban` |
-| `pix` | `pixKey` or `accountNumber` |
-| `spei` | `accountNumber` or `iban` |
-| `npp` | `accountNumber` + `routingNumber` |
-| `nip` | `accountNumber` |
-| `breb` | `paymentKey` or `accountNumber` |
-| `pse` | `accountNumber` or `iban` |
-| `transfers_3_0` | `accountNumber` or `iban` |
-
-<Accordion title="Every other method">
-
-These do not open as deposit rails; they are destinations you can save as contacts and pay out to.
-
-| Method | Identifiers |
-| --- | --- |
-| `bdt_ewallet` | `financialInstitutionId` + `phoneNumber` |
-| `bdt_local` | `financialInstitutionId` + `branchNumber` + `accountNumber` |
-| `bob_local` | `financialInstitutionId` + `accountNumber` + `accountKind` |
-| `brl_local` | `financialInstitutionId` + `branchNumber` + `accountNumber` + `accountKind` |
-| `cad_eft` | `financialInstitutionId` + `accountNumber` + `routingNumber` |
-| `clp_local` | `financialInstitutionId` + `accountNumber` + `accountKind` |
-| `cny_alipay` | `phoneNumber` |
-| `cny_wechatpay` | `phoneNumber` |
-| `cop_local` | `financialInstitutionId` + `accountNumber` + `accountKind` |
-| `crc_local` | `financialInstitutionId` + `iban` + `phoneNumber` |
-| `dkk_local` | `iban` |
-| `dop_ewallet` | `financialInstitutionId` + `phoneNumber` |
-| `dop_local` | `financialInstitutionId` + `accountNumber` + `accountKind` |
-| `egp_local` | `financialInstitutionId` + `iban` |
-| `fednow` | `accountNumber` + `routingNumber` |
-| `gtq_ewallet` | `financialInstitutionId` + `phoneNumber` |
-| `gtq_local` | `financialInstitutionId` + `accountNumber` + `accountKind` + `phoneNumber` |
-| `hkd_fps` | `financialInstitutionId` + `accountNumber` |
-| `hnl_local` | `financialInstitutionId` + `accountNumber` + `accountKind` + `phoneNumber` |
-| `idr_ewallet` | `financialInstitutionId` + `phoneNumber` |
-| `idr_local` | `financialInstitutionId` + `accountNumber` |
-| `ils_local` | `financialInstitutionId` + `iban` |
-| `inr_local` | `accountNumber` + `routingNumber` |
-| `inr_upi` | `accountNumber` |
-| `jmd_local` | `financialInstitutionId` + `branchNumber` + `accountNumber` + `accountKind` + `phoneNumber` |
-| `jpy_local` | `financialInstitutionId` + `branchNumber` + `accountNumber` + `phoneNumber` |
-| `krw_local` | `financialInstitutionId` + `accountNumber` |
-| `myr_local` | `financialInstitutionId` + `accountNumber` |
-| `nok_local` | `iban` |
-| `php_ewallet` | `financialInstitutionId` + `phoneNumber` |
-| `php_local` | `financialInstitutionId` + `accountNumber` |
-| `pkr_ewallet` | `financialInstitutionId` + `phoneNumber` |
-| `pkr_raast` | `financialInstitutionId` + `accountNumber` or `iban` |
-| `pln_local` | `iban` |
-| `rtp` | `accountNumber` + `routingNumber` |
-| `sar_local` | `financialInstitutionId` + `iban` |
-| `sle_local` | `financialInstitutionId` + `phoneNumber` |
-| `thb_local` | `financialInstitutionId` + `accountNumber` |
-| `try_fast` | `financialInstitutionId` + `iban` |
-| `tzs_local` | `financialInstitutionId` + `phoneNumber` |
-| `ugx_local` | `financialInstitutionId` + `phoneNumber` |
-| `vnd_local` | `financialInstitutionId` + `accountNumber` |
-| `xof_local` | `financialInstitutionId` + `phoneNumber` |
-| `zmw_local` | `financialInstitutionId` + `phoneNumber` |
-
-</Accordion>
-
-Alongside the identifiers, every requisite and every contact carries a `holder`: `type` (`individual` or `business`) with `firstName` and `lastName`, or `businessName`. Some methods route on the name alone and ignore the account identifiers for matching; the identifiers are still required.
+[Virtual accounts](/whitelabel/virtual-accounts) defines product, rail, virtual account and account details.
 
 ## Products
 
-These are the products a client can request with `POST /dapi/v1/banks`, the methods its payers use, and the currency each one settles from. A payer wires that currency; the client's wallet is credited in a stablecoin.
+Request a virtual account with `POST /dapi/v1/banks` and one of these products. The payer sends the listed currency over one of the listed methods.
 
-| `product` | Methods | Currency | Region |
+| `product` | Methods | Currency |
+| --- | --- | --- |
+| `us` | `ach`, `fedwire` | USD |
+| `swift` | `swift` | USD |
+| `eu` | `sepa` | EUR |
+| `uk` | `ukfps` | GBP |
+| `uae` | `uaefts` | AED |
+| `br` | `pix` | BRL |
+| `mx` | `spei` | MXN |
+| `co` | `breb` | COP |
+| `au` | `npp` | AUD |
+| `ng` | `nip` | NGN |
+
+`GET /dapi/v1/banks` returns the products one client can request, with `currency` and `method` for each. Use the response in code, not this table.
+
+The `product` enum in the API reference has more codes than this table. A code the client cannot request is absent from its `GET /dapi/v1/banks` response, and `POST /dapi/v1/banks` with it returns `403 rail_not_available`.
+
+## What each method needs
+
+The identifiers are the `requisites.fields` of an active virtual account and the `fields` you send to save a contact.
+
+`+` means each group is required. `or` means one of the alternatives in that group.
+
+A contact can use any method in the table. A virtual account can use the methods from `ach` to `transfers_3_0`.
+
+| Method | Currency | Market | Identifiers |
 | --- | --- | --- | --- |
-| `us` | `ach`, `fedwire` | USD | United States |
-| `swift` | `swift` | USD | International |
-| `eu` | `sepa` | EUR | Euro area |
-| `uk` | `ukfps` | GBP | United Kingdom |
-| `uae` | `uaefts` | AED | United Arab Emirates |
-| `br` | `pix` | BRL | Brazil |
-| `mx` | `spei` | MXN | Mexico |
-| `co` | `breb` | COP | Colombia |
-| `au` | `npp` | AUD | Australia |
-| `ng` | `nip` | NGN | Nigeria |
+| `ach`, `fedwire` | USD | United States | `accountNumber` + `routingNumber` |
+| `swift` | USD | International | `accountNumber` or `iban` + `bic` |
+| `sepa` | EUR | Euro area | `iban` |
+| `ukfps` | GBP | United Kingdom | `accountNumber` + `routingNumber` |
+| `uaefts` | AED | United Arab Emirates | `iban` |
+| `pix` | BRL | Brazil | `pixKey` or `accountNumber` |
+| `spei` | MXN | Mexico | `accountNumber` or `iban` |
+| `npp` | AUD | Australia | `accountNumber` + `routingNumber` |
+| `nip` | NGN | Nigeria | `accountNumber` |
+| `breb` | COP | Colombia | `paymentKey` or `accountNumber` |
+| `pse` | COP | Colombia | `accountNumber` or `iban` |
+| `transfers_3_0` | ARS | Argentina | `accountNumber` or `iban` |
+| `bdt_ewallet` | BDT | Bangladesh | `financialInstitutionId` + `phoneNumber` |
+| `bdt_local` | BDT | Bangladesh | `financialInstitutionId` + `branchNumber` + `accountNumber` |
+| `bob_local` | BOB | Bolivia | `financialInstitutionId` + `accountNumber` + `accountKind` |
+| `brl_local` | BRL | Brazil | `financialInstitutionId` + `branchNumber` + `accountNumber` + `accountKind` |
+| `cad_eft` | CAD | Canada | `financialInstitutionId` + `accountNumber` + `routingNumber` |
+| `clp_local` | CLP | Chile | `financialInstitutionId` + `accountNumber` + `accountKind` |
+| `cny_alipay`, `cny_wechatpay` | CNY | China | `phoneNumber` |
+| `cop_local` | COP | Colombia | `financialInstitutionId` + `accountNumber` + `accountKind` |
+| `crc_local` | CRC | Costa Rica | `financialInstitutionId` + `iban` + `phoneNumber` |
+| `dkk_local` | DKK | Denmark | `iban` |
+| `dop_ewallet` | DOP | Dominican Republic | `financialInstitutionId` + `phoneNumber` |
+| `dop_local` | DOP | Dominican Republic | `financialInstitutionId` + `accountNumber` + `accountKind` |
+| `egp_local` | EGP | Egypt | `financialInstitutionId` + `iban` |
+| `fednow`, `rtp` | USD | United States | `accountNumber` + `routingNumber` |
+| `gtq_ewallet` | GTQ | Guatemala | `financialInstitutionId` + `phoneNumber` |
+| `gtq_local` | GTQ | Guatemala | `financialInstitutionId` + `accountNumber` + `accountKind` + `phoneNumber` |
+| `hkd_fps` | HKD | Hong Kong | `financialInstitutionId` + `accountNumber` |
+| `hnl_local` | HNL | Honduras | `financialInstitutionId` + `accountNumber` + `accountKind` + `phoneNumber` |
+| `idr_ewallet` | IDR | Indonesia | `financialInstitutionId` + `phoneNumber` |
+| `idr_local` | IDR | Indonesia | `financialInstitutionId` + `accountNumber` |
+| `ils_local` | ILS | Israel | `financialInstitutionId` + `iban` |
+| `inr_local` | INR | India | `accountNumber` + `routingNumber` |
+| `inr_upi` | INR | India | `accountNumber` |
+| `jmd_local` | JMD | Jamaica | `financialInstitutionId` + `branchNumber` + `accountNumber` + `accountKind` + `phoneNumber` |
+| `jpy_local` | JPY | Japan | `financialInstitutionId` + `branchNumber` + `accountNumber` + `phoneNumber` |
+| `krw_local` | KRW | South Korea | `financialInstitutionId` + `accountNumber` |
+| `myr_local` | MYR | Malaysia | `financialInstitutionId` + `accountNumber` |
+| `nok_local` | NOK | Norway | `iban` |
+| `php_ewallet` | PHP | Philippines | `financialInstitutionId` + `phoneNumber` |
+| `php_local` | PHP | Philippines | `financialInstitutionId` + `accountNumber` |
+| `pkr_ewallet` | PKR | Pakistan | `financialInstitutionId` + `phoneNumber` |
+| `pkr_raast` | PKR | Pakistan | `financialInstitutionId` + `accountNumber` or `iban` |
+| `pln_local` | PLN | Poland | `iban` |
+| `sar_local` | SAR | Saudi Arabia | `financialInstitutionId` + `iban` |
+| `sle_local` | SLE | Sierra Leone | `financialInstitutionId` + `phoneNumber` |
+| `thb_local` | THB | Thailand | `financialInstitutionId` + `accountNumber` |
+| `try_fast` | TRY | Türkiye | `financialInstitutionId` + `iban` |
+| `tzs_local` | TZS | Tanzania | `financialInstitutionId` + `phoneNumber` |
+| `ugx_local` | UGX | Uganda | `financialInstitutionId` + `phoneNumber` |
+| `vnd_local` | VND | Vietnam | `financialInstitutionId` + `accountNumber` |
+| `xof_local` | XOF | West African CFA franc zone | `financialInstitutionId` + `phoneNumber` |
+| `zmw_local` | ZMW | Zambia | `financialInstitutionId` + `phoneNumber` |
 
-`GET /dapi/v1/banks` is authoritative and narrower: it returns only the products a given client can request, after its residency and legal form are taken into account. Read `currency` and `method` off that response rather than deriving them from this table. The `product` enum in the API reference lists more codes than this table; a code with no rail behind it for a client is simply absent from that client's list, and requesting it answers `403 rail_not_available`.
+An `_ewallet` method pays a mobile wallet identified by a phone number. A `_local` method is the domestic clearing system of that market. For both, save a contact and then book a payout.
 
-The product is the key: the same code in every environment, and the one you send, store and put in the path. `rail` on the record names the route HEVN chose behind it. It is informational and can change while the record is `preparing` — compare nothing against it and never show it to your customers.
+Each `requisites` object and each contact has a `holder`. Its `type` is `individual` with `firstName` and `lastName`, or `business` with `businessName`. The holder does not replace the identifiers.
 
-A named account is opened in the client's own legal name, so payers see the client and nothing else is needed for the money to be attributed. A pooled account is one partner account serving many clients; its account details carry a `paymentReference`, and each deposit is attributed by it, so the payer must quote it.
+## Availability
 
-## Accounts a rail settles into
-
-`supportedAccounts` on a virtual account is which of the client's accounts its rail can deliver into, named as `USDC` or `EURC`, and `railCurrency` is what the rail delivers.
-
-The token is fixed by the rail, and HEVN picks the rail for the product, so it is not something you choose when you request. `destinationAccount` on the record echoes what the active account delivers.
-
-Per deposit the choice is on the money-in call: `POST /dapi/v1/payins` takes a `destinationAccount`, and a token no rail of the client's settles into answers `422 payin_not_available` with `details.options[]` listing the pairs that do.
-
-`feeBps` on the record is HEVN's deposit fee in basis points for that product, from the client's plan. It is a whole number: `25` is 0.25%.
+| Narrowed by | Effect | Returned as |
+| --- | --- | --- |
+| Your integrator agreement ([Going live](/whitelabel/sandbox#what-hevn-must-enable)) | Which products HEVN enables for you | `403 rail_not_available` on `POST /dapi/v1/banks` |
+| The client's residency and legal form | Which of those products the client can request | The product is absent from `GET /dapi/v1/banks` |
+| The client's verification state | Whether a requested virtual account can become `active` | `blockers[]` on the record: `kyb_required`, `verification_required`, `terms_required` |
+| Rail status | Whether the rail accepts payments now | `503 provider_unavailable`, or `channel_unavailable` in a contact's `blockers[]` |
 
 ## Chain codes
 
-On-chain destinations use a chain code, not a rail: a wallet [contact](/whitelabel/payouts#save-an-address-as-a-contact) carries one in `crypto.chain`, and a quoted on-chain [payin](/whitelabel/payins#quote-an-on-chain-transfer) carries one in `originChainId`.
+A chain code names the chain in `crypto.chain` of a wallet [contact](/whitelabel/payouts#save-an-address-as-a-contact) and in `originChainId` of a quoted on-chain [payin](/whitelabel/payins#quote-an-on-chain-transfer).
 
-`GET /dapi/v1/chains` answers the live list rather than this page: every chain, its EVM `chainId`, and each token's `decimals` and contract `address`. `settlement: true` marks the chain balances live on, and a token's `account` names the account it holds when a client can hold a balance in it. Read it once at startup instead of hardcoding what follows.
+A transfer to `baseSmartWallet` and a quoted on-chain payin need no virtual account and no verification. The client must be `ready`.
 
-`eth` · `bsc` · `avax` · `op` · `arb` · `pol` · `sol` · `base` · `gnosis` · `tron` · `xrp` · `zec` · `doge` · `ltc` · `btc` · `cardano` · `bera` · `sui` · `near` · `near_intents` · `xlayer` · `plasma` · `ton` · `stellar` · `monad` · `starknet` · `aptos` · `adi` · `bch`
+Read [`GET /dapi/v1/chains`](/api-reference/catalog/list-supported-chains-and-tokens) at startup and do not hardcode the codes below.
 
-A client balance settles on **Base**, in USDC or EURC, so a contact on Base holding either token is paid straight out of it. A contact on any other chain in this list, or expecting any other token, is paid through a [cross-chain route](/whitelabel/payouts#a-routed-payout-is-priced) — the same `POST /dapi/v1/payouts`, quoted with `fromChainId` and `toChainId`, refused with `409 payout_not_fundable` when routing is unavailable for the account.
+Chain codes: `eth`, `bsc`, `avax`, `op`, `arb`, `pol`, `sol`, `base`, `gnosis`, `tron`, `xrp`, `zec`, `doge`, `ltc`, `btc`, `cardano`, `bera`, `sui`, `near`, `near_intents`, `xlayer`, `plasma`, `ton`, `stellar`, `monad`, `starknet`, `aptos`, `adi`, `bch`.
 
-## Market rates
+A payout to a chain other than Base is [routed](/whitelabel/payouts#a-routed-payout-is-priced).
 
-`GET /dapi/v1/rates?from=EUR&to=USDC` converts one currency or token into another at the current market rate, before any transfer exists:
+## Fees
+
+A fee or rate in this API is either declared before a payment exists or quoted on one payment. Rates are set per integrator. Ask HEVN for yours.
+
+### Declared and quoted
+
+| | Declared | Quoted |
+| --- | --- | --- |
+| Meaning | A rate for a product or a contact | The terms of one payment |
+| Returned by | `GET /dapi/v1/banks`, `GET /dapi/v1/banks/{product}/rate`, `GET /dapi/v1/contacts/{contactId}/capabilities`, `POST /dapi/v1/payouts/preview`, `GET /dapi/v1/rates` | `quote` on `POST /dapi/v1/payins` and `POST /dapi/v1/payouts` |
+| Use | Display before the customer commits | Charge and reconcile |
+| Binding | No. It can change | Yes, until `expiresAt` |
+
+Do not bill from a stored declared rate.
+
+### Fee fields
+
+| Field | Returned by | Meaning |
+| --- | --- | --- |
+| `feeBps`, `minimumDeposit` | `GET /dapi/v1/banks` | The payin fee is taken from the converted amount. A payment below `minimumDeposit` is returned to the payer. |
+| `feeBps`, `fixedFee`, `minAmount`, `maxAmount` | `options[]` on `GET /dapi/v1/contacts/{contactId}/capabilities` | Indicative price and amount range for one contact. See [Payouts](/whitelabel/payouts#save-a-contact). |
+| `feeAmount`, `feeCurrency`, `rate` | `quote` on a payin or a payout | The binding terms. See [Payins](/whitelabel/payins) and [Payouts](/whitelabel/payouts). |
+| `expiresAt` | `quote` on a payout, top level of a payin | When the quoted terms stop applying. |
+
+[`POST /dapi/v1/payouts/preview`](/api-reference/transfers/create-an-outgoing-transfer-quote) prices a rail without a contact. A price from capabilities or preview is indicative. `POST /dapi/v1/payouts` repeats the checks and returns the binding quote.
+
+To choose which side of a payment absorbs the fee, send `amount` or `amountTo` ([Conventions](/whitelabel/conventions#money)).
+
+### Product rate
+
+[`GET /dapi/v1/banks/{product}/rate`](/api-reference/virtual-accounts/retrieve-the-receiving-conversion-rate) returns the indicative price of a payin on one product.
+
+```json
+{ "currency": "EUR", "rate": "…", "fixedFee": "…", "fixedFeeCurrency": "EUR" }
+```
+
+### Market rate
+
+[`GET /dapi/v1/rates?from=EUR&to=USDC`](/api-reference/catalog/retrieve-a-market-reference-rate) returns the current market rate between two currencies or tokens.
 
 ```json
 { "fromCurrency": "EUR", "toCurrency": "USDC", "rate": "1.14776038", "indicative": true }
 ```
 
-Both sides accept a fiat code or a token symbol, so a fiat pair, a token pair and a mixed pair answer the same way. It is a display rate and says so: the rate a transfer settles at comes from that transfer's own quote, and a rail's deposit rate comes from `GET /dapi/v1/banks/{rail}/rate`. A currency HEVN does not price answers `404 not_found`.
+A currency HEVN does not price returns `404 not_found`.
 
-<Card title="Next: KYB fields" icon="arrow-right" href="/whitelabel/reference/kyb-fields">
-  Every field of the KYB document, its accepted values, and the document slots.
-</Card>
+### Not a fee
+
+| Item | Why |
+| --- | --- |
+| Gas | Gas on Base is paid by an ERC-4337 paymaster. A quote has no network fee line, and the client's wallet needs no ETH. |
+| Escrow `feeBps` | Your take rate on `capture` and `charge`, deducted from the captured amount before the seller is paid. The ceiling is fixed when the deal is created. See [Escrow](/whitelabel/escrow#the-matrix). |
+
+<Card title="Next: Errors" icon="arrow-right" href="/whitelabel/reference/errors" />

@@ -1,93 +1,17 @@
 ---
 title: "Swaps"
-description: "Move money between two accounts you own: dollars to euros on the wallet, or the custodial balance to the wallet and back."
+description: "Move money between two accounts of your integrator account, for example USDC to EURC."
 ---
 
-import ConfirmLoopSnippet from "/snippets/confirm-loop.mdx";
-import IdempotencySnippet from "/snippets/idempotency.mdx";
-import SignPayloadSnippet from "/snippets/sign-payload.mdx";
+A swap moves money between two accounts that the same owner holds, for example `USDC` to `EURC`. Create one with `POST /dapi/v1/swaps` and sign it with your developer key.
 
-A swap moves money between two accounts the **same owner** holds. Nobody else is paid, so there is no
-contact and no beneficiary: `POST /dapi/v1/swaps` prices and reserves the move,
-`POST /dapi/v1/swaps/{swapId}/confirm` authorizes it. An account holding euros that owes dollars swaps
-before it pays out, and the money never leaves its own name.
+The [sign-in window](/whitelabel/sign-in-with-hevn) does not approve swaps, so a session acting for a client can preview a swap but cannot create one.
 
-Swaps run on your own integrator account, signed by your developer key. A client's holder cannot
-approve a swap in the [sign-in window](/whitelabel/sign-in-with-hevn) yet, so `POST /dapi/v1/swaps`
-with a client in `X-Hevn-Account` answers `403 account_not_controlled`. `POST /dapi/v1/swaps/preview`
-still prices a pair for a client, so you can show a rate.
+`sourceAccount` and `destinationAccount` take the account names in [Accounts](/whitelabel/overview#accounts).
 
-<CodeGroup>
-```python Python
-swap = hevn.post("/swaps", {
-    "sourceAccount": "USDC",
-    "destinationAccount": "EURC",
-    "amount": "500.00",
-    "publicKey": key.public_key,
-}, idempotency_key="swap-A-1187")
+## Preview a swap
 
-signature = key.sign_payload(swap["approval"]["payload"])
-receipt = hevn.confirm_until_settled(f"/swaps/{swap['id']}/confirm", signature)
-```
-
-```javascript Node
-const swap = await hevn.post("/swaps", {
-  sourceAccount: "USDC",
-  destinationAccount: "EURC",
-  amount: "500.00",
-  publicKey: key.publicKey,
-}, { idempotencyKey: "swap-A-1187" });
-
-const signature = key.signPayload(swap.approval.payload);
-const receipt = await hevn.confirmUntilSettled(`/swaps/${swap.id}/confirm`, signature);
-```
-
-```go Go
-swap, err := api.Post("/swaps", hevn.Body{
-	"sourceAccount":      "USDC",
-	"destinationAccount": "EURC",
-	"amount":             "500.00",
-	"publicKey":          key.PublicKey,
-}, hevn.IdempotencyKey("swap-A-1187"))
-
-signature, err := key.SignPayload(swap.Str("approval.payload"))
-receipt, err := api.ConfirmUntilSettled("/swaps/"+swap.Str("id")+"/confirm", signature)
-```
-</CodeGroup>
-
-Examples use the client from [HTTP client](/whitelabel/reference/client), unbound, so every call acts
-on your own account.
-
-## The accounts
-
-Both sides are named from one vocabulary, the same one the balance reads back and a payout's
-`sourceAccount` takes. `USDC` and `EURC` are the stablecoins on the wallet; `FDIC_USD` and `FDIC_EUR` are dollars and euros a
-partner bank holds for the account:
-
-| Account | Where the money is | Currency |
-| --- | --- | --- |
-| `USDC` | the account's Base smart wallet | USD |
-| `EURC` | the same smart wallet | EUR |
-| `FDIC_USD` | a virtual account a partner bank holds for the account | USD |
-| `FDIC_EUR` | a virtual account a partner bank holds for the account | EUR |
-
-The two sides must differ, and both must be accounts the owner actually holds. An account it does
-not hold is `422 account_unavailable` — an account with no custodial virtual account cannot name
-`FDIC_USD` or `FDIC_EUR`. A pair nothing can serve right now is `422 swap_route_unavailable`.
-
-```mermaid
-stateDiagram-v2
-    [*] --> awaitingSignature: POST /dapi/v1/swaps
-    awaitingSignature --> submitted: POST /confirm with your signature
-    submitted --> settled
-    submitted --> failed
-```
-
-## Price it first
-
-`POST /dapi/v1/swaps/preview` takes the same accounts and amount without a `publicKey`, compares
-every route that can serve the pair, and answers the best one. It reserves nothing, signs nothing and
-returns no `swapId`, so it is safe to call on every keystroke of a form.
+`POST /dapi/v1/swaps/preview` returns the best price among the routes that serve the pair. Preview has no side effects.
 
 <CodeGroup>
 ```bash cURL
@@ -122,7 +46,7 @@ priced, err := api.Post("/swaps/preview", hevn.Body{
 ```
 </CodeGroup>
 
-```json Response — 200
+```json Response: 200
 { "sourceAccount": "USDC",
   "destinationAccount": "EURC",
   "quote": { "fromAmount": "500.00", "fromCurrency": "USDC",
@@ -132,27 +56,13 @@ priced, err := api.Post("/swaps/preview", hevn.Body{
              "expiresAt": "2026-09-20T18:12:41Z" } }
 ```
 
-Pin one side and one only: `amount` is what leaves the source account, `amountTo` is what has to
-arrive on the destination. Sending both, or neither, is `422 validation_failed`.
+Fields: [Price a transfer between the client's own accounts](/api-reference/transfers/price-a-transfer-between-the-clients-own-accounts).
 
-`minimumToAmount` is the floor a route with slippage guarantees; `estimated: true` marks a move whose
-delivered amount is only known on arrival, and then `etaHours` says how long that takes. A locked
-price carries `expiresAt` and nothing else has to be read.
+## Create and confirm
 
-## Reserve and sign
+Call `POST /dapi/v1/swaps` with the preview body plus `publicKey` and an [`Idempotency-Key`](/whitelabel/conventions#idempotency-key). It prices the swap again and returns the approval.
 
-`POST /dapi/v1/swaps` prices the move again, fixes it, and returns the approval to sign. The response
-tells you what that approval authorizes:
-
-| `authorization` | What it means | What else is on the response |
-| --- | --- | --- |
-| `debit` | the move is funded by sending tokens out of your wallet | `debit` — the exact address, amount and token that will leave |
-| `intent` | the move is settled by HEVN against your account's own signature, with nothing leaving the wallet | `intent` — the EIP-712 `digest` of the terms being authorized |
-
-Either way you sign `approval.payload` and post it to the same confirm route. The difference is what
-HEVN does with the co-signature, not what your code does with the approval.
-
-```json Response — 201, Location: /dapi/v1/swaps/swp_9f2c1ab84d
+```json Response: 201, Location: /dapi/v1/swaps/swp_9f2c1ab84d
 { "id": "swp_9f2c1ab84d",
   "status": "awaitingSignature",
   "idempotencyKey": "swap-A-1187",
@@ -167,28 +77,17 @@ HEVN does with the co-signature, not what your code does with the approval.
              "token": "USDC", "chainId": 8453 } }
 ```
 
-When `authorization` is `debit`, check `debit` before you sign — it is decoded out of the operation
-itself, not echoed from your request, and it is the one cross-check a signer has
-([Signing](/whitelabel/signing)).
+When `authorization` is `debit`, compare `debit.address`, `debit.amount` and `debit.token` with the swap you meant before you sign. Fields: [Create a transfer between the client's own accounts](/api-reference/transfers/create-a-transfer-between-the-clients-own-accounts).
 
-<SignPayloadSnippet />
+Sign `approval.payload` and post it to `POST /dapi/v1/swaps/{swapId}/confirm` ([Signing](/whitelabel/signing)).
 
-Then confirm, and keep confirming while it is still in flight:
+Confirm returns `202` with a `pollUrl`. Read `GET /dapi/v1/swaps/{swapId}` until `status` is `settled` or `failed`. While the approval is open, retry as described in [Retrying a confirm](/whitelabel/signing#retrying-a-confirm). Once the approval is used or expired, confirm returns `409 swap_not_confirmable`, so read the swap.
 
-<ConfirmLoopSnippet />
+## Read a swap
 
-A confirm answers `200` when settlement landed inside the request and `202 submitted` when it did
-not; in the second case `pollUrl` names the read route. Confirm is single use: the same signature a
-second time is `409 funding_attempt_expired` on a `debit` swap and `410 approval_expired` on an
-`intent` one. Either way the move already happened, and the way to check on it is
-`GET /dapi/v1/swaps/{swapId}`, never another confirm.
+`GET /dapi/v1/swaps/{swapId}` returns the status and the quote the swap was fixed at.
 
-## Read it back
-
-`GET /dapi/v1/swaps/{swapId}` carries the lifecycle, the accounts it ran between, the terms it was
-fixed at, and `transactionId` once the move is on your ledger.
-
-```json Response — 200
+```json Response: 200
 { "id": "swp_9f2c1ab84d",
   "status": "settled",
   "sourceAccount": "USDC",
@@ -202,34 +101,29 @@ fixed at, and `transactionId` once the move is on your ledger.
   "settledAt": "2026-09-20T18:09:12Z" }
 ```
 
-A swap is not a second source of truth about money: both sides of it are ordinary ledger rows, so
-`GET /dapi/v1/transactions` shows the result without reading this route at all
-([Balances and transactions](/whitelabel/balances-and-transactions)).
+A swap that involves an `FDIC_*` account has a `transactionId` once it is on the [ledger](/whitelabel/balances-and-transactions). Between token accounts `transactionId` is null, so match the swap on `transactionHash`. Fields: [Retrieve a transfer between the client's own accounts](/api-reference/transfers/retrieve-a-transfer-between-the-clients-own-accounts).
 
-## Retries
+To pay out of `FDIC_USD` without a swap, see [Payouts](/whitelabel/payouts#bank-held-balance).
 
-<IdempotencySnippet />
+## Statuses
 
-The key names the move. A retry with the same key returns the swap it already created, with
-`Idempotency-Replayed: true`; the same key with different accounts or a different amount is
-`409 idempotency_key_reused`, which is the guarantee that a repeated call is never a second
-conversion.
+| `status` | Meaning | Next |
+| --- | --- | --- |
+| `awaitingSignature` | Created and not yet confirmed. | Sign and confirm. |
+| `submitted` | Confirmed and settling. | Read the swap. |
+| `settled` | Settlement completed. | n/a |
+| `failed` | The swap did not settle. | Read `failure.code`. |
 
-## Paying straight out of the custodial balance
+## Refusals
 
-An account that holds `FDIC_USD` does not have to swap before it pays. `POST /dapi/v1/payouts` with
-`"sourceAccount": "FDIC_USD"` spends that balance directly: the payout is authorized by an intent
-signature instead of a debit, so the response carries `authorization: "intent"` and no `debit`, and
-confirm is unchanged ([Payouts](/whitelabel/payouts#pay-out-of-the-custodial-balance)). Use a swap when you want
-the money on your wallet, and a payout when you want a beneficiary paid.
+| Error | Cause | Action |
+| --- | --- | --- |
+| `400 invalid_request` | No route serves the pair. | Choose another pair of accounts. |
+| `422 account_unavailable` | The owner does not hold the `FDIC_*` account. | Use an account from the [balance](/whitelabel/balances-and-transactions#balance). |
+| `422 swap_route_unavailable` | The [sandbox](/whitelabel/sandbox) does not run swaps or previews. | n/a |
+| `403 account_not_controlled` | `POST /dapi/v1/swaps` was called with a client in `X-Hevn-Account`. | Swap only your own accounts. A client's accounts cannot be swapped through the API. |
+| `409 swap_not_confirmable` | The approval was used or has expired. | Read the swap. |
 
-## In the sandbox
+Other codes: [Errors](/whitelabel/reference/errors).
 
-Swaps are the one money route the sandbox does not serve. The emulated chain has no exchange venue
-behind it and the emulator issues no custodial dollar balance, so `POST /dapi/v1/swaps` and its preview there
-answer `422 swap_route_unavailable`, with a message that says so, rather than a quote. Build against the contract on this page and exercise it in production
-([Sandbox](/whitelabel/sandbox)).
-
-<Card title="Next: Balances and transactions" icon="arrow-right" href="/whitelabel/balances-and-transactions">
-  Read a client's balance, walk its ledger with a cursor, export a statement.
-</Card>
+<Card title="Next: Balances and transactions" icon="arrow-right" href="/whitelabel/balances-and-transactions" />

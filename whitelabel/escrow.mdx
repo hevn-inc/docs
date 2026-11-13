@@ -1,116 +1,72 @@
 ---
 title: "Escrow"
-description: "Lock one client's funds in an on-chain contract while another delivers: the states a deal passes through, the windows it lives in, and a marketplace order end to end."
+description: "Hold a buyer's funds in an on-chain contract, then authorize, capture, void or refund them with signed actions."
 ---
 
-import IdempotencySnippet from "/snippets/idempotency.mdx";
-
-Escrow locks one client's funds in an on-chain contract while another delivers. The buyer's funds stay in the buyer's own wallet until you authorize a lock, they then sit in the escrow contract where neither party — and neither HEVN nor you — can spend them outside its rules, and they reach the seller only when you capture.
+An escrow deal holds a buyer's funds in an on-chain contract until you capture them for the seller. Create a deal with `POST /dapi/v1/escrow`, then drive it with the operator actions in [The matrix](#the-matrix).
 
 ```mermaid
 stateDiagram-v2
     [*] --> draft: POST /dapi/v1/escrow
-    draft --> authorized: authorize — the hold leaves the buyer's wallet
-    draft --> charged: charge — hold and pay out in one action
+    draft --> authorized: authorize
+    draft --> charged: charge
     authorized --> partiallyCaptured: capture (part)
     partiallyCaptured --> captured: capture (rest)
     authorized --> captured: capture (all)
-    authorized --> voided: void — the hold goes back to the buyer
+    authorized --> voided: void
     partiallyCaptured --> voided: void
-    authorized --> reclaimed: reclaim — after holdUntil
+    authorized --> reclaimed: reclaim (after holdUntil)
     partiallyCaptured --> reclaimed: reclaim
-    captured --> partiallyRefunded: refund (part)
-    charged --> partiallyRefunded: refund (part)
-    partiallyRefunded --> refunded: refund (rest)
-    captured --> refunded: refund (all)
-    charged --> refunded: refund (all)
+    captured --> partiallyRefunded: refund
+    charged --> partiallyRefunded: refund
+    partiallyRefunded --> refunded: refund
+    captured --> refunded: refund
+    charged --> refunded: refund
 ```
 
-A `voided` or `reclaimed` deal can still be refunded, if something was captured before the hold was released.
-
-Every transition you drive is one `POST /dapi/v1/escrow/{escrowId}/actions` that you sign with your developer key, on your own wallet. You are the **operator** of every deal you create; escrow never takes `X-Hevn-Account`, because the caller is always you. Like `/clients*` and `/connect/sessions`, it refuses the header with `400 account_scope_conflict` and `details.reason = "selfScopedRoute"`. See [Sessions](/whitelabel/sessions#acting-as-a-client).
+Escrow routes are self-scoped and refuse `X-Hevn-Account` ([Acting as a client](/whitelabel/authentication#acting-as-a-client)).
 
 <Warning>
-  The buyer approves a deal with their own key: the spend permission that lets you pull the money later lives on the buyer's wallet, and your key never signs there. The [sign-in window](/whitelabel/sign-in-with-hevn) does not offer escrow approvals yet, so `POST /dapi/v1/escrow` with a client linked through Sign in with HEVN as the buyer answers `403 account_not_controlled`. Talk to HEVN before you build on escrow. The rest of this page describes the deal and the operator actions as they work once the buyer has approved.
+  The buyer approves a deal with their key, and the [sign-in window](/whitelabel/sign-in-with-hevn) does not offer escrow approvals. `POST /dapi/v1/escrow` with a buyer linked through Sign in with HEVN returns `403 account_not_controlled`. Contact HEVN before you build on escrow.
 </Warning>
 
-## The states money is in
+## Parties
 
-A deal carries two amounts, and they are what you branch on:
+| Party | Role |
+| --- | --- |
+| Sender | A client, the buyer. Funds the deal and approves its spend permission. Can `reclaim` an uncaptured hold after `holdUntil`. |
+| Receiver | Another client, the seller. Receives what you capture. |
+| Operator | You. Signs `authorize`, `charge`, `capture`, `void` and `refund` with your developer key on your wallet. |
 
-- **`capturableAmount`** — money out of the buyer's wallet, held in the contract, not yet paid to the seller. `capture` moves it to the seller, `void` returns it to the buyer, and the buyer's own `reclaim` returns it after the hold window.
-- **`refundableAmount`** — money already paid to the seller that you can still send back. A refund leaves **your own** wallet, not the seller's, so keep a working balance in the deal's token.
+The parties are different accounts. Sender and receiver are `ready` [clients](/whitelabel/clients) linked to you through [Sign in with HEVN](/whitelabel/sign-in-with-hevn). A referred account does not qualify. HEVN enables escrow for your account in both environments ([What HEVN must enable](/whitelabel/sandbox#what-hevn-must-enable)).
 
-`status` is a label for the last thing that happened, not a decision input. Read **`availableActions`** — the server computes it from the amounts, the windows and what already landed on chain — and pick from it. A draft nobody approved in time has an empty `availableActions`; there is no `expired` status and nothing sweeps a stale deal.
+The deal uses each party's Base smart wallet address at creation. Its terms are hashed into an on-chain payment record and cannot be changed.
 
-Amounts are decimal strings in the token's major unit, rendered at the token's precision: `"100.000000"` for USDC. `token` is a symbol — `USDC` or `EURC` — never an address. The full status vocabulary is in [Escrow actions](/whitelabel/escrow-actions#statuses).
+## Amounts
 
-## The three parties
+`capturableAmount` is held in the contract. `refundableAmount` is paid to the seller and still refundable. Choose the next action from `availableActions` and these two amounts.
 
-| Party | Who | What they do |
-| --- | --- | --- |
-| Sender | one of your clients, the buyer | Their wallet funds the deal. They approve its spend permission with their own key, and can reclaim an uncaptured hold after `holdUntil`. |
-| Receiver | another of your clients, the seller | Receives what you capture. |
-| Operator | you, the integrator | Authorize, charge, capture, void and refund. Every one is signed by your key on your own wallet. |
+A draft not approved before `approveBy` stays `draft` with an empty `availableActions`. There is no `expired` status.
 
-All three must be different accounts, and both parties must be clients linked to you. HEVN binds sender and receiver through the relationship [Sign in with HEVN](/whitelabel/sign-in-with-hevn) writes; an account you merely referred never qualifies, and a stranger's account id answers `422 receiver_not_a_client` or `404 client_not_found`. The addresses are each party's Base smart wallet at creation time, and the deal is immutable: its terms are hashed into an on-chain payment record.
+Amounts use the [money format](/whitelabel/conventions#money), for example `"100.000000"` for USDC. Field meanings are on [Read one escrow](/api-reference/escrow/read-one-escrow).
 
-## The three windows
+## Windows
 
-You give three durations and HEVN resolves them once, at creation, each measured from the end of the one before it.
+HEVN converts `approveWithin`, `holdFor` and `refundableFor` into the deadlines in `windows` when it creates the deal. Each window starts when the previous one ends. `void` has no window and is available while `capturableAmount` is positive.
 
-```mermaid
-gantt
-    title Default windows on a deal created at 10:04 on 17 September
-    dateFormat YYYY-MM-DD HH:mm
-    axisFormat %d %b
-    section approveWithin — 1h
-    approve · authorize · charge :a1, 2026-09-17 10:04, 1h
-    section holdFor — 14d
-    capture · void               :a2, after a1, 14d
-    section refundableFor — 90d
-    refund                       :a3, after a2, 90d
-    section after holdFor
-    reclaim · void               :crit, a4, after a2, 90d
-```
+Defaults, the duration format and the create refusals are on [Open an escrow](/api-reference/escrow/open-an-escrow-and-return-the-payers-approval).
 
-| Duration | Default | Ends at | What it bounds |
-| --- | --- | --- | --- |
-| `approveWithin` | `1h` | `windows.approveBy` | The buyer's approval, and the `authorize` or `charge` that collects the money. After it, an unapproved deal is dead. |
-| `holdFor` | `14d` | `windows.holdUntil` | Your delivery window. `capture` is legal until it ends; after it the buyer can `reclaim`. |
-| `refundableFor` | `90d` | `windows.refundableUntil` | Your returns window. `refund` is legal until it ends. |
+## Fees
 
-A duration is `^\d{1,4}[smhd]$` — `30m`, `1h`, `14d`. You never compute a timestamp, which is what makes a retry safe: repeating `POST /dapi/v1/escrow` with the same `Idempotency-Key` returns the same deal with the same absolute windows, no matter how much later it arrives. Different durations under the same key answer `409 idempotency_key_reused` with `details.escrowId`.
+- `feeBps` on the deal is your fee ceiling. `capture` and `charge` take a fee up to it, paid to your Base smart wallet. There is no `feeReceiver` field.
+- `refund` returns the gross amount from your wallet. The fee is not taken back.
+- HEVN sponsors the gas for each action.
 
-`void` is the exception with no clock on it: while anything is capturable, you can always hand it back.
-
-## What it costs
-
-`feeBps` on the deal is your **ceiling**, an integer in basis points. `capture` and `charge` may take any fee up to it; the fee goes to your own Base smart wallet, which HEVN derives — there is no `feeReceiver` to send. `fee = amount × feeBps / 10000`, the receiver gets the rest, and a refund returns the gross amount from your wallet without clawing the fee back.
-
-Set the ceiling at creation. It is part of the immutable deal, so a deal created with `feeBps: 0` can never take a commission.
-
-HEVN sponsors the gas for every action and charges nothing on top.
-
-## Before you start
-
-- Both parties are clients linked to you and are `ready` — see [Clients](/whitelabel/clients).
-- Your account may operate escrow. HEVN enables that, in the sandbox as in production; nothing in the API grants it. Without it every escrow call is refused — see [Going live](/whitelabel/going-live#what-hevn-must-enable).
-- The buyer's wallet holds the token when you authorize, not when you create. Creating a deal moves nothing.
-- Call escrow with your own access token and **no** `X-Hevn-Account` — the header answers `400 account_scope_conflict` on every escrow route.
-- Your developer key still exists and the call leaves an allowlisted source IP. Both are re-checked on every request, and again immediately before HEVN co-signs an action — see [Developer key](/whitelabel/developer-key#the-ip-allowlist).
-
-<IdempotencySnippet />
-
-## A marketplace order, end to end
-
-Every example below uses the client from [HTTP client](/whitelabel/reference/client) and the `sign_payload` helper from [Signing](/whitelabel/signing).
-
-Order `A-1187`: Northwind Trading Ltd (`cl_7YQ2Kf3mN8`) buys 100 USDC of parts from Ardenne Fabrication SARL (`cl_2ABxR9dL4m`), and you take 2.5% when it ships.
+## Run an order
 
 <Steps>
-  <Step title="Open the deal, and let the buyer approve it">
-    One call creates the deal and prepares the buyer's approval — the on-chain permission that lets you pull the money later. The response echoes the create's key as `action.idempotencyKey`. The approval is the buyer's to sign with their own key, not yours.
+  <Step title="Create the deal">
+    Call `POST /dapi/v1/escrow`. It moves no funds and prepares the approval that the buyer signs.
 
     <CodeGroup>
     ```python Python
@@ -150,14 +106,12 @@ Order `A-1187`: Northwind Trading Ltd (`cl_7YQ2Kf3mN8`) buys 100 USDC of parts f
     ```
     </CodeGroup>
 
-    ```json Response — 201, Location: /dapi/v1/escrow/esc_5Qb4e17c9d
+    ```json Response 201, Location: /dapi/v1/escrow/esc_5Qb4e17c9d
     {
       "id": "esc_5Qb4e17c9d",
       "status": "draft",
       "availableActions": ["approve"],
-      "sender": { "clientId": "cl_7YQ2Kf3mN8" }, "receiver": { "clientId": "cl_2ABxR9dL4m" },
-      "token": "USDC", "maxAmount": "100.000000",
-      "authorizedAmount": "0.000000",
+      "maxAmount": "100.000000", "authorizedAmount": "0.000000",
       "capturableAmount": "0.000000", "refundableAmount": "0.000000",
       "windows": { "approveBy": "2026-09-17T11:04:11Z",
                    "holdUntil": "2026-10-01T11:04:11Z",
@@ -166,15 +120,17 @@ Order `A-1187`: Northwind Trading Ltd (`cl_7YQ2Kf3mN8`) buys 100 USDC of parts f
                   "status": "awaitingSignature",
                   "approval": { "id": "a7c1…", "payload": "eyJ…",
                                 "expiresAt": "2026-09-17T10:05:11Z" } },
-      "createdAt": "2026-09-17T10:04:11Z"
+      "…": "…"
     }
     ```
 
-    Nothing has moved. `availableActions` becomes `["authorize", "charge"]` once the buyer's approval lands on chain; read the deal until it does.
+    Read the deal until `availableActions` is `["authorize", "charge"]`. The buyer's approval is then on chain.
   </Step>
 
-  <Step title="Lock the buyer's funds in the contract">
-    `authorize` pulls the amount out of the buyer's wallet into the escrow contract. It happens **once** per deal: authorize less than `maxAmount` and the remainder is unusable, so authorize the order total.
+  <Step title="Authorize the hold">
+    Prepare `authorize` with `POST /dapi/v1/escrow/{escrowId}/actions`, then sign and confirm it as described in [Signing](/whitelabel/signing). It moves the amount from the buyer's wallet into the contract. The wallet must hold the token when you confirm.
+
+    A deal accepts `authorize` once. An amount below `maxAmount` leaves the remainder unusable.
 
     <CodeGroup>
     ```python Python
@@ -205,71 +161,156 @@ Order `A-1187`: Northwind Trading Ltd (`cl_7YQ2Kf3mN8`) buys 100 USDC of parts f
     ```
     </CodeGroup>
 
-    ```json Response — 200
-    { "deal": { "id": "esc_5Qb4e17c9d", "status": "authorized",
-                "capturableAmount": "100.000000", "refundableAmount": "0.000000",
-                "availableActions": ["capture", "void"] },
-      "action": { "action": "authorize", "idempotencyKey": "order-A-1187-authorize",
-                  "status": "confirmed", "amount": "100.000000",
-                  "transactionHash": "0x3a77…" },
+    ```json Response 200
+    { "deal": { "status": "authorized", "capturableAmount": "100.000000",
+                "availableActions": ["capture", "void"], "…": "…" },
+      "action": { "action": "authorize", "status": "confirmed",
+                  "amount": "100.000000", "transactionHash": "0x3a77…", "…": "…" },
       "events": [ { "name": "PaymentAuthorized", "amount": "100.000000",
                     "transactionHash": "0x3a77…", "blockNumber": 19884412 } ] }
     ```
-
-    The buyer's balance is down 100 USDC, the seller has nothing yet, and you have 14 days to deliver.
   </Step>
 
-  <Step title="Ship it, and capture with your commission">
-    `capture` pays the seller and takes your fee in the same action. It is repeatable up to `capturableAmount`, so a partial shipment is a partial capture.
+  <Step title="Capture with your fee">
+    Before `holdUntil`, prepare and confirm `capture` the same way, with the body `{"action": "capture", "amount": "100.00", "feeBps": 250}` and the key `order-A-1187-capture`. You can repeat it up to `capturableAmount`.
 
-    <CodeGroup>
-    ```python Python
-    capture = hevn.post(f"/escrow/{deal['id']}/actions",
-                        {"action": "capture", "amount": "100.00", "feeBps": 250},
-                        idempotency_key="order-A-1187-capture")
-    hevn.post(f"/escrow/{deal['id']}/actions/order-A-1187-capture/confirm",
-              {"signature": key.sign_payload(capture["action"]["approval"]["payload"])})
-    ```
-
-    ```javascript Node
-    const capture = await hevn.post(`/escrow/${deal.id}/actions`,
-      { action: "capture", amount: "100.00", feeBps: 250 },
-      { idempotencyKey: "order-A-1187-capture" });
-
-    await hevn.post(`/escrow/${deal.id}/actions/order-A-1187-capture/confirm`,
-      { signature: key.signPayload(capture.action.approval.payload) });
-    ```
-
-    ```go Go
-    capture, err := api.Post("/escrow/"+deal.Str("id")+"/actions",
-    	hevn.Body{"action": "capture", "amount": "100.00", "feeBps": 250},
-    	hevn.IdempotencyKey("order-A-1187-capture"))
-
-    signature, err := key.SignPayload(capture.Str("action.approval.payload"))
-    _, err = api.Post("/escrow/"+deal.Str("id")+"/actions/order-A-1187-capture/confirm",
-    	hevn.Body{"signature": signature})
-    ```
-    </CodeGroup>
-
-    The seller receives 97.50 USDC, 2.50 lands on your wallet, and the deal ends `captured` with `refundableAmount: "100.000000"` — the gross is what you can still send back.
+    The seller receives 97.50 USDC and your wallet receives 2.50. The deal is `captured` with `refundableAmount: "100.000000"`.
   </Step>
 </Steps>
 
-## When the order does not go to plan
+## Cancel or refund
 
-| What happened | Action | Where the money goes |
+| Case | Action | Status |
 | --- | --- | --- |
-| Cancelled before you ship | `void` | The whole hold returns to the buyer. The deal ends `voided` and nothing was charged. |
-| Only part shipped | `capture` the shipped lines, then `void` the rest | The deal passes `partiallyCaptured` and ends `voided`, with the captured amount still refundable. |
-| Returned after delivery | `refund` | The amount leaves **your** wallet and reaches the buyer. `partiallyRefunded`, then `refunded`. |
-| You never captured | The buyer's own `reclaim`, after `holdUntil` | The hold returns to the buyer. It is not an action you send, and it keeps working even if your integrator profile is paused. |
+| Cancelled before capture | `void` | `voided` |
+| Partly delivered | `capture` that part, then `void` | `partiallyCaptured`, then `voided`. The captured amount stays refundable. |
+| Returned after capture | `refund` | `partiallyRefunded`, then `refunded` |
+| Not captured before `holdUntil` | The buyer's `reclaim`, which you cannot send | `reclaimed` |
 
-`void` and `refund` keep working when your relationship with a client is paused or your profile is suspended, and so does the buyer's `reclaim`, so held money is never stranded.
+Keep the deal's token in your wallet for refunds. If the wallet cannot cover the amount, `refund` returns `409 simulation_failed`.
 
-<Warning>
-  A refund is paid by your own wallet, not out of the deal. If you owe refunds, keep a balance in the deal's token — an empty operator wallet turns `refund` into `409 simulation_failed`.
-</Warning>
+`void`, `refund` and `reclaim` remain available while your relationship with a client is paused or your profile is suspended.
 
-<Card title="Next: Escrow actions" icon="list-check" href="/whitelabel/escrow-actions">
-  Every action, the window it is legal in, the amount it takes, and the state it leaves behind.
-</Card>
+## The matrix
+
+Prepare an operator action with `POST /dapi/v1/escrow/{escrowId}/actions` and sign the returned payload. Then confirm it at `POST /dapi/v1/escrow/{escrowId}/actions/{idempotencyKey}/confirm`. The `amount` and `feeBps` rules are on [Prepare an escrow action](/api-reference/escrow/prepare-an-escrow-action-and-return-the-payload-to-sign).
+
+| Action | Allowed when | Resulting status |
+| --- | --- | --- |
+| `authorize` | Before `approveBy`, while no funds are collected | `authorized` |
+| `charge` | Before `approveBy`, while no funds are collected | `charged` |
+| `capture` | Before `holdUntil`, repeatable | `partiallyCaptured`, then `captured` |
+| `void` | While `capturableAmount` is positive | `voided` |
+| `refund` | Before `refundableUntil`, repeatable | `partiallyRefunded`, then `refunded` |
+
+`charge` is `authorize` and `capture` in one on-chain action, with no hold.
+
+## Prepare an action
+
+```json Request: POST /dapi/v1/escrow/esc_5Qb4e17c9d/actions, Idempotency-Key: order-A-1187-capture
+{ "action": "capture", "amount": "40.00", "feeBps": 250 }
+```
+
+```json Response 201
+{
+  "deal": { "id": "esc_5Qb4e17c9d", "status": "authorized", "…": "…" },
+  "action": { "action": "capture", "idempotencyKey": "order-A-1187-capture",
+              "status": "awaitingSignature", "amount": "40.000000", "…": "…",
+              "approval": { "id": "b1d0…", "payload": "eyJ…",
+                            "expiresAt": "2026-09-17T10:31:02Z" } }
+}
+```
+
+Confirm with `action.idempotencyKey` in the path. A replayed key returns the same record ([Idempotency-Key](/whitelabel/conventions#idempotency-key)).
+
+## Confirm an action
+
+Sign the decoded bytes of `approval.payload` as described in [Signing](/whitelabel/signing), then send the signature.
+
+```json Request: POST /dapi/v1/escrow/esc_5Qb4e17c9d/actions/order-A-1187-capture/confirm
+{ "signature": "MEUCIQDk3f8Zc0xq2w1Yv7pB9nH4mJ6sR2tL5uD8aE0cQ1oXgAIg…" }
+```
+
+| Response | Meaning | Next |
+| --- | --- | --- |
+| `200` | Mined. The body has the deal and its `events`. | Read `action.status`: `confirmed` or `reverted`. |
+| `202` with `pollUrl` | The action is `submitted`. `pollUrl` is the deal read. | Call `POST /dapi/v1/escrow/{escrowId}/sync` while the action is `signing` or `submitted`. |
+| `403 forbidden` | The developer key was deleted, or the IP is outside its [allowlist](/whitelabel/authentication#the-ip-allowlist). The prepared action is unchanged. | Confirm from an allowlisted host. |
+| `403 account_not_controlled` | The action would sign on the buyer's wallet. | Confirm operator actions only. |
+| `410 approval_expired` | The approval closed, or none is open. | Prepare again with the same key. |
+| `409 approval_consumed` | The approval was already used. | Read the deal, then prepare again with the same key. |
+| `409 escrow_state_changed` | No capturable amount is left, or the payment was already collected. | Read the deal. Pick from `availableActions`. |
+
+`400 signature_invalid`, `503 bundler_rejected` and `503 bundler_unavailable` are handled as in [Retrying a confirm](/whitelabel/signing#retrying-a-confirm).
+
+### Action in flight
+
+A signing wallet runs one on-chain action at a time across all its deals. While one is `signing` or `submitted`, the next prepare or confirm returns `409 action_in_flight` with no `details`.
+
+Queue actions per signing wallet and store the id of the deal in flight. Sync that deal before you retry.
+
+## Statuses
+
+`status` records the last transition. Choose the next action from `availableActions` ([Amounts](#amounts)).
+
+| Deal status | Meaning | Next |
+| --- | --- | --- |
+| `draft` | No funds held. The buyer's approval does not change the status. | `authorize` or `charge`, after the buyer's approval |
+| `authorized` | The hold is in the contract. | `capture` or `void` |
+| `charged` | Paid to the seller in one action. | `refund` |
+| `partiallyCaptured` | Part of the hold was paid to the seller. | `capture` or `void` |
+| `captured` | No capturable amount is left. | `refund` |
+| `voided` | The hold returned to the buyer. | `refund` if part was captured |
+| `reclaimed` | The buyer took the hold back after `holdUntil`. | `refund` if part was captured |
+| `partiallyRefunded` | Part was refunded from your wallet. | `refund` |
+| `refunded` | The paid amount was refunded from your wallet. | n/a |
+
+| Action status | Meaning | Next |
+| --- | --- | --- |
+| `awaitingSignature` | Prepared, with an open approval. | Sign and confirm within 60 seconds. |
+| `signing` | Confirm in progress. | Wait. Do not prepare again. |
+| `submitted` | Sent to the bundler, with no receipt yet. | Sync the deal as described in [Reads](#reads). |
+| `confirmed` | Mined and applied to the deal. | n/a |
+| `reverted` | Mined and reverted. No funds moved. | Read the deal. Prepare again with a new key. |
+| `failed` | Not sent to the bundler. | Prepare again with the same key. |
+| `dropped` | No receipt within the timeout. | Keep syncing. It can confirm for up to 24 hours. |
+| `superseded` | Replaced by a later prepare. | Ignore. |
+
+## Reads
+
+`GET /dapi/v1/escrow/{escrowId}` returns one deal with its last action. There is no action list.
+
+`GET /dapi/v1/escrow` lists the deals you operate ([List the escrows](/api-reference/escrow/list-the-escrows-this-account-operates)).
+
+<CodeGroup>
+
+```bash cURL
+curl "$HEVN_API/escrow?status=authorized&status=partiallyCaptured&limit=50" \
+  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN"
+```
+
+```python Python
+open_deals = hevn.get("/escrow?status=authorized&status=partiallyCaptured&limit=50")["items"]
+```
+
+```javascript Node
+const { items: openDeals } =
+  await hevn.get("/escrow?status=authorized&status=partiallyCaptured&limit=50");
+```
+
+```go Go
+page, err := api.Get("/escrow?status=authorized&status=partiallyCaptured&limit=50")
+openDeals := page.List("items")
+```
+
+</CodeGroup>
+
+Write a repeated `status` into the path, because the HTTP client's parameter map holds one value per name.
+
+`POST /dapi/v1/escrow/{escrowId}/sync` reconciles the deal with the chain and returns it with `consistent` ([Reconcile one escrow](/api-reference/escrow/reconcile-one-escrow-with-the-chain)).
+
+## Errors
+
+A closed window, a fee above the ceiling or an amount above the cap returns `400 invalid_request` with no `details`. There is no `window_closed` or `amount_out_of_range` code. Read the deal and pick from `availableActions`. Other codes are in [Errors](/whitelabel/reference/errors#escrow).
+
+<Card title="Next: Sandbox" icon="flask" href="/whitelabel/sandbox" />

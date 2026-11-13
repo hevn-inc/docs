@@ -1,85 +1,45 @@
 ---
 title: "What is HEVN"
-description: "HEVN is a non-custodial financial platform: your money lives in a smart wallet only you own, while HEVN provides the payment tooling around it."
+description: "HEVN is payments software over a Base smart wallet that the account holder controls."
 ---
 
-HEVN is a financial platform for global payments built on USDC. It gives individuals and businesses the tools a finance team expects — invoices, contacts, contracts, payouts to bank accounts, cards, and statements — without ever taking custody of their money.
+HEVN is payments software: an API and app over a Base smart wallet that only its holder's key can sign for. HEVN is not a bank. Virtual accounts, fiat payins and fiat payouts are provided by partner banks, which hold fiat while it is in transit.
 
-Every HEVN account is a [Base Smart Wallet](https://docs.base.org/base-account/overview/what-is-base-account) on the Base network, owned exclusively by a key that only the user controls. HEVN the platform stores metadata (contacts, invoices, virtual account details) and orchestrates workflows, but it **cannot move, freeze, or access user funds**.
+A HEVN account is a profile plus a Base smart wallet that holds USDC. The app adds contacts, invoices, contracts, payouts to bank accounts, cards issued by a partner and transaction reports.
 
-## Two ways to use HEVN, two people holding the key
+## Self-serve and whitelabel
 
-Everything on this tab describes the **self-serve** product: the person who owns the email owns the
-wallet, and nothing moves without a signature from their own key. HEVN cannot sign for them.
-
-The [whitelabel](/whitelabel/overview) product keeps that rule and adds an operator. Your customer
-creates their own HEVN account in a sign-in window on your site and links it to your product; your
-backend, holding a developer key, verifies the account, opens its rails and books its payments; and
-your customer still approves every payment with their own key in that window.
-
-Read this tab for how the platform is built and what it cannot do with the money. Read the
-[Whitelabel](/whitelabel/overview) tab if you are building the product around it.
-
-<CardGroup cols={2}>
-  <Card title="Architecture" icon="layers" href="/general/architecture">
-    How email, Privy, and Base smart wallets fit together.
-  </Card>
-  <Card title="Key management with Privy" icon="key-round" href="/general/privy-wallets">
-    Self-custodial keys secured by Shamir sharding and TEEs.
-  </Card>
-  <Card title="Base smart wallets" icon="wallet" href="/general/smart-wallets">
-    Gasless USDC, deterministic addresses, and onchain ownership.
-  </Card>
-  <Card title="Security model" icon="shield-check" href="/general/security-model">
-    What HEVN can and cannot do with your money.
-  </Card>
-  <Card title="Whitelabel" icon="boxes" href="/whitelabel/overview">
-    Run HEVN under your own brand: link your customers' accounts through a sign-in window and operate them from code.
-  </Card>
-</CardGroup>
-
-## Core principles
-
-### Non-custodial by construction
-
-HEVN is not a wallet provider holding funds on your behalf. Your balance is USDC sitting in a smart contract wallet on Base. The only key that can authorize spending from that wallet is your [Privy embedded wallet](https://docs.privy.io/wallets/overview/embedded) — a key that is cryptographically sharded and never visible to HEVN or to Privy itself.
-
-There is no HEVN omnibus account, no pooled balance, and no internal ledger that "represents" your money. The onchain balance **is** the balance.
-
-### Deterministic identity
-
-Your entire account chain is derived deterministically:
-
-```mermaid
-flowchart LR
-    A["Email"] --> B["Privy embedded wallet"]
-    B -->|"initial owner"| C["Base Smart Wallet<br/>(your HEVN account)"]
-```
-
-Because each step is deterministic, HEVN can compute the wallet address for any email address **before** the recipient ever signs up. This is what makes sending money by email safe: funds go directly to a smart wallet that only the owner of that email will ever be able to control. There is no escrow step and no custodial holding period.
-
-### HEVN is never in the money flow
-
-- **Deposits** (bank transfers, card top-ups, crypto) settle directly to your smart wallet address.
-- **Payouts** to bank accounts are executed by a licensed banking partner: the partner issues a one-time deposit address, and *you* send the funds from your wallet. HEVN never receives, forwards, or holds the money.
-- **Cross-chain deposits and withdrawals** use the [NEAR Intents 1Click API](https://docs.near-intents.org/integration/distribution-channels/1click-api/about-1click-api) with one-time passive deposit addresses that HEVN does not control.
-
-## What the platform layer does
-
-The HEVN API (and the JWT it issues) covers everything that is *not* money movement:
-
-- Contact book, invoicing, and contract management
-- Virtual account details (IBANs / account numbers) requested from partner banks and surfaced to you
-- KYC/KYB, statements, analytics
-- Team and multi-user access administration
-
-Authorization to actually **spend** funds always happens at the wallet layer, with a signature from your key. See [Authentication](/general/authentication) for the split between platform auth and money auth.
+| | Self-serve | Whitelabel |
+| --- | --- | --- |
+| Account creation | The holder signs up in the HEVN app with an email | Your customer creates a HEVN account in a sign-in window on your site and links it to your product |
+| Operator | None | Your backend, with a developer key. It verifies the account, opens its rails and books its payments |
+| Payment approval | The holder, with their key | The holder, with their key, in the sign-in window |
+| Docs | This tab | [Whitelabel tab](/whitelabel/overview) |
 
 ## Interfaces
 
-| Surface | What it is | Docs |
+| Interface | What it is | Docs |
 | --- | --- | --- |
-| Web app | Full product UI at [app.gethevn.com](https://app.gethevn.com) | — |
-| REST API | The whitelabel integration surface: link and operate your customers' accounts | [REST API tab](/api-reference/overview) |
-| Whitelabel | HEVN as the payments engine behind your product, under your brand | [Whitelabel tab](/whitelabel/overview) |
-| Remote transfers | A capped key that lets your own server or script send USDC from your account. Advanced use only | [Remote Transfers tab](/remote-transfers/overview) |
+| Web app | Product UI at [app.gethevn.com](https://app.gethevn.com) | n/a |
+| REST API | The HTTP API behind the whitelabel integration, at `/dapi/v1` | [REST API tab](/api-reference/overview) |
+| Whitelabel | Guides for linking your customers' accounts and operating them from your backend | [Whitelabel tab](/whitelabel/overview) |
+| Remote transfers | A capped key that lets your server or script send USDC from your account. Advanced use. Create one key per integration | [Remote Transfers tab](/remote-transfers/overview) |
+
+## Account structure
+
+| Layer | What it is |
+| --- | --- |
+| Identity | The holder's email address or Google account |
+| Key | A [Privy](https://privy.io) embedded wallet, unlocked by the email login |
+| Funds | A Base smart wallet that holds USDC. The Privy key is its first owner, and the sole owner until the holder [adds others](/general/security-model#shared-access) |
+| Platform | The HEVN API. It stores contacts, invoices and account details |
+
+The wallet is non-custodial. HEVN holds no key to it, and spending needs a signature from an owner key. See [Security model](/general/security-model).
+
+## Deterministic addresses
+
+Each email maps to one Privy key, and the smart wallet address is computed from that key with `CREATE2`. HEVN can compute the address for an email before its holder signs up.
+
+A payment sent by email goes straight to that address. USDC sent to an address before the wallet is deployed stays there until first use.
+
+<Card title="Next: How money moves" icon="arrow-right" href="/general/how-money-moves" />

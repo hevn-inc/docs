@@ -1,99 +1,53 @@
 ---
 title: "Signing"
-description: "Prepare, check, sign, confirm: what you sign, what HEVN verifies, and why confirm is always safe to repeat."
+description: "Prepare, check, sign and confirm a payment from your integrator account with the developer key."
 ---
 
-Nothing you sign is constructed by you. HEVN builds the operation, echoes its terms, and verifies the
-same terms again at confirm — your job is to check the echo and sign, not to assemble a transaction.
-
-Your developer key signs for one wallet: your own integrator account's. Payouts and swaps from that
-account and the operator actions on your escrow deals go through the four steps below. A payout for a
-client never does — it answers `authorization: "client"`, and its holder signs it in the
-[sign-in window](/whitelabel/sign-in-with-hevn#approve-a-payout).
+Signing is how your developer key approves a payment from your integrator account. Open the payment with `POST /dapi/v1/payouts`, sign `approval.payload`, and post the signature to the confirm route.
 
 <Steps>
   <Step title="Prepare" icon="file-text">
-    You call the opening route — `POST /dapi/v1/payouts` or
-    `POST /dapi/v1/escrow/{escrowId}/actions`. HEVN prices the payment, books it, builds the on-chain
-    operation and stores an approval. The response carries `quote`, `approval` and `debit`.
+    Call the prepare route. The response has `quote`, `approval` and `debit`.
   </Step>
   <Step title="Check" icon="scale">
-    Compare `debit.amount`, `debit.token` and `debit.address` with the payment your own system
-    intended, and refuse if they differ. This is the one guarantee the design cannot give you.
+    Compare `debit` with the payment in your system and stop if they differ. `debit` is decoded from the operation you sign: `amount`, `amountAtomic`, `token`, `chainId` and `address`.
   </Step>
   <Step title="Sign" icon="pen-tool">
-    Base64-decode `approval.payload` and sign **those exact bytes**: ECDSA P-256 over SHA-256,
-    DER-encoded, base64 out.
+    Base64-decode `approval.payload` and sign the decoded bytes in the [signature format](#signature-format).
   </Step>
   <Step title="Confirm" icon="check">
-    Post the signature to the matching confirm route inside the approval window. HEVN verifies it
-    locally, co-signs, and submits.
+    Post the signature to the confirm route before `approval.expiresAt`. HEVN verifies it against the stored bytes, co-signs and submits.
   </Step>
 </Steps>
 
-```mermaid
-sequenceDiagram
-    participant S as Your server
-    participant H as HEVN API
-    participant B as Base bundler
-    S->>H: POST /dapi/v1/payouts — contactId, amount, publicKey
-    Note over H: prices it, books it with the partner,<br/>builds the operation, stores the approval
-    H-->>S: quote + approval.payload + debit
-    Note over S: assert debit.amount, debit.token and debit.address<br/>against your own record, then sign base64decode(payload)
-    Note over H: approval.expiresAt is 120 s after prepare
-    loop safe to repeat — never re-open unless it expired
-        S->>H: POST /dapi/v1/payouts/{payoutId}/confirm — signature
-        H->>B: signature verified locally, operation submitted
-        B-->>H: receipt
-        H-->>S: 200 settled + transactionHash, or 202 submitted — confirm again
-    end
-```
+## Routes
 
-## Where the mechanism is used
-
-| What moves | Prepare | Confirm | Approval window |
+| What moves | Prepare, under `/dapi/v1` | Confirm | Approval window |
 | --- | --- | --- | --- |
-| Fiat out of your account over a bank rail | `POST /dapi/v1/payouts` | `POST /dapi/v1/payouts/{payoutId}/confirm` | 120 s |
-| USDC out of your account on Base | `POST /dapi/v1/payouts` with a wallet contact | `POST /dapi/v1/payouts/{payoutId}/confirm` | 120 s |
-| Money between two of your own accounts | `POST /dapi/v1/swaps` | `POST /dapi/v1/swaps/{swapId}/confirm` | 120 s |
-| An escrow action you operate | `POST /dapi/v1/escrow/{escrowId}/actions` | `POST /dapi/v1/escrow/{escrowId}/actions/{idempotencyKey}/confirm` | 60 s |
-| A payout for a client | `POST /dapi/v1/payouts` with `X-Hevn-Account` | none — the holder signs in the [sign-in window](/whitelabel/sign-in-with-hevn#approve-a-payout) | about 10 min, the window session |
+| Payout from your account: fiat over a bank rail, or USDC on Base to a wallet contact | `POST /payouts` | `POST /payouts/{payoutId}/confirm` | 120 s |
+| Swap between two of your accounts | `POST /swaps` | `POST /swaps/{swapId}/confirm` | 120 s |
+| Escrow action you operate | `POST /escrow/{escrowId}/actions` | `POST /escrow/{escrowId}/actions/{idempotencyKey}/confirm` | 60 s |
+| Payout for a client | `POST /payouts` with `X-Hevn-Account` | None. The holder signs in the [sign-in window](/whitelabel/sign-in-with-hevn#approve-a-payout). | About 10 minutes (the sign-in window session) |
 
-## What the approval authorizes
+On the signed routes, omit `X-Hevn-Account` or send your `cl_…`. See [Who can spend](/whitelabel/overview#who-can-spend) and [Acting as a client](/whitelabel/authentication#acting-as-a-client).
 
-`authorization` on a payout or a swap says what the one signature covers, and whose it is.
+## Authorization values
 
-| `authorization` | What HEVN does with your co-signature | What to check before signing |
-| --- | --- | --- |
-| `debit` | funds the payment by moving tokens out of your Base smart wallet | `debit.amount`, `debit.token` and `debit.address` |
-| `intent` | signs the payment's own terms with your smart wallet, and settles it with the partner — nothing leaves the wallet | `quote`, and `intent.digest` if you reproduce the terms yourself |
-| `client` | nothing — there is no `approval` for you. The client's holder signs the debit themselves | `quote` and `contact`, before you open the sign-in window for it |
+`authorization` in the prepare response says who signs. With `debit` and `intent` your developer key signs, and the payload bytes, the confirm route and the retry rules are the same. With `client` the holder signs and no `approval` is returned, so check `quote` and `contact` before you open the sign-in window. With `wallet` an external account sends the transfer, so there is nothing to confirm. Which value a payout or a swap returns, and what to check before signing, is on [Create an outgoing transfer](/api-reference/transfers/create-an-outgoing-transfer) and [Create a transfer between the client's own accounts](/api-reference/transfers/create-a-transfer-between-the-clients-own-accounts).
 
-A payout from a wallet account is `debit`; one with `"sourceAccount": "FDIC_USD"` is `intent`, because
-the money is spent where the partner bank already holds it. A swap is whichever its route needs. The
-bytes you sign, the confirm route and the retry rules are identical either way — only `debit` versus
-`intent` on the response differs.
-
-The signed routes act on your own account: send no `X-Hevn-Account`, or your own `cl_…`. Confirming
-a client's payout or swap answers `403 account_not_controlled`. Escrow is always operated by you, so it
-refuses that header. Every confirm body is the same two fields:
+The confirm body:
 
 ```json
 { "signature": "MEUCIQD…", "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE…" }
 ```
 
-`publicKey` is optional; it only saves HEVN a scan over your account's keys. A key that is not one
-of them is `403 key_not_registered` — see [Developer key](/whitelabel/developer-key#when-a-key-is-refused).
+The field rules are on [Authorize an outgoing transfer](/api-reference/transfers/authorize-an-outgoing-transfer).
 
-Every other call in these guides carries a cURL tab. The confirms do not: a signature is produced by
-your key over bytes HEVN just handed you, so a curl block could only show a stale one. The prepare
-call has a cURL tab, the confirm is Python, Node and Go.
+HEVN re-checks the key and the source address before it co-signs. A key deleted after the prepare, or a confirm from outside [the IP allowlist](/whitelabel/authentication#the-ip-allowlist), returns `403`.
 
-## What you sign
+## Payload
 
-`approval.payload` is base64 of a canonical JSON document — the authorization HEVN will execute on
-your behalf. Decoded, one from a payout looks like this (formatted here to read; the real bytes carry
-no whitespace):
+`approval.payload` is base64 of a canonical JSON document. A decoded payout payload, formatted for reading (the real bytes have no whitespace):
 
 ```json
 {
@@ -111,113 +65,53 @@ no whitespace):
 }
 ```
 
-<Warning>
-  **Sign `base64decode(payload)` verbatim.** Never parse the JSON and re-serialize it. Any library
-  that reorders keys, adds a space after `:`, escapes non-ASCII differently or appends a newline
-  produces different bytes and a signature that is refused with `400 signature_invalid`.
-</Warning>
+Sign `base64decode(payload)` unchanged. Do not parse and re-serialize the JSON. Reordered keys, a space after `:`, different escaping or a trailing newline return `400 signature_invalid`.
+
+HEVN builds the operation from the booking: a single stablecoin transfer from your wallet. The approval is bound to your account, the target, the wallet and your signer.
+
+Prepare refuses a target that is not in a fundable state, a wallet whose on-chain owner is not your signer (`409 signer_not_attached`) and a balance below the transfer (`409 insufficient_funds`). See [Errors](/whitelabel/reference/errors).
 
 ## Signature format
 
-| Rule | Value |
-| --- | --- |
-| Algorithm | ECDSA on **P-256**, digest **SHA-256** |
-| Encoding | **ASN.1 DER** `(r, s)` |
-| Transport | **base64**, standard alphabet, padded |
-| Content | Exactly one signature — no `,`, `\n` or `\r` anywhere in the string |
+| Rule | Value | Common mistake |
+| --- | --- | --- |
+| Algorithm | ECDSA on P-256, digest SHA-256 | Pre-hashing. Most libraries hash the message. |
+| Encoding | ASN.1 DER `(r, s)` | Raw 64-byte `r‖s` (WebCrypto, Java's `SHA256withECDSAinP1363Format`). Convert it to DER. |
+| Transport | base64, standard alphabet, padded | base64url (`-` and `_`), or missing `=` padding. |
+| Content | One signature, with no `,`, `\n` or `\r` | Signing the base64 text and not the decoded bytes. Base64 wrapped at 64 columns. A newline appended by a shell pipeline. |
+
+A signature that breaks a rule returns `400 signature_invalid` and does not consume the approval. Sign on your server and not in a browser.
 
 import SignPayloadSnippet from "/snippets/sign-payload.mdx";
 
 <SignPayloadSnippet />
 
-Five ways to get it wrong, all of them answering `400 signature_invalid`:
+## Approval lifetime
 
-- **Raw `r‖s`.** WebCrypto and Java's `SHA256withECDSAinP1363Format` produce a fixed 64-byte
-  signature. Convert it to DER before encoding.
-- **base64url.** `-` and `_` are rejected; keep the standard alphabet and the `=` padding.
-- **Whitespace.** Do not wrap the base64 at 64 columns, and do not let a shell pipeline append a
-  newline.
-- **Signing the string.** Sign the decoded bytes, not the base64 text.
-- **Hashing twice.** Most libraries hash for you. Do not pre-hash and then sign the digest as a
-  message.
+An approval is single-use and ends at `approval.expiresAt`. The windows are in [Routes](#routes).
 
-Sign on your server. The key can authorize a spend from your own wallet, so a browser is the wrong
-place for it.
-
-## What HEVN binds, and what it verifies
-
-You are not trusted to describe the operation, and you are not asked to. At prepare, HEVN:
-
-- loads the target itself — the booked payout, the contact you named, the deal — and refuses anything
-  that is not in a fundable state;
-- checks that the wallet is your own and that its live on-chain owner is your signer;
-- builds a **single stablecoin transfer** from that wallet, with the amount and destination
-  taken from what it just booked, and checks the balance covers it;
-- re-validates that built operation against the stored terms before it hands you anything to sign;
-- pins an idempotency key of its own on the authorization, so the same signature cannot be replayed
-  as a different request;
-- binds the approval to your account, the target, the wallet and your signer, and stores it with an
-  expiry.
-
-At confirm, your signature is verified **locally** against the stored bytes before anything is
-consumed. A wrong signature is a refusal that costs you nothing: the approval survives, and you can
-fix the signing and confirm again.
-
-The credential is re-checked at both ends. Every request on this API re-reads the developer key behind
-your session and the address the request came from, and the confirm re-checks both once more immediately before HEVN co-signs — so a key deleted between the prepare and
-the confirm, or a confirm sent from an address outside its allowlist, is a `403` and nothing is
-signed. See [Developer key](/whitelabel/developer-key#the-ip-allowlist).
-
-<Tip>
-  Check the echo anyway. `debit.amount`, `debit.amountAtomic`, `debit.token`, `debit.chainId` and
-  `debit.address` are decoded from the very operation you are about to sign — comparing them against
-  your own record is the only check HEVN cannot make for you.
-</Tip>
-
-## Approvals are single-use and short-lived
-
-An approval is live for 120 seconds (60 for escrow actions), and `approval.expiresAt` is in the
-response. Three rules follow:
-
-- **Prepare, check, sign and confirm in one pass.** Never queue a payload for a human to approve
-  later — it will expire.
-- **Re-opening is free and idempotent.** Call the opening route again with the same
-  `Idempotency-Key`: an expired-and-unused approval is replaced with a fresh one on the *same* booked
-  payment, at the same price. It does not re-quote and does not pay twice.
-- **Re-open as often as you need.** There is no attempt budget, because there is nothing to budget:
-  every re-opened approval prepares an operation in the same on-chain slot, and a slot can only be
-  spent once. See [Why a retry cannot pay twice](/whitelabel/conventions#why-a-retry-cannot-pay-twice).
+- Run the steps in one pass. A payload queued for a person to approve later expires.
+- To re-open, call the prepare route again with the same `Idempotency-Key`. While the payment has not moved, it returns a new approval on the same booked payment, at the same price. A payout that already moved comes back with no `approval`.
+- Re-opening has no attempt limit. Each new approval uses the same on-chain slot. See [Why a retry cannot pay twice](/whitelabel/conventions#why-a-retry-cannot-pay-twice).
 
 ## Retrying a confirm
 
-Confirm is designed to be repeated, and it never pays twice. This table is the whole policy:
+The first confirm with a valid signature uses the approval. A second confirm on the same approval is refused, so read the payout or swap instead of confirming again. A payout confirm returns `200` when the operation lands within the request, and `202` with `pollUrl` otherwise. A swap confirm, and a payout confirm with `authorization: intent`, always return `202`. An escrow confirm repeated with the same path key returns the first result.
 
-| What you got | What it means | What to do |
+| Response | Meaning | Next |
 | --- | --- | --- |
-| `200` `status: "settled"` | Done | Store `transactionHash` |
-| `200` `status: "failed"` | It reached the chain and reverted | Re-open with the same `Idempotency-Key` |
-| `202` `status: "submitted"` | Sent, no receipt yet | **Confirm again**, same body, until you get a `200` |
-| A timeout or network error | Unknown | **Confirm again**, same body |
-| `503` `bundler_rejected` / `bundler_unavailable` | Chain infrastructure | Confirm again, with backoff |
-| `409` `funding_in_progress` | An attempt is live | Wait, then confirm again |
-| `409` `already_funded` | **The money moved** | Success. Read `details.transactionHash` |
-| `409` `funding_attempt_expired` | The approval expired unsigned | Re-open with the same `Idempotency-Key` |
-| `409` `payment_slot_consumed` | An operation for this payment already landed | Stop re-opening. Read the payout; book a new one only if it says `failed` |
-| `400` `signature_invalid` | Wrong bytes or wrong encoding | Fix the signing and confirm again |
+| `200` `status: "settled"` | Done | Store `transactionHash`. |
+| `200` `status: "failed"` | The operation reverted on chain. | Book a new payment with a new `Idempotency-Key`. A re-open of this one returns `payment_slot_consumed`. |
+| `202` `status: "submitted"` | Sent, no receipt yet | Read `pollUrl` until `status` is `settled` or `failed`. |
+| Timeout or network error | Unknown | Read the payout or swap. If `status` is `awaitingSignature`, re-open with the same `Idempotency-Key`. |
+| `503` `user_operation_rejected` or `user_operation_unavailable` | The operation was not accepted, or its state could not be read. | As for a timeout. |
+| `503` `bundler_rejected` or `bundler_unavailable` | An escrow action was rejected, or the chain was unreachable. | Confirm the escrow action again with backoff. |
+| `409` `funding_attempt_expired` (payout with `debit`), `410` `approval_expired` (payout with `intent`), `409` `swap_not_confirmable` (swap) | No open approval: it expired, or a confirm already used it. | As for a timeout. |
+| `409` `funding_in_progress` | An attempt is live. | Wait, then send the same call again. |
+| `409` `already_funded` | A swap re-open found that the money moved. | Success. Read `details.transactionHash`. |
+| `409` `payment_slot_consumed` | An operation for this payment already landed or reverted. | Stop re-opening. Read the payout and book a new one if it is `failed`. |
+| `400` `signature_invalid` | Wrong bytes, wrong encoding, or a key that is not on your account. The approval stays usable. | Fix the signing and confirm again. |
 
-<Warning>
-  After a `202`, a `503` or a timeout, confirm again rather than re-opening — a signed operation may
-  still be in flight, and confirming is what resolves it. Re-open only on an explicit `failed` or
-  `funding_attempt_expired`. Re-opening after a signed operation is not dangerous — the chain refuses
-  the second one — it just answers `payment_slot_consumed` instead of telling you what happened.
-</Warning>
+Each approval for one payment uses the same on-chain slot. If an earlier operation lands after a re-open, the new one returns `payment_slot_consumed`. The loop as code is in [HTTP client](/whitelabel/reference/client).
 
-The same policy as code, in one place:
-
-import ConfirmLoop from "/snippets/confirm-loop.mdx";
-
-<ConfirmLoop />
-
-<Card title="Next: Sign in with HEVN" icon="log-in" href="/whitelabel/sign-in-with-hevn">
-  Link your customer's own account through a HEVN popup on your site.
-</Card>
+<Card title="Next: Conventions" icon="arrow-right" href="/whitelabel/conventions" />

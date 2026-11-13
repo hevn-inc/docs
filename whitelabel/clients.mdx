@@ -1,13 +1,13 @@
 ---
-title: "Clients"
-description: "Read a client linked through Sign in with HEVN, wait until it is usable, list your clients, and keep the one id that identifies each of them."
+title: "Clients and verification"
+description: "Read and update a linked client, then write, submit and track a business client's KYB document."
 ---
 
-import PollSnippet from "/snippets/poll.mdx";
+A client is your customer's HEVN account, linked to your integrator account through [Sign in with HEVN](/whitelabel/sign-in-with-hevn). Read it with `GET /dapi/v1/client`, then verify a business client with `PUT /dapi/v1/client/kyb`.
 
-A client is your customer's own HEVN account, linked to your integrator account through [Sign in with HEVN](/whitelabel/sign-in-with-hevn). You do not create it with an API call: the account holder creates it in the sign-in window, and `POST /dapi/v1/clients/link` hands you its id.
+`POST /dapi/v1/clients/link` returns the `cl_…` id. Send it as `X-Hevn-Account` to read the client with `GET /dapi/v1/client`.
 
-```json POST /dapi/v1/clients/link — 200
+```json POST /dapi/v1/clients/link 200
 {
   "id": "cl_7YQ2Kf3mN8",
   "status": "ready",
@@ -19,38 +19,21 @@ A client is your customer's own HEVN account, linked to your integrator account 
 }
 ```
 
-`email` is the address the holder signed in with. A newly created account has nothing else on it yet, so `name` and `phone` are usually absent: the company's identity goes into its [verification document](/whitelabel/onboarding), the phone in through `PATCH /dapi/v1/client`. Responses omit fields with no value, so an absent field and a null field are the same thing — see [conventions](/whitelabel/conventions).
+The fields are described on [Connect an existing account](/api-reference/accounts/connect-an-existing-account). A field with no value is omitted.
 
-Examples use the client from [HTTP client](/whitelabel/reference/client). This page straddles the two account scopes: `POST /dapi/v1/clients/link` and `GET /dapi/v1/clients` are about **your** account and **refuse** `X-Hevn-Account` with `400 account_scope_conflict`, while `GET /dapi/v1/client` and `PATCH /dapi/v1/client` act on one client and **require** it. [Sessions](/whitelabel/sessions#acting-as-a-client) has the whole table.
+An individual has no KYB progress. Poll `verifiedAt` after they [verify their identity](/whitelabel/sign-in-with-hevn#verify-an-individual).
 
-## Three statuses
+Which routes take `X-Hevn-Account` is covered in [Acting as a client](/whitelabel/authentication#acting-as-a-client). For who signs a client's payouts, see [Who can spend](/whitelabel/overview#who-can-spend).
 
-```mermaid
-stateDiagram-v2
-    [*] --> provisioning: account created in the sign-in window
-    provisioning --> ready: smart wallet deployed
-    provisioning --> failed: provisioning refused
+## Statuses
 
-    note right of provisioning
-        Poll GET /dapi/v1/client every 2 s,
-        with the id in X-Hevn-Account.
-    end note
-    note right of ready
-        The account, your seat on it, the KYB subject
-        and the Base smart wallet all exist.
-    end note
-    note right of failed
-        Contact support with the client id.
-    end note
-```
+| `status` | Meaning | Next |
+| --- | --- | --- |
+| `provisioning` | The smart wallet is not deployed yet. | Poll `GET /dapi/v1/client` every 2 s. |
+| `ready` | The account, your seat on it, the KYB subject and the Base smart wallet exist. | [Write the KYB document](#write-the-document). |
+| `failed` | Provisioning was refused. | Contact support with the client id. |
 
-`ready` means usable. It is the only signal you need before you write the client's KYB document, open a rail for it or book its payouts. A client the window just created is usually `ready` by the time you exchange the code; when it is still `provisioning`, wait for it.
-
-## Wait until it is ready
-
-`pollUrl` carries no id. It is literally `/dapi/v1/client`, the singular route that reads whichever account `X-Hevn-Account` names — so a poller sends the `cl_…` in that header rather than building a path from it.
-
-<PollSnippet />
+A client is usually `ready` when you exchange the code. `poll_until` is defined in [HTTP client](/whitelabel/reference/client).
 
 <CodeGroup>
 
@@ -61,39 +44,33 @@ curl "$HEVN_API/client" \
 ```
 
 ```python Python
-northwind = hevn.acting_as(client["id"])
-client = poll_until(
-    lambda: northwind.get("/client"),
+client = hevn.acting_as(client_id)
+ready = poll_until(
+    lambda: client.get("/client"),
     lambda c: c["status"] != "provisioning",
 )
 ```
 
 ```javascript Node
-const northwind = hevn.actingAs(client.id);
+const client = hevn.actingAs(clientId);
 const ready = await pollUntil(
-  () => northwind.get("/client"),
+  () => client.get("/client"),
   (c) => c.status !== "provisioning",
 );
 ```
 
 ```go Go
-northwind := api.ActingAs(client.Str("id"))
+client := api.ActingAs(clientID)
 ready, err := hevn.PollUntil(func() (hevn.Payload, error) {
-	return northwind.Get("/client")
+	return client.Get("/client")
 }, func(c hevn.Payload) bool { return c.Str("status") != "provisioning" }, 2*time.Minute)
 ```
 
 </CodeGroup>
 
-There is one id to store. `cl_7YQ2Kf3mN8` is what you put in `X-Hevn-Account`: to read this client, to write its KYB document, and to act for it on every money route. Nothing takes it in a path. Keep it in your own records against your own user, server-side — never accept it from a browser, where any page could substitute another customer's id. `baseSmartWallet` is the address that holds the client's balance; keep it for your own reconciliation, but no call takes it as an argument.
+## List clients
 
-`kybStatus` follows the client's verification from here on — `notStarted`, then `pending`, `approved`, `rfi` or `rejected` — and `kybApplicationId` names the latest submission behind it. [Onboarding](/whitelabel/onboarding) owns that vocabulary; this row is where you read it without a second call.
-
-`verifiedAt` is the one verdict for both kinds of client: when a business passed KYB, or when an individual verified their identity in the [sign-in window](/whitelabel/sign-in-with-hevn#verify-an-individual). It is absent until then. An individual has no `kybStatus` progress to follow — `verifiedAt` is the field to poll.
-
-A `failed` client answers with a `failure` object whose `code` is `provisioning_failed`, `request_rejected` or `request_canceled`. Contact support with the client id.
-
-## List your clients
+`GET /dapi/v1/clients` lists the accounts linked to you. Use it to recover a lost id. Filters are on [List clients](/api-reference/accounts/list-clients), and paging follows [Pagination](/whitelabel/conventions#pagination).
 
 <CodeGroup>
 
@@ -117,11 +94,9 @@ mine := page.List("items")
 
 </CodeGroup>
 
-`GET /dapi/v1/clients` answers `{ "items": [...], "nextCursor": "..." }`, every account connected to you, newest first. It takes `status` (`provisioning`, `ready`, `failed`), `email` as an exact, lowercased match, and cursor pagination. It is the place to recover an id you lost: a holder who signs in again through the window also gives you a fresh code for the same client.
+## Update phone and address
 
-## Update the phone and the address
-
-`PATCH /dapi/v1/client` writes two things and nothing else — the phone number the rails check, and the postal address. It is a client-scoped route, so the id travels in `X-Hevn-Account`:
+`PATCH /dapi/v1/client` writes the phone and the postal address. The fields are on [Update a client profile](/api-reference/accounts/update-a-client-profile).
 
 <CodeGroup>
 
@@ -147,14 +122,357 @@ patched, err := api.ActingAs(clientID).Patch("/client", hevn.Body{"phone": "+131
 
 </CodeGroup>
 
-`phone` is E.164, for example `+13125550142`. Every rail a company opens checks for a phone number on the account, so set it before you [open one](/whitelabel/virtual-accounts). `address` takes `streetAddress`, `addressLine2`, `city`, `state` and `zip`. Only the keys you send are written.
+Changing a locked field returns `409 profile_locked` with `details.fields`.
 
-Everything else a company has to tell HEVN is verification data and belongs in its KYB document. The address country is frozen at registration; changing a locked field answers `409 profile_locked` with `details.fields`.
+### Phone numbers
 
-## What you can do with a client
+A company's virtual account requires a phone number. Either phone satisfies the check: `company.phone` in the KYB document, or the account phone written with `PATCH /dapi/v1/client`.
 
-Linking gives your integrator account a seat on the client's account. With it you read and write everything a finance team would set up — the verification document, rails, contacts, payins, the ledger — and you **book** payouts. You never **sign** them: the account holder's own key is the only one that can spend from their wallet, and they approve each payout in the [sign-in window](/whitelabel/sign-in-with-hevn#approve-a-payout). Your developer key has no power over the client's money at all. That is the whole point of the model — see [accounts and control](/whitelabel/accounts-and-control).
+## Write the document
 
-<Card title="Next: Onboard a client" icon="arrow-right" href="/whitelabel/onboarding">
-  Fill the KYB document, upload its papers, submit, and answer an RFI.
-</Card>
+A business client is verified from one KYB document that you write, submit for review and correct on request. Write it with `PUT /dapi/v1/client/kyb` until the response returns `ready: true`. Then call `POST /dapi/v1/client/kyb/complete`.
+
+The KYB and document routes are client-scoped, so send `X-Hevn-Account`. An individual client verifies in the [sign-in window](/whitelabel/sign-in-with-hevn#verify-an-individual).
+
+The document has the sections `company`, `people[]` and `documents[]`. Field types, enum values and slot names are on [Provide applicant information](/api-reference/verification/provide-applicant-information).
+
+<Steps>
+
+<Step title="Write the company">
+
+The example has the required fields. `company.legalName` must be unique across HEVN. A US `taxId` in a format other than `XX-XXXXXXX` counts as missing.
+
+Also send the optional fields you hold, such as `identityDocuments`, `operatingCountries`, `highRiskActivities`, `hasPep`, `isRegulated` and the per-method volume split. Optional fields are not listed in `missing[]`, but a reviewer often asks for them in an RFI.
+
+```json
+{
+  "company": {
+    "legalName": "Northwind Trading Ltd",
+    "country": "US",
+    "taxId": "88-1234567",
+    "phone": "+13125550142",
+    "email": "compliance@northwind.example",
+    "address": {
+      "streetAddress": "401 N Michigan Ave",
+      "city": "Chicago",
+      "state": "US-IL",
+      "zip": "60601",
+      "country": "US"
+    },
+    "entityType": "llc",
+    "expectedMonthlyVolumeUsd": "250000",
+    "businessDescription": "Wholesale and retail distribution of industrial fasteners.",
+    "businessType": "retail",
+    "sourceOfFunds": "business_revenue",
+    "purposeOfFunds": "vendor_payments",
+    "flowOfFunds": "Customers pay us by wire; we pay suppliers in EUR."
+  }
+}
+```
+
+<CodeGroup>
+
+```bash cURL
+curl -X PUT "$HEVN_API/client/kyb" \
+  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+  -H "X-Hevn-Account: $HEVN_CLIENT_ID" \
+  -H "Content-Type: application/json" \
+  --data @document.json
+```
+
+```python Python
+client = hevn.acting_as(CLIENT_ID)
+readiness = client.put("/client/kyb", document)
+```
+
+```javascript Node
+const client = hevn.actingAs(clientId);
+const readiness = await client.put("/client/kyb", document);
+```
+
+```go Go
+client := api.ActingAs(clientID)
+readiness, err := client.Put("/client/kyb", document)
+```
+
+</CodeGroup>
+
+```json Response 200
+{
+  "ready": false,
+  "missing": ["people", "documents.certificate_of_incorporation", "…"],
+  "people": []
+}
+```
+
+`ready: false` means the write succeeded. Read each `missing[]` entry as described in [Missing paths](#missing-paths).
+
+</Step>
+
+<Step title="Add the people">
+
+`people[]` lists the client's owners, directors and signers. Give each person a stable `key` and at least one role: `ownershipPercentage`, `hasControl`, `isDirector` or `isSigner`.
+
+```json
+{
+  "people": [
+    {
+      "key": "jane",
+      "firstName": "Jane",
+      "lastName": "Doe",
+      "dateOfBirth": "1984-02-11",
+      "email": "jane@northwind.example",
+      "phone": "+13125550188",
+      "address": {
+        "streetAddress": "1120 W Fulton Market",
+        "city": "Chicago",
+        "state": "US-IL",
+        "zip": "60607",
+        "country": "US"
+      },
+      "taxIdCountry": "US",
+      "taxId": "123-45-6789",
+      "ownershipPercentage": "100",
+      "hasControl": true,
+      "isDirector": true,
+      "isSigner": true
+    }
+  ]
+}
+```
+
+```json Response 200
+{
+  "ready": false,
+  "missing": ["people[0].documents.proof_of_address", "…"],
+  "people": [{ "key": "jane", "id": "7f1e6b2c-90a4-4d31-9b5e-2c08d7a41f63" }]
+}
+```
+
+Sending `people` replaces the roster you created, so a person you omit is removed. `"people": []` removes them all. For a holding company in the chain, see [Complex ownership](#complex-ownership).
+
+</Step>
+
+<Step title="Upload the files">
+
+Upload each file with `POST /dapi/v1/documents`, base64-encoded in `content`, with the target slot in `slot`.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST "$HEVN_API/documents" \
+  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+  -H "X-Hevn-Account: $HEVN_CLIENT_ID" \
+  -H "Content-Type: application/json" \
+  -d "{\"slot\":\"certificate_of_incorporation\",\"fileName\":\"incorporation.pdf\",
+       \"content\":\"$(base64 < incorporation.pdf | tr -d '\n')\"}"
+```
+
+```python Python
+import base64, pathlib
+
+upload = client.post("/documents", {
+    "slot": "certificate_of_incorporation",
+    "fileName": "incorporation.pdf",
+    "content": base64.b64encode(pathlib.Path("incorporation.pdf").read_bytes()).decode(),
+})
+```
+
+```javascript Node
+const upload = await client.post("/documents", {
+  slot: "certificate_of_incorporation",
+  fileName: "incorporation.pdf",
+  content: readFileSync("incorporation.pdf").toString("base64"),
+});
+```
+
+```go Go
+file, err := os.ReadFile("incorporation.pdf")
+upload, err := client.Post("/documents", hevn.Body{
+	"slot":     "certificate_of_incorporation",
+	"fileName": "incorporation.pdf",
+	"content":  base64.StdEncoding.EncodeToString(file),
+})
+```
+
+</CodeGroup>
+
+Responses and limits are on [Upload a document](/api-reference/documents/upload-a-document). File each returned `id` into a slot on the next `PUT`. Company files go in the top-level `documents[]` and a person's files in that person's `documents[]`.
+
+```json
+{
+  "documents": [{ "slot": "certificate_of_incorporation", "uploadId": "doc_1a7Kd2" }],
+  "people": [
+    { "key": "jane", "documents": [{ "slot": "proof_of_address", "uploadId": "doc_5b3Qm9" }] }
+  ]
+}
+```
+
+An unknown slot returns `422 document_type_unsupported` with `details.field`. An `uploadId` of another client returns `404 document_not_found` with `details.uploadId`.
+
+Required slots:
+
+| Slot | Required when | Content |
+| --- | --- | --- |
+| `certificate_of_incorporation` | Always | Registrar's proof that the company exists. |
+| `corporate_structure` | Always | Ownership chart, down to natural persons. |
+| `director_structure` | Always | List of directors. |
+| `proof_of_address` | Always | Recent document showing the registered address. |
+| `source_of_funds` | Always | Evidence for the `sourceOfFunds` value. |
+| `tax_identification_document` | `company.country` is `US` | IRS letter that assigned the EIN. |
+| `vat_registration` | `company.country` is `AE` | FTA VAT/TRN registration certificate. |
+| `regulatory_license` | `company.isRegulated` is `true` | The licence the company holds from its regulator. |
+| `proof_of_address` in `people[].documents` | For each person | Recent document showing where the person lives. |
+
+A reviewer can request any other slot in an RFI.
+
+</Step>
+
+<Step title="Complete the submission">
+
+Call `POST /dapi/v1/client/kyb/complete` with no body. It is the only call that starts a review.
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST "$HEVN_API/client/kyb/complete" \
+  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+  -H "X-Hevn-Account: $HEVN_CLIENT_ID"
+```
+
+```python Python
+application = client.post("/client/kyb/complete")
+```
+
+```javascript Node
+const application = await client.post("/client/kyb/complete");
+```
+
+```go Go
+application, err := client.Post("/client/kyb/complete", nil)
+```
+
+</CodeGroup>
+
+```json Response 201
+{
+  "applicationId": "kyb_9F4tRb",
+  "status": "pending",
+  "attemptNo": 1,
+  "pollUrl": "/dapi/v1/client/kyb"
+}
+```
+
+Replays and refusals are on [Complete the verification submission](/api-reference/verification/complete-the-verification-submission).
+
+</Step>
+
+</Steps>
+
+### Missing paths
+
+Each `missing[]` entry is a path into the document. Set the value at that path and write again.
+
+| Path | Meaning |
+| --- | --- |
+| `company.flowOfFunds` | A company field is empty. |
+| `company.address.zip` | A required address field is empty. |
+| `people` | The roster is empty. Add at least one person. |
+| `people[0].taxIdCountry` | A field on the first person is empty. |
+| `people[0].documents.proof_of_address` | That person's slot is empty. |
+| `documents.certificate_of_incorporation` | A company slot is empty. |
+| `graph.entities.<uuid>.phone` | A field is empty on an entity reached through a holding company. See [Complex ownership](#complex-ownership). |
+
+The index in `people[0]` is the position in `document.people[]` of `GET /dapi/v1/client/kyb`. It can differ from the order you sent.
+
+### Complex ownership
+
+The flat document describes one company held by people. Set `company.hasIntermediateEntityOwnership` to `true` when a holding company stands in the chain.
+
+Write such a chain through HEVN's entity-graph routes. They are outside this API and available on request.
+
+A flat write leaves entities added through those routes in place. A write that would remove one returns `409 kyb_roster_conflict` with `details.entityIds`.
+
+## Track the application
+
+`GET /dapi/v1/client/kyb` returns readiness, the application if one is filed, and the stored document. Poll it as described in [polling](/whitelabel/conventions#status-codes).
+
+```json
+{
+  "ready": true,
+  "missing": [],
+  "status": "rfi",
+  "application": {
+    "id": "kyb_9F4tRb",
+    "attemptNo": 1,
+    "status": "rfi",
+    "comment": "The proof of address for Jane Doe is older than three months.",
+    "submittedAt": "2026-09-17T10:31:04Z"
+  },
+  "document": {
+    "company": { "legalName": "Northwind Trading Ltd", "country": "US", "…": "…" },
+    "people": [{ "key": "jane", "id": "7f1e6b2c-…", "…": "…" }],
+    "documents": [{ "slot": "certificate_of_incorporation", "uploadId": "doc_1a7Kd2" }]
+  }
+}
+```
+
+| `status` | Meaning | Next |
+| --- | --- | --- |
+| `notStarted` | No application is filed. | Complete the document, then the submission. |
+| `pending` | The application is filed and under review. | Poll. Timing is set by the reviewer. |
+| `approved` | The application was accepted. | [Request virtual accounts](/whitelabel/virtual-accounts). |
+| `rfi` | The reviewer asked for something. | [Answer the RFI](#answer-an-rfi). |
+| `rejected` | The application was refused. | Read `application.comment`. Complete again only after you change the document. |
+
+In the sandbox, set the status with [`POST /dapi/v1/sandbox/kyb/status`](/whitelabel/sandbox#decide-a-kyb-application).
+
+## Answer an RFI
+
+1. Read `application.comment`.
+2. Correct the document with `PUT /dapi/v1/client/kyb`. To replace a file, file a new upload into the same slot. To correct a person, send that person's `key` and the new value.
+3. Call `POST /dapi/v1/client/kyb/complete` again. `attemptNo` increments, `kybStatus` returns to `pending`, and the next review replaces `comment`.
+
+When the reviewer could not read a value on a file, `comment` names the file and the value. Upload a legible copy, or write the value onto the upload.
+
+### Fill a document's fields by hand
+
+Call `PUT /dapi/v1/documents/{documentId}/content` with the upload id from the `document` block of `GET /dapi/v1/client/kyb`. Company uploads are in `documents[]` and a person's are in `people[].documents[]`.
+
+<CodeGroup>
+
+```bash cURL
+curl -X PUT "$HEVN_API/documents/doc_1a7Kd2/content" \
+  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+  -H "X-Hevn-Account: $HEVN_CLIENT_ID" \
+  -H "Content-Type: application/json" \
+  -d '{"fields":{"entity_name":"Northwind Trading Ltd","registration_number":"7712043",
+       "jurisdiction":"US","incorporation_date":"2019-04-02"}}'
+```
+
+```python Python
+filled = client.put("/documents/doc_1a7Kd2/content", {"fields": {
+    "entity_name": "Northwind Trading Ltd", "registration_number": "7712043",
+    "jurisdiction": "US", "incorporation_date": "2019-04-02",
+}})
+```
+
+```javascript Node
+const filled = await client.put("/documents/doc_1a7Kd2/content", { fields: {
+  entity_name: "Northwind Trading Ltd", registration_number: "7712043",
+  jurisdiction: "US", incorporation_date: "2019-04-02",
+} });
+```
+
+```go Go
+filled, err := client.Put("/documents/doc_1a7Kd2/content", hevn.Body{"fields": hevn.Body{
+	"entity_name": "Northwind Trading Ltd", "registration_number": "7712043",
+	"jurisdiction": "US", "incorporation_date": "2019-04-02",
+}})
+```
+
+</CodeGroup>
+
+Key format and refusals are on [Fill the typed fields read off a document](/api-reference/documents/fill-the-typed-fields-read-off-a-document).
+
+<Card title="Next: Virtual accounts" icon="arrow-right" href="/whitelabel/virtual-accounts" />

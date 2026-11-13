@@ -1,129 +1,48 @@
 ---
 title: "REST API overview"
-description: "The published contract for every operation of the HEVN Platform API, grouped the way the whitelabel guide is."
+description: "Where the OpenAPI document is served, which host to call, and the headers a request needs."
 ---
 
-This tab is generated from the HEVN Platform API's OpenAPI document: every operation, each with a
-schema, request examples and an interactive playground. The API serves that document itself, at
-`https://sandbox-api.hevn.finance/dapi/v1/openapi.json`, with Swagger UI at
-`https://sandbox-api.hevn.finance/dapi/v1/docs` — so the running deployment is always the authority for a field.
+The REST API tab is generated from the OpenAPI document of the HEVN Platform API. Log in with `POST /dapi/v1/auth/challenge` and `POST /dapi/v1/auth/token` ([Sessions](/whitelabel/authentication#sessions)).
 
-It is the machine-readable half of the [Whitelabel guide](/whitelabel/overview). The guide explains
-the model — your integrator account, the client accounts your customers link to it through Sign in with
-HEVN, the developer key that logs your backend in. This reference is the exact contract for every call, and its
-groups follow the guide's order: log in, link a client, submit its verification, open a rail, move money, operate
-escrow.
+## OpenAPI document
 
-<CardGroup cols={2}>
-  <Card title="Whitelabel overview" icon="book-open" href="/whitelabel/overview">
-    What you can build, and the object graph behind it.
-  </Card>
-  <Card title="Quickstart" icon="rocket" href="/whitelabel/quickstart">
-    Ten steps in the sandbox, from an empty account to money that moved on chain.
-  </Card>
-</CardGroup>
+| Resource | URL |
+| --- | --- |
+| OpenAPI document | `https://sandbox-api.hevn.finance/dapi/v1/openapi.json` |
+| Swagger UI | `https://sandbox-api.hevn.finance/dapi/v1/docs` |
+
+Where this tab and the served document differ, use the served document.
 
 ## Servers
 
 | Environment | Server | Notes |
 | --- | --- | --- |
-| Production | `https://api.hevn.finance/dapi/v1` | Real money, Base. |
-| Sandbox | `https://sandbox-api.hevn.finance/dapi/v1` | Test funds, Base Sepolia, one emulated partner. |
+| Production | `https://api.hevn.finance/dapi/v1` | Live funds on Base. |
+| Sandbox | `https://sandbox-api.hevn.finance/dapi/v1` | Test funds on Base Sepolia, with one emulated partner bank. |
 
-The document the API serves declares one **relative** server, `/dapi/v1`, so the host decides which of the two rows
-above you are talking to; the copy published in this tab names both hosts so the playground can pick one. Every path in
-this reference hangs off that base: a full URL is `https://api.hevn.finance/dapi/v1/banks`, and
-so is every `Location` header and every `pollUrl` the API answers with — both are absolute paths from the host root
-that already begin `/dapi/v1`. The two deployments have separate accounts, and a token issued by one is refused by the
-other, so pick the host before you send a request.
+The served document declares one relative server, `/dapi/v1`, so the host you call sets the environment. Paths are relative to that base: `/banks` is `https://api.hevn.finance/dapi/v1/banks`. `Location` headers and `pollUrl` values are absolute paths that begin with `/dapi/v1`.
 
-The operations tagged **sandbox** exist on the sandbox host only; production answers `404` for them.
-Everything else exists on both.
+The environments have separate accounts, and a token issued by one host is refused by the other. Operations tagged `sandbox` return `404` in production.
 
-## The bearer model
+## Headers
 
-Every operation but the three under **auth** takes one header:
-
-```http
-Authorization: Bearer <accessToken>
-```
-
-The access token is a short-lived JWT your backend mints for itself by signing a challenge with your registered
-developer key. It is the **only** credential this API accepts. Its audience is `platform` and it carries a
-`developer_key_id` claim naming the developer key that established the session; a request under `/dapi/v1` carrying
-anything else — no bearer, an ordinary API token, or the `platform-refresh` token — is refused before it reaches a
-route, with `401 unauthenticated` or `403 forbidden` and `details.reason: "developerSessionRequired"`. Ordinary
-`/api/v1` routes refuse a platform token just as firmly, in the other direction.
-
-An API key belongs to [remote transfers](/remote-transfers/overview) and can never authenticate here, because the
-boundary refuses the request before the key is read.
-
-HEVN re-reads the developer key on every request: it must still exist, the request must arrive from an address inside
-the immutable allowlist set when the key was created. A deleted key or a new egress IP is a `403` on every operation,
-whatever the token says — see
-[Developer key](/whitelabel/developer-key).
-
-To act for one of your clients, send that client's id in a second header instead of minting a second
-token:
-
-```http
-X-Hevn-Account: cl_7YQ2Kf3mN8
-```
-
-No operation names a client in its path; the header is the only selector, and operations fall into three groups.
-Most accept it and act on your own account when you omit it. The singular `/client`, `/client/balance`, `/client/kyb`
-and `/client/kyb/complete` **require** it — the spec marks it `required: true`, and omitting it is a
-`422 validation_failed` on a missing header, not a read of your own account. Operations that are about your own account
-by definition — `POST /clients/link`, `GET /clients`, `POST /connect/sessions` and all of **escrow** — refuse it with `400 account_scope_conflict` and
-`details.reason: "selfScopedRoute"`. The three under **auth** ignore it: a login has no account to act for yet. The
-full table is in [Sessions](/whitelabel/sessions#acting-as-a-client).
-
-## One error envelope
-
-Every refusal, on every route, has the same body:
-
-```json
-{
-  "error": {
-    "code": "insufficient_funds",
-    "message": "The account's USDC balance does not cover this transfer.",
-    "details": { "available": "3000000", "required": "5000000" }
-  }
-}
-```
-
-`code` is a stable lowercase slug — branch on it, never on `message`. The spec publishes the whole slug enum as
-`PlatformErrorCode`, not a per-operation list, so the registry with what to do about each is in
-[Errors](/whitelabel/reference/errors). Every response carries an `X-Request-ID`; quote it in a support request.
-
-## Conventions this reference assumes
-
-Bodies, query parameters and response fields are camelCase; unknown keys are refused rather than
-ignored; null fields are omitted, so absent and null are the same thing. Money is always a decimal
-string in the asset's major unit (`"500.00"`), never a JSON number. Ids are opaque and prefixed by
-what they name. Lists page with a cursor. `Idempotency-Key` is accepted on every write and required
-on none. All seven rules, in one page:
-[Conventions](/whitelabel/conventions).
-
-## Money movement is signed
-
-Reading data, writing metadata and booking a client's payout need only a token. Every money movement
-needs a signature from the wallet's owner:
-
-| What moves | Prepare | Who signs, and where |
+| Header | Sent on | Defined in |
 | --- | --- | --- |
-| A client's payout, to a bank or a wallet | `POST /payouts` with `X-Hevn-Account` | The client's holder, in the sign-in window `POST /connect/sessions` opens |
-| A payout or swap from your own account | `POST /payouts`, `POST /swaps` | Your developer key: `POST /payouts/{payoutId}/confirm`, `POST /swaps/{swapId}/confirm` |
-| An escrow action you operate | `POST /escrow/{escrowId}/actions` | Your developer key: `POST /escrow/{escrowId}/actions/{idempotencyKey}/confirm` |
+| `Authorization: Bearer <accessToken>` | All operations outside the `auth` tag. `POST /auth/refresh` takes the refresh token as the bearer. | [Tokens](/whitelabel/authentication#tokens) |
+| `X-Hevn-Account: cl_…` | Operations that act for a client | [Acting as a client](/whitelabel/authentication#acting-as-a-client) |
 
-The holder's side is [Sign in with HEVN](/whitelabel/sign-in-with-hevn); your key's side is one
-mechanism, described once in [Signing](/whitelabel/signing).
+`/dapi/v1` does not accept `X-Api-Key`. That header authenticates [Remote Transfers](/remote-transfers/overview).
 
-<CardGroup cols={2}>
-  <Card title="Authentication" icon="key-round" href="/api-reference/authentication">
-    The two login calls, the two tokens, and the header that picks the account.
-  </Card>
-  <Card title="HTTP client" icon="code" href="/whitelabel/reference/client">
-    A working client in Python, Node and Go: login, retries, signing, polling.
-  </Card>
-</CardGroup>
+## Errors
+
+An error response is a JSON envelope with `error.code`, `error.message` and `error.details`. The OpenAPI document lists the codes in one enum, `PlatformErrorCode`, with no per-operation list. [Errors](/whitelabel/reference/errors) gives the HTTP status and next step for each code.
+
+## Related pages
+
+| Topic | Page |
+| --- | --- |
+| Money format, ids, idempotency, pagination, status codes | [Conventions](/whitelabel/conventions) |
+| Signing a payout, swap or escrow action with the developer key | [Signing](/whitelabel/signing) |
+| A holder authorising a client's payout in the sign-in window | [Sign in with HEVN](/whitelabel/sign-in-with-hevn) |
+| Rate limits and lifetimes | [Conventions](/whitelabel/conventions#rate-limits) |

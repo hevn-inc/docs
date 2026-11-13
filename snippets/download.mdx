@@ -2,7 +2,7 @@
 
 ```python Python
 def download(self, path, params, into):
-    """A method on Hevn. An export streams a file; every other route answers JSON."""
+    """A method on Hevn. The export route streams a file, and the other routes return JSON."""
     headers = {"Authorization": f"Bearer {self.session.token()}"}
     if self.client_id:
         headers["X-Hevn-Account"] = self.client_id
@@ -17,7 +17,7 @@ def download(self, path, params, into):
 ```
 
 ```javascript Node
-// A method on Hevn. An export streams a file; every other route answers JSON.
+// A method on Hevn. The export route streams a file, and the other routes return JSON.
 export async function download(path, params, into) {
   const url = new URL(this.api + path);
   for (const [k, v] of Object.entries(params ?? {})) url.searchParams.set(k, String(v));
@@ -32,7 +32,7 @@ export async function download(path, params, into) {
 ```
 
 ```go Go
-// Download streams an export to a file; every other route answers JSON.
+// Download streams an export to a file. The other routes return JSON.
 func (c *Client) Download(path string, query Query, into string) (string, error) {
 	res, err := c.HTTP.Do(c.request("GET", path, nil, Opts{Query: query}))
 	if err != nil {

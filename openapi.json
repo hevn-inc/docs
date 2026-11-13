@@ -12,7 +12,7 @@
           "auth"
         ],
         "summary": "Start a developer-key login and receive the payload to sign",
-        "description": "Start developer-key authentication. Sign the returned payload with the registered key and exchange it once through `POST /auth/token` before it expires.",
+        "description": "Starts a developer-key login. Sign the decoded `payload` and exchange it once at `POST /dapi/v1/auth/token` before `expiresAt`. Any problem with the email, the key, its allowlist, the signer or the signature returns `401 invalid_credentials` without naming the check.",
         "operationId": "start_challenge_auth_challenge_post",
         "requestBody": {
           "content": {
@@ -59,7 +59,7 @@
           "auth"
         ],
         "summary": "Exchange a signed login challenge for a session",
-        "description": "Exchange a signed, unexpired challenge for an access token and refresh token. A challenge is consumed once; replay, a different key or a different account is refused.",
+        "description": "Exchanges a signed challenge for an access token and a refresh token. A used challenge returns `409 challenge_consumed` and an expired one `410 challenge_expired`. The body of `POST /dapi/v1/auth/challenge` is also accepted for a one-call login. Where that form is not enabled, the call returns `501 login_mode_unavailable` and `details.use` names the challenge route.",
         "operationId": "mint_token_auth_token_post",
         "security": [
           {
@@ -148,7 +148,7 @@
           "auth"
         ],
         "summary": "Exchange a refresh token for a session, optionally acting for an account",
-        "description": "Exchange a device-bound refresh token for a new short-lived access token. `userId` may select an account the authenticated actor is currently authorized to access.",
+        "description": "Send the refresh token as the bearer, with an empty body or a `userId`. Returns a new access token and no new refresh token. A deleted key or a source address outside the key's allowlist returns `403 forbidden`.",
         "operationId": "refresh_session_auth_refresh_post",
         "security": [
           {
@@ -207,13 +207,228 @@
         }
       }
     },
+    "/clients": {
+      "post": {
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Create a client",
+        "description": "Open a company account for a client of yours. HEVN keeps no wallet for it, so register the client's addresses through `/client/accounts`. Returns 202 with the client in `provisioning`. Poll `pollUrl` with the returned id in `X-Hevn-Account` until it is `ready`, which it becomes once the account exists and holds an active external account. Retrying with the same `Idempotency-Key` returns the same client.",
+        "operationId": "create_client_clients_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Hevn-Account",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself.",
+              "examples": [
+                "cl_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+              ],
+              "title": "X-Hevn-Account"
+            },
+            "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Your own key for this write, `^[A-Za-z0-9._:-]{1,128}$`. A retry with the same key replays the first answer; the same key with a different request is refused.",
+              "examples": [
+                "po-inv-2026-114"
+              ],
+              "title": "Idempotency-Key"
+            },
+            "description": "Your own key for this write, `^[A-Za-z0-9._:-]{1,128}$`. A retry with the same key replays the first answer; the same key with a different request is refused."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClientCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "accounts"
+        ],
+        "summary": "List clients",
+        "description": "Every account linked to you, newest first. Use it to recover a lost client id.",
+        "operationId": "list_clients_clients_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "email",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "email"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Exact match, lowercased.",
+              "title": "Email"
+            },
+            "description": "Exact match, lowercased."
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/PlatformClientStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only clients in this status.",
+              "title": "Status"
+            },
+            "description": "Only clients in this status."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 512
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "X-Hevn-Account",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself.",
+              "examples": [
+                "cl_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+              ],
+              "title": "X-Hevn-Account"
+            },
+            "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ClientResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/clients/link": {
       "post": {
         "tags": [
           "accounts"
         ],
         "summary": "Connect an existing account",
-        "description": "Exchange the short-lived code the account holder approved in the HEVN sign-in window for access to their account. The account holder keeps signing their own transfers: a payout for this client answers with `authorization: client` and no approval, and the holder approves it in the HEVN sign-in window. Linking the same account again returns it.",
+        "description": "Exchange the code the HEVN sign-in window returned for access to the holder's account. Sending `X-Hevn-Account` returns 400 `account_scope_conflict`. Exchanging the same code again returns the same client. A payout for this client returns `authorization: client`, and the holder approves it in the HEVN sign-in window. On 400 `link_code_invalid` or 410 `link_code_expired`, start a new sign-in. Do not retry 409 `client_already_linked`.",
         "operationId": "link_client_clients_link_post",
         "security": [
           {
@@ -298,130 +513,6 @@
         }
       }
     },
-    "/clients": {
-      "get": {
-        "tags": [
-          "accounts"
-        ],
-        "summary": "List clients",
-        "description": "Every account connected to you, newest first.",
-        "operationId": "list_clients_clients_get",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "email",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "format": "email"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Exact match, lowercased.",
-              "title": "Email"
-            },
-            "description": "Exact match, lowercased."
-          },
-          {
-            "name": "status",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "$ref": "#/components/schemas/PlatformClientStatus"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Status"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 100,
-              "minimum": 1,
-              "default": 50,
-              "title": "Limit"
-            }
-          },
-          {
-            "name": "cursor",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "maxLength": 512
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Cursor"
-            }
-          },
-          {
-            "name": "X-Hevn-Account",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself.",
-              "examples": [
-                "cl_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
-              ],
-              "title": "X-Hevn-Account"
-            },
-            "description": "The client account to act for, as a `cl_…` id. Omit it to act as yourself."
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Page_ClientResponse_"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Request validation failed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PlatformErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/client": {
       "get": {
         "tags": [
@@ -479,7 +570,7 @@
           "accounts"
         ],
         "summary": "Update a client profile",
-        "description": "Update the phone and postal address for the client selected by `X-Hevn-Account`. Everything else about a client is verification data.",
+        "description": "Update the phone and postal address for the client selected by `X-Hevn-Account`. Keys you do not send are unchanged. Other company data belongs in the KYB document.",
         "operationId": "update_client_client_patch",
         "security": [
           {
@@ -557,13 +648,330 @@
         }
       }
     },
+    "/client/accounts": {
+      "get": {
+        "tags": [
+          "external accounts"
+        ],
+        "summary": "List external accounts",
+        "description": "Every active external account of the client selected by `X-Hevn-Account`, oldest first. An external account is an address the client holds on one of the supported networks; it holds USDC only, and HEVN keeps no transaction history for it beyond the transfers HEVN itself arranges.",
+        "operationId": "list_accounts_client_accounts_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 512
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "X-Hevn-Account",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The selected client account, as a `cl_…` id.",
+              "examples": [
+                "cl_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+              ],
+              "title": "X-Hevn-Account"
+            },
+            "description": "The selected client account, as a `cl_…` id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ExternalAccountView_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "external accounts"
+        ],
+        "summary": "Add an external account",
+        "description": "Register an address for the client on `chain` (base, arb, eth, op, pol or sol). A receiving account opened on it delivers USDC on that network, an on-chain pay-in can be delivered to it, and a Base address can fund payouts it sends itself. Answers 201 the first time and 200 with `Idempotency-Replayed: true` when the same address was already added with the same label; another label is `account_address_taken`.",
+        "operationId": "create_account_client_accounts_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Hevn-Account",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The selected client account, as a `cl_…` id.",
+              "examples": [
+                "cl_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+              ],
+              "title": "X-Hevn-Account"
+            },
+            "description": "The selected client account, as a `cl_…` id."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Your own key for this write, `^[A-Za-z0-9._:-]{1,128}$`. A retry with the same key replays the first answer; the same key with a different request is refused.",
+              "examples": [
+                "po-inv-2026-114"
+              ],
+              "title": "Idempotency-Key"
+            },
+            "description": "Your own key for this write, `^[A-Za-z0-9._:-]{1,128}$`. A retry with the same key replays the first answer; the same key with a different request is refused."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClientAccountCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExternalAccountView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/client/accounts/{accountId}": {
+      "get": {
+        "tags": [
+          "external accounts"
+        ],
+        "summary": "Retrieve one external account",
+        "description": "Retrieve one active external account of the client. Unknown and archived ids share the not-found.",
+        "operationId": "read_account_client_accounts__accountId__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "External account identifier, as an `acc_` id.",
+              "examples": [
+                "acc_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+              ],
+              "title": "Accountid"
+            },
+            "description": "External account identifier, as an `acc_` id."
+          },
+          {
+            "name": "X-Hevn-Account",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The selected client account, as a `cl_…` id.",
+              "examples": [
+                "cl_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+              ],
+              "title": "X-Hevn-Account"
+            },
+            "description": "The selected client account, as a `cl_…` id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExternalAccountView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "external accounts"
+        ],
+        "summary": "Archive an external account",
+        "description": "Archive an external account and close every receiving account opened on it. An archived account is no longer listed and cannot be used; adding the address again creates a new account.",
+        "operationId": "archive_account_client_accounts__accountId__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "External account identifier, as an `acc_` id.",
+              "examples": [
+                "acc_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+              ],
+              "title": "Accountid"
+            },
+            "description": "External account identifier, as an `acc_` id."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Your own key for this write, `^[A-Za-z0-9._:-]{1,128}$`. A retry with the same key replays the first answer; the same key with a different request is refused.",
+              "examples": [
+                "po-inv-2026-114"
+              ],
+              "title": "Idempotency-Key"
+            },
+            "description": "Your own key for this write, `^[A-Za-z0-9._:-]{1,128}$`. A retry with the same key replays the first answer; the same key with a different request is refused."
+          },
+          {
+            "name": "X-Hevn-Account",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The selected client account, as a `cl_…` id.",
+              "examples": [
+                "cl_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+              ],
+              "title": "X-Hevn-Account"
+            },
+            "description": "The selected client account, as a `cl_…` id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExternalAccountView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/connect/sessions": {
       "post": {
         "tags": [
           "accounts"
         ],
         "summary": "Create a sign-in window session",
-        "description": "Issue a short-lived URL for the HEVN sign-in window. Open it in a popup from your page: `link` lets the account holder connect their account and returns a code for `POST /clients/link`, `sign` lets the holder of a connected account approve one payout that waits for their signature. The result comes back on `redirectUri` with `state`.",
+        "description": "Issue a short-lived URL for the HEVN sign-in window and open it in a popup. `link` returns a code for `POST /clients/link`, `sign` approves one payout that waits for the holder's signature, and `verify` lets a linked individual verify their identity. The result comes back on `redirectUri` with `state`. Sending `X-Hevn-Account` returns 400 `account_scope_conflict`. Until HEVN activates your integrator account, it returns 403 `client_creation_not_enabled`. A body that breaks a field rule returns 422 `validation_failed`.",
         "operationId": "create_connect_session_connect_sessions_post",
         "security": [
           {
@@ -633,7 +1041,7 @@
           "verification"
         ],
         "summary": "Provide applicant information",
-        "description": "Save information for the business applicant and its related individual applicants in the entity graph. This updates an editable verification submission; it does not send anything for review. People are addressed by a stable `key` chosen by the caller, so retrying the same body updates the same entities. Omitting `people` leaves the roster unchanged; sending `people: []` removes only caller-managed people. `ready: false` is a successful draft write and `missing` names every outstanding field or document.",
+        "description": "Save information for the business applicant and its related individual applicants. The write updates an editable submission and starts no review. Send `company`, `people` and `documents` in one body or in separate calls, and a section you omit is unchanged. The call is safe to repeat without `Idempotency-Key`, because people are addressed by a stable `key`. A write that would remove a person added outside this route returns `409 kyb_roster_conflict` with `details.entityIds`. An unknown company enum value returns `422 invalid_enum_value` with `details.field` and `details.allowed`, and nothing is written. `ready: false` is a successful write, and `missing` names every outstanding field or document.",
         "operationId": "write_kyb_client_kyb_put",
         "security": [
           {
@@ -715,7 +1123,7 @@
           "verification"
         ],
         "summary": "Retrieve the verification submission",
-        "description": "Return the current editable applicant information, related people, filed documents, outstanding requirements and the latest review status. `missing` is authoritative for whether `complete` can succeed. A pending or completed review is read-only as an application snapshot; later draft edits apply to the next submission.",
+        "description": "Return the current editable applicant information, related people, filed documents, outstanding requirements and the latest review status. `missing` is authoritative for whether `complete` can succeed. The application is a read-only snapshot, and later edits apply to the next completion.",
         "operationId": "read_kyb_client_kyb_get",
         "security": [
           {
@@ -768,7 +1176,7 @@
           "verification"
         ],
         "summary": "Complete the verification submission",
-        "description": "Close the editable submission and send its immutable snapshot for compliance review. This is the only operation that starts review. It is refused with `kyb_incomplete` and the same `missing` paths returned by GET when applicant information or documents are outstanding. An identical retry replays the existing application instead of creating a second review.",
+        "description": "Send an immutable snapshot of the submission for compliance review. This is the only operation that starts review, and it takes no body. A new application returns `201` with `Location`. When the submission matches a pending or approved application, the call returns `200` with `Idempotency-Replayed: true` and that application. While `missing` has entries it returns `422 kyb_incomplete` with the same paths in `details.missing`. A file still being read returns `409 kyb_documents_processing`. Completing a changed submission supersedes a pending application, unless the call sends `Idempotency-Key`, which then returns `409 idempotency_key_reused`.",
         "operationId": "complete_kyb_client_kyb_complete_post",
         "security": [
           {
@@ -842,7 +1250,7 @@
           "documents"
         ],
         "summary": "Upload a document",
-        "description": "Stores a file and answers the `doc_…` id the verification document references as `uploadId`. Uploading the same bytes in the same slot twice answers the first id.",
+        "description": "Store a file and return the `doc_…` id that the KYB document references as `uploadId`. Returns 201 for a new file, and 200 with `Idempotency-Replayed: true` and the first id when the same bytes are already in this slot. A decoded file over 20 MB returns 413 `payload_too_large`, and content that is not base64 returns 422 `validation_failed` naming `content`.",
         "operationId": "upload_document_documents_post",
         "security": [
           {
@@ -933,7 +1341,7 @@
           "documents"
         ],
         "summary": "Fill the typed fields read off a document",
-        "description": "The verification gate refuses a submission whose documents have no recognised fields. Write them here — the keys are the paths the refusal names in `details.documents`, without the slot prefix.",
+        "description": "The verification gate refuses a submission whose documents have no recognised fields. Write them here with the `doc_…` id from `POST /documents` or from the `document` block of `GET /client/kyb`. A key the slot does not have, or a value that does not fit its field, returns 422 `validation_failed` naming `fields`, and a slot with no field schema returns 422 `document_type_unsupported`. The response is the document record.",
         "operationId": "write_document_content_documents__documentId__content_put",
         "security": [
           {
@@ -1035,7 +1443,7 @@
           "escrow"
         ],
         "summary": "Open an escrow and return the payer's approval",
-        "description": "Create an escrow draft and return the payer's approval that funds it. The payer signs it on its own wallet: a developer key cannot, and a payer that owns its wallet is refused with `account_not_controlled` until it can approve in the HEVN sign-in window. No on-chain action is submitted until it is signed.",
+        "description": "Create an escrow draft and return the payer's approval that funds it. The payer signs it on its own wallet: a developer key cannot, and a payer that owns its wallet is refused with `account_not_controlled` until it can approve in the HEVN sign-in window. No on-chain action is submitted until it is signed. Returns 201 with a `Location` header. A repeat with the same `Idempotency-Key` returns 200 with the same deal and windows. A different body under that key returns 409 `idempotency_key_reused` with `details.escrowId`. A zero duration returns 422 `validation_failed`.",
         "operationId": "create_escrow_escrow_post",
         "security": [
           {
@@ -1134,7 +1542,7 @@
           "escrow"
         ],
         "summary": "List the escrows this account operates",
-        "description": "List escrow agreements operated by the authenticated account, newest first.",
+        "description": "List escrow agreements operated by the authenticated account, newest first, with cursor pagination. Repeat `status` to match several statuses. `senderClientId` and `receiverClientId` filter by party.",
         "operationId": "list_escrows_escrow_get",
         "security": [
           {
@@ -1344,7 +1752,7 @@
           "escrow"
         ],
         "summary": "Reconcile one escrow with the chain",
-        "description": "Reconcile one escrow with current on-chain state. This read-through operation may persist newly observed events but never invents a successful chain action.",
+        "description": "Reconcile one escrow with current on-chain state and return it with `consistent` set. It may store newly observed on-chain events. The chain is read at most once per 15 seconds per deal. Between reads the call returns the stored deal.",
         "operationId": "sync_escrow_escrow__escrowId__sync_post",
         "security": [
           {
@@ -1414,7 +1822,7 @@
           "escrow"
         ],
         "summary": "Prepare an escrow action and return the payload to sign",
-        "description": "Prepare an escrow action and return the immutable payload to sign. This request does not broadcast the action.",
+        "description": "Prepare an escrow action and return the immutable payload to sign. This request does not broadcast the action. Returns 201, or 200 with `Idempotency-Replayed: true` for a replayed key. A closed window, a fee above the deal's ceiling or an amount above its cap returns 400 `invalid_request` with no details. Nothing left to capture, void or refund returns 409 `escrow_state_changed`.",
         "operationId": "prepare_escrow_action_escrow__escrowId__actions_post",
         "security": [
           {
@@ -1525,7 +1933,7 @@
           "escrow"
         ],
         "summary": "Submit the signature for a prepared escrow action",
-        "description": "Submit the signature for the previously prepared escrow action. The path idempotency key must match the prepared action and makes safe retries return the first result.",
+        "description": "Submit the signature for the previously prepared escrow action. The path idempotency key must match the prepared action, so a retry returns the first result. Returns 200 once the action is mined, with the deal and the action's events. Read `action.status` for the outcome. Returns 202 with `pollUrl` while the action is `submitted`.",
         "operationId": "confirm_escrow_action_escrow__escrowId__actions__idempotencyKey__confirm_post",
         "security": [
           {
@@ -1616,7 +2024,7 @@
           "transfers"
         ],
         "summary": "Create an outgoing transfer",
-        "description": "Validate the contact, fix the transfer terms, reserve an idempotent outgoing transfer and return the approval payload to sign. Supplying `amount` fixes the debit side; `amountTo` fixes the contact side.",
+        "description": "Validate the contact, fix the payout terms and return how to authorize them. Returns `201` with `Location`. A retry with the same `Idempotency-Key` and terms returns `200`, `Idempotency-Replayed: true` and the same payout. The same key with another contact, `bankId`, pinned amount or `acc_` source returns `409 idempotency_key_reused` with `details.payoutId`. A `400` or `422` comes before booking, so the key stays usable for the corrected request. An `acc_` `sourceAccount` returns `authorization: wallet` with `transfer`, the USDC transfer that account sends itself, and has no confirm call.",
         "operationId": "create_payout_payouts_post",
         "security": [
           {
@@ -1707,7 +2115,7 @@
           "transfers"
         ],
         "summary": "Create an outgoing transfer quote",
-        "description": "Estimate rate, fees, limits and contact amount without creating a contact, transfer or external side effect.",
+        "description": "Estimate the delivered amount, minimum and fees for a payment method and source amount. Takes no contact and has no side effects.",
         "operationId": "preview_payout_payouts_preview_post",
         "security": [
           {
@@ -1777,7 +2185,7 @@
           "transfers"
         ],
         "summary": "Authorize an outgoing transfer",
-        "description": "Verify the developer-key signature against the immutable approval and fund the prepared transfer. A retry cannot change the contact, amount, payment method or quote.",
+        "description": "Verify the developer-key signature against the immutable approval and fund the prepared transfer. A retry cannot change the contact, amount, payment method or quote. A payout with `authorization: wallet` has nothing to confirm and returns `invalid_request` with `details.reason: funded_by_wallet_transfer`.",
         "operationId": "confirm_payout_payouts__payoutId__confirm_post",
         "security": [
           {
@@ -1935,7 +2343,7 @@
           "transfers"
         ],
         "summary": "Create a transfer between the client's own accounts",
-        "description": "Price a move between two accounts the client owns, reserve it idempotently and return the approval to sign. `authorization` says what that approval covers: a `debit` of the client's wallet that funds the move, or an `intent` its smart wallet signs so the backend can settle it.",
+        "description": "Price the swap, reserve it and return `201` with a `Location` header and the approval to sign. `authorization` says what the approval covers: a `debit` of the wallet that funds the swap, or an `intent` that settles against the signature. The same `Idempotency-Key` and body return the same swap with `200` and `Idempotency-Replayed: true`. The same key with a different body returns `409 idempotency_key_reused`. A session acting for a client through `X-Hevn-Account` gets `403 account_not_controlled`. The sandbox returns `422 swap_route_unavailable`.",
         "operationId": "create_swap_swaps_post",
         "security": [
           {
@@ -2026,7 +2434,7 @@
           "transfers"
         ],
         "summary": "Price a transfer between the client's own accounts",
-        "description": "Compare every route that can serve this pair of accounts and return the best price. Nothing is booked with a provider and nothing is signed.",
+        "description": "Compare the routes that serve this pair of accounts and return the best price. Preview has no side effects and accepts a client in `X-Hevn-Account`. No route for the pair returns `400 invalid_request`. The sandbox returns `422 swap_route_unavailable` for every preview.",
         "operationId": "preview_swap_swaps_preview_post",
         "security": [
           {
@@ -2096,7 +2504,7 @@
           "transfers"
         ],
         "summary": "Authorize a transfer between the client's own accounts",
-        "description": "Verify the developer-key signature against the immutable approval and settle the move. A retry cannot change the accounts, the amount or the quote it was fixed at.",
+        "description": "Verify the developer-key signature against the approval and start settlement. Returns `202` with `pollUrl`. A retry cannot change the accounts, the amount or the quote. Once the approval is used or expired the route returns `409 swap_not_confirmable`, so read the swap instead.",
         "operationId": "confirm_swap_swaps__swapId__confirm_post",
         "security": [
           {
@@ -2254,7 +2662,7 @@
           "contacts"
         ],
         "summary": "Create a contact",
-        "description": "Create an idempotent reusable contact from either payment-account or on-chain details. Fields are validated for the selected account type before persistence.",
+        "description": "Save a reusable contact from account details, a wallet address or an email. Returns `201` with `Location`. Details that match a saved contact return `200`, `Idempotency-Replayed: true` and that contact.",
         "operationId": "create_contact_contacts_post",
         "security": [
           {
@@ -2499,7 +2907,7 @@
           "contacts"
         ],
         "summary": "Update a contact",
-        "description": "Update fields present in the request. Omitted fields are retained; immutable payment-routing identity cannot be replaced through this operation.",
+        "description": "Update the fields sent and keep the rest. Account identifiers, method and currency cannot be changed, and sending them returns `422 validation_failed`. Save a new contact for new details.",
         "operationId": "update_contact_contacts__contactId__patch",
         "security": [
           {
@@ -2597,7 +3005,7 @@
           "contacts"
         ],
         "summary": "Delete a contact",
-        "description": "Remove a saved contact from future selection. Existing transactions remain immutable and readable.",
+        "description": "Remove a saved contact and return the removed record. Payouts already booked to it stay readable.",
         "operationId": "delete_contact_contacts__contactId__delete",
         "security": [
           {
@@ -2687,7 +3095,7 @@
           "contacts"
         ],
         "summary": "Retrieve contact channels",
-        "description": "Return currently available payment methods, limits, fees and blockers. Capabilities are a point-in-time eligibility read, not a transfer quote.",
+        "description": "Return the payment options for this contact with limits, fees, the payout fields each one requires and blockers. The result is a point-in-time read and fixes no quote.",
         "operationId": "read_contact_capabilities_contacts__contactId__capabilities_get",
         "security": [
           {
@@ -2727,8 +3135,10 @@
                   "type": "null"
                 }
               ],
+              "description": "Source amount to check against the limits of each option.",
               "title": "Amount"
-            }
+            },
+            "description": "Source amount to check against the limits of each option."
           },
           {
             "name": "X-Hevn-Account",
@@ -2782,7 +3192,7 @@
           "virtual accounts"
         ],
         "summary": "List virtual accounts and available payment methods",
-        "description": "List receiving payment methods available to the selected account and identify which virtual accounts have already been opened.",
+        "description": "List the products this client can request, requested or not, and the virtual accounts already requested. A product no rail serves for this client is absent. Records that were closed or refused are omitted.",
         "operationId": "list_rails_banks_get",
         "security": [
           {
@@ -2840,7 +3250,7 @@
           "virtual accounts"
         ],
         "summary": "Request a receiving account for a product",
-        "description": "Answers 201 with the account record the first time, 200 with `Idempotency-Replayed: true` when the product was already requested or is already active. A receiving account is a singleton per client and product, so the server key is the client and the product. Unmet prerequisites never refuse the request: the record stays preparing and lists its blockers.",
+        "description": "Send one product per call. The first request returns 201 with `Location`. Missing requirements do not refuse it. The record stays `preparing` and `blockers` lists what is pending. A product already requested returns 200 with `Idempotency-Replayed: true` and the same record, so no `Idempotency-Key` is needed. There is one virtual account per client, product and `accountId`. `accountId` names an external account it delivers to. Omit it for the client's wallet. A product that cannot deliver to that external account returns `409 account_destination_unsupported`. A product no rail serves for this client returns `403 rail_not_available` with `details.product`. An unknown product code returns `422 validation_failed`.",
         "operationId": "open_rail_banks_post",
         "security": [
           {
@@ -2931,7 +3341,7 @@
           "virtual accounts"
         ],
         "summary": "Retrieve one virtual account",
-        "description": "Retrieve the receiving account of one region product and, when opened, its receiving details. The product is the path key.",
+        "description": "Retrieve one product in the same shape as the list, with account details once active. `accountId` reads the one that delivers to that external account. A product no rail serves for this client returns `403 rail_not_available`.",
         "operationId": "read_rail_banks__product__get",
         "security": [
           {
@@ -2951,6 +3361,28 @@
               ]
             },
             "description": "Region product, for example eu or us"
+          },
+          {
+            "name": "accountId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^(?:acc_)?[A-Za-z0-9._:\\-]{1,216}$",
+                  "examples": [
+                    "acc_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "External account whose receiving account to read. Omit it for the client's wallet.",
+              "title": "Accountid"
+            },
+            "description": "External account whose receiving account to read. Omit it for the client's wallet."
           },
           {
             "name": "X-Hevn-Account",
@@ -3004,7 +3436,7 @@
           "virtual accounts"
         ],
         "summary": "Retrieve the receiving conversion rate",
-        "description": "Return the current conversion rate and fixed fee for this receiving payment method. The result is indicative until an incoming transfer is created.",
+        "description": "Return the indicative conversion rate and fixed fee of an incoming payment on one product. A payment is priced by its own quote. For a product not requested yet, the response holds `currency` only. A product no rail serves for this client returns `403 rail_not_available`.",
         "operationId": "read_rail_rate_banks__product__rate_get",
         "security": [
           {
@@ -3077,7 +3509,7 @@
           "transfers"
         ],
         "summary": "Create an incoming transfer quote",
-        "description": "Price money arriving for this account. Set `originChainId` for an on-chain transfer or `rail` for a local payment method; exactly one is required. An unsupported route answers `payin_not_available`.",
+        "description": "Price money arriving for this client. Send `rail` for a local payment method or `originChainId` for an on-chain transfer. Returns 201 with `Location`, and the quote holds until `expiresAt`. A currency and method the client cannot be paid in returns `422 payin_not_available`. On a `rail` quote, `details.options` lists the rail and currency pairs for this client, and `payerRequired` marks those that need `payer`. An `acc_` `destinationAccount` needs `originChainId` and `refundAddress`, or the call returns `422 refund_address_required`. A `rail` to it returns `409 account_destination_unsupported`. Repeating an `Idempotency-Key` with the same terms returns the same incoming transfer, and other terms return `409 idempotency_key_reused`.",
         "operationId": "create_payin_payins_post",
         "security": [
           {
@@ -3168,7 +3600,7 @@
           "transfers"
         ],
         "summary": "Open the incoming transfer and retrieve funding instructions",
-        "description": "Idempotent: an already-open transfer returns the same payment-account details or on-chain deposit address. A quote that stopped holding answers `410 payin_expired`.",
+        "description": "Open the quoted incoming transfer and return what the payer needs. A repeated call returns the same instructions. A quote past `expiresAt`, or one no longer awaiting funds, returns `410 payin_expired` with `details.payinId`. An unknown id returns `404 payin_not_found`.",
         "operationId": "open_payin_payins__payinId__instructions_post",
         "security": [
           {
@@ -3341,7 +3773,7 @@
           "accounts"
         ],
         "summary": "Read a client's balances",
-        "description": "One row per account the client holds: the tokens on the smart wallet of the client selected by `X-Hevn-Account`, plus any custodial balance. `USDC_ARB` is USDC on Arbitrum at the same wallet address; it is turned on with the client's first balance read. A custodial row is read live from the provider that holds it and is left out when that provider cannot be reached.",
+        "description": "One row per account the client in `X-Hevn-Account` holds: the tokens on its smart wallet plus any `FDIC_USD` balance. Without the header the route returns `422 validation_failed`. `USDC_ARB` is USDC on Arbitrum at the same wallet address and is turned on by the client's first balance read.",
         "operationId": "read_balance_client_balance_get",
         "security": [
           {
@@ -3394,7 +3826,7 @@
           "transactions"
         ],
         "summary": "Refresh the client's ledger from its sources",
-        "description": "Refresh the client's ledger from the banks and chains its money moved over, then answer how many entries changed. Reads never do this on their own: `GET /dapi/v1/transactions` answers from the ledger as it stands, so call this when a transfer made elsewhere has to be visible before you read. It reaches out to every source, so it is rate-limited and not a per-request call.",
+        "description": "Refresh the client's ledger from the payment networks and chains its money moved over and return how many entries changed. List and read routes do not refresh the ledger. Call this before listing when a transfer made outside the integration must be visible. The route is rate-limited.",
         "operationId": "sync_transactions_transactions_sync_post",
         "security": [
           {
@@ -3454,7 +3886,7 @@
           "transactions"
         ],
         "summary": "List transactions, newest first",
-        "description": "Cursor-paged: pass `nextCursor` back as `cursor`. There is no offset and no total.",
+        "description": "Cursor-paged: pass `nextCursor` back as `cursor`. There is no offset and no total. Filter values are case-sensitive and comma-separated. An unknown value returns `400 invalid_request` with the value in `details.reason`. `accountId` keeps the transactions of one external account.",
         "operationId": "list_transactions_transactions_get",
         "security": [
           {
@@ -3547,6 +3979,24 @@
               ],
               "title": "Bankid"
             }
+          },
+          {
+            "name": "accountId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only the transactions of this external account (`acc_` id). External-account income is left out of the summary unless this filter names it.",
+              "title": "Accountid"
+            },
+            "description": "Only the transactions of this external account (`acc_` id). External-account income is left out of the summary unless this filter names it."
           },
           {
             "name": "incomeOnly",
@@ -3696,7 +4146,7 @@
           "transactions"
         ],
         "summary": "Inflow and outflow totals for the same filters",
-        "description": "Its own route: an aggregate is never folded into a page.",
+        "description": "Settled and pending totals in USD for the same filters as `GET /dapi/v1/transactions`. External-account income is counted only when `accountId` names that account.",
         "operationId": "read_summary_transactions_summary_get",
         "security": [
           {
@@ -3789,6 +4239,24 @@
               ],
               "title": "Bankid"
             }
+          },
+          {
+            "name": "accountId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only the transactions of this external account (`acc_` id). External-account income is left out of the summary unless this filter names it.",
+              "title": "Accountid"
+            },
+            "description": "Only the transactions of this external account (`acc_` id). External-account income is left out of the summary unless this filter names it."
           },
           {
             "name": "incomeOnly",
@@ -3909,7 +4377,7 @@
           "transactions"
         ],
         "summary": "Export transactions, a statement, a confirmation or a receipt",
-        "description": "Without `kind` the filtered transaction list is exported as `csv`, `xlsx` or `pdf`. `kind=statement` and `kind=confirmation` need `bankId` and support `pdf` or `xlsx`; `kind=receipt` needs `transactionId` and answers `pdf`.",
+        "description": "Stream a file named in `Content-Disposition`. Without `kind` the filtered transaction list is exported as `csv`, `xlsx` or `pdf`. `kind=statement` and `kind=confirmation` need `bankId` and take `pdf` or `xlsx`. `kind=receipt` needs `transactionId` and takes `pdf`. Ledger filters apply to the transaction list and to `kind=statement`. With no `from` or `to`, `kind=statement` covers the current month to now. A missing parameter or an unsupported `format` returns `422 validation_failed` naming the parameter.",
         "operationId": "export_transactions_transactions_export_get",
         "security": [
           {
@@ -3923,8 +4391,10 @@
             "required": false,
             "schema": {
               "$ref": "#/components/schemas/ExportFormat",
+              "description": "File format. The default `csv` is accepted only without `kind`.",
               "default": "csv"
-            }
+            },
+            "description": "File format. The default `csv` is accepted only without `kind`."
           },
           {
             "name": "kind",
@@ -3939,8 +4409,10 @@
                   "type": "null"
                 }
               ],
+              "description": "Document to export. Omit it for the filtered transaction list.",
               "title": "Kind"
-            }
+            },
+            "description": "Document to export. Omit it for the filtered transaction list."
           },
           {
             "name": "bankId",
@@ -3971,8 +4443,10 @@
                   "type": "null"
                 }
               ],
+              "description": "Transaction id (`txn_…`) for `kind=receipt`.",
               "title": "Transactionid"
-            }
+            },
+            "description": "Transaction id (`txn_…`) for `kind=receipt`."
           },
           {
             "name": "type",
@@ -4043,6 +4517,24 @@
               ],
               "title": "Contactid"
             }
+          },
+          {
+            "name": "accountId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only the transactions of this external account (`acc_` id). External-account income is left out of the summary unless this filter names it.",
+              "title": "Accountid"
+            },
+            "description": "Only the transactions of this external account (`acc_` id). External-account income is left out of the summary unless this filter names it."
           },
           {
             "name": "incomeOnly",
@@ -4355,6 +4847,7 @@
           "sandbox"
         ],
         "summary": "Read the sandbox treasury that funds emulated credits",
+        "description": "Returns the shared testnet faucet account that pays emulated credits and receives the funds of emulated payouts. The response does not depend on `X-Hevn-Account`.",
         "operationId": "read_treasury_sandbox_treasury_get",
         "security": [
           {
@@ -4414,6 +4907,7 @@
           "sandbox"
         ],
         "summary": "Emulate an incoming deposit: an account transfer with bankId, a token transfer without",
+        "description": "With `bankId`, books an unquoted payin to that virtual account at a fixed rate. Without it, sends a faucet transfer of `token` to the client's wallet. A `202` means the transfer is unconfirmed. Repeat the same request until `status` is `settled`, and the amount is credited once. An identical request without `Idempotency-Key` replays the first credit.",
         "operationId": "credit_deposit_sandbox_deposits_post",
         "security": [
           {
@@ -4514,6 +5008,7 @@
           "sandbox"
         ],
         "summary": "Emulate the arrival of the funds a pay-in is waiting for",
+        "description": "Emulates the payer's transfer for a quoted payin. The body is optional. A payin not yet opened with `POST /dapi/v1/payins/{payinId}/instructions` returns `409 quote_not_submitted`. A `202` means the transfer is unconfirmed, so repeat the call.",
         "operationId": "complete_payin_sandbox_payins__payinId__complete_post",
         "security": [
           {
@@ -4630,6 +5125,7 @@
           "sandbox"
         ],
         "summary": "Move an emulated outgoing transfer to its next reported status",
+        "description": "`submitted`, `settled` and `refunded` need a funded payout, otherwise the call returns `409 payout_not_fundable`. `failed` does not return the debited amount. `refunded` returns the source token to the client's wallet, and the call returns `202` until that transfer lands, so repeat it until it returns `200`. A backward move returns `409 conflict`.",
         "operationId": "set_payout_status_sandbox_payouts__payoutId__status_post",
         "security": [
           {
@@ -4739,7 +5235,7 @@
           "sandbox"
         ],
         "summary": "Decide the client's latest KYB application, as the compliance reviewer would",
-        "description": "Moves the latest application to `approved`, `rfi` or `rejected` (the last two need a `comment`). Asking for the status it already has replays it. An `rfi` or `rejected` application is answered as in production: write the document and complete the submission again, then decide the new attempt.",
+        "description": "Moves the client's latest application to `approved`, `rfi` or `rejected`, and returns the body of `GET /dapi/v1/client/kyb`. Sending the current status returns it unchanged. For an individual client with no application, `approved` verifies the client. Otherwise a client with no application returns `409 conflict`, and so does an application in `rfi` or `rejected`. Complete the submission again to file a new attempt.",
         "operationId": "set_kyb_status_sandbox_kyb_status_post",
         "security": [
           {
@@ -4815,13 +5311,13 @@
           "balance": {
             "type": "string",
             "title": "Balance",
-            "description": "Available balance on this account.",
+            "description": "Available balance in the major unit, at the account's precision. `FDIC_USD` has two decimals.",
             "example": "500.00"
           },
           "usdValue": {
             "type": "string",
             "title": "Usdvalue",
-            "description": "Indicative USD value of this balance.",
+            "description": "Indicative USD value of this balance, rounded to cents.",
             "example": "500.00"
           }
         },
@@ -4856,13 +5352,13 @@
           "payload": {
             "type": "string",
             "title": "Payload",
-            "description": "Base64 canonical authorization payload to sign with the developer key."
+            "description": "Base64 of a canonical JSON document. Sign the decoded bytes unchanged. Re-serialized JSON returns `400 signature_invalid`."
           },
           "expiresAt": {
             "type": "string",
             "format": "date-time",
             "title": "Expiresat",
-            "description": "UTC timestamp after which this approval is refused."
+            "description": "UTC time the approval expires, 120 seconds after it is issued. An approval is single-use."
           }
         },
         "type": "object",
@@ -4878,7 +5374,8 @@
         "enum": [
           "debit",
           "intent",
-          "client"
+          "client",
+          "wallet"
         ],
         "title": "AuthorizationKind"
       },
@@ -5479,8 +5976,7 @@
           "adi",
           "bch"
         ],
-        "title": "ChainCode",
-        "description": "Supported blockchain network code."
+        "title": "ChainCode"
       },
       "ChainListView": {
         "properties": {
@@ -5552,27 +6048,27 @@
             "type": "string",
             "format": "email",
             "title": "Email",
-            "description": "Email address of the account that owns the registered developer key."
+            "description": "Email address of the HEVN account that holds the developer key."
           },
           "publicKey": {
             "type": "string",
             "title": "Publickey",
-            "description": "Base64 DER SubjectPublicKeyInfo for the registered P-256 developer key."
+            "description": "Base64 DER SubjectPublicKeyInfo of the P-256 developer key, in the standard alphabet with padding. PEM armor and base64url are refused."
           },
           "nonce": {
             "type": "integer",
             "title": "Nonce",
-            "description": "Caller-generated single-use number included in the signed authentication proof."
+            "description": "A new integer for each login. It is part of the signed proof string."
           },
           "requestExpiry": {
             "type": "integer",
             "title": "Requestexpiry",
-            "description": "Unix time in milliseconds after which the signed request is refused."
+            "description": "Unix time in milliseconds when the signed proof expires. It must be in the future and at most 5 minutes ahead, or the call returns `400 request_expired`."
           },
           "signature": {
             "type": "string",
             "title": "Signature",
-            "description": "Base64 DER ECDSA P-256/SHA-256 signature over the login proof message."
+            "description": "Base64 DER ECDSA signature over SHA-256 of `hevn-developer-key-login:{email}:{nonce}:{requestExpiry}`. A raw 64-byte `r‖s` signature is refused."
           }
         },
         "additionalProperties": false,
@@ -5592,18 +6088,18 @@
             "type": "string",
             "format": "uuid",
             "title": "Challengeid",
-            "description": "Single-use authentication challenge identifier."
+            "description": "Single-use challenge id to send to `POST /dapi/v1/auth/token`."
           },
           "payload": {
             "type": "string",
             "title": "Payload",
-            "description": "Base64-encoded canonical authorization payload the developer key must sign."
+            "description": "Base64 of the bytes to sign. Sign the decoded bytes unchanged with the developer key."
           },
           "expiresAt": {
             "type": "string",
             "format": "date-time",
             "title": "Expiresat",
-            "description": "UTC timestamp after which the challenge is refused."
+            "description": "UTC time the challenge expires. It equals the `requestExpiry` you signed."
           }
         },
         "type": "object",
@@ -5625,7 +6121,7 @@
           "signature": {
             "type": "string",
             "title": "Signature",
-            "description": "Signature over the decoded payload returned for this challenge."
+            "description": "Base64 DER ECDSA P-256 signature over SHA-256 of the base64-decoded `payload` of this challenge."
           },
           "publicKey": {
             "anyOf": [
@@ -5637,7 +6133,7 @@
               }
             ],
             "title": "Publickey",
-            "description": "Registered P-256 public key; omit when the signature uniquely identifies the key."
+            "description": "Base64 DER public key of the developer key. Omit it to try each key on the account."
           }
         },
         "additionalProperties": false,
@@ -5647,6 +6143,53 @@
           "signature"
         ],
         "title": "ChallengeTokenRequest"
+      },
+      "ClientAccountCreateRequest": {
+        "properties": {
+          "chain": {
+            "type": "string",
+            "enum": [
+              "base",
+              "arb",
+              "eth",
+              "op",
+              "pol",
+              "sol"
+            ],
+            "title": "WalletNetwork",
+            "description": "Network the address receives USDC on: base, arb, eth, op, pol or sol."
+          },
+          "address": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Address",
+            "description": "Address on `chain`: a 0x address on EVM networks, a base58 address on Solana.",
+            "examples": [
+              "0x8ba1f109551bD432803012645Ac136ddd64DBA72"
+            ]
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label",
+            "description": "Name shown for this address."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "chain",
+          "address"
+        ],
+        "title": "ClientAccountCreateRequest"
       },
       "ClientAddressRequest": {
         "properties": {
@@ -5746,7 +6289,7 @@
               }
             ],
             "title": "Basesmartwallet",
-            "description": "Base smart-wallet address controlled by the account."
+            "description": "Base smart-wallet address of the client. A crypto payer sends to it."
           },
           "accounts": {
             "items": {
@@ -5754,12 +6297,12 @@
             },
             "type": "array",
             "title": "Accounts",
-            "description": "One entry per account the client holds a balance on."
+            "description": "One entry per account the client holds. An `FDIC_USD` entry is read live on each call and is left out when it cannot be read."
           },
           "totalUsd": {
             "type": "string",
             "title": "Totalusd",
-            "description": "Indicative total balance converted to USD.",
+            "description": "Sum of `usdValue` across `accounts`, rounded to cents.",
             "example": "500.00"
           }
         },
@@ -5769,6 +6312,43 @@
           "totalUsd"
         ],
         "title": "ClientBalanceView"
+      },
+      "ClientCreateRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Name",
+            "description": "Legal name of the company to open."
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email",
+            "description": "Email address of the company. It must not belong to another account."
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\+[1-9]\\d{6,14}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone",
+            "description": "Phone number in international E.164 format."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "email"
+        ],
+        "title": "ClientCreateRequest"
       },
       "ClientFailureResponse": {
         "properties": {
@@ -5802,7 +6382,7 @@
             "maxLength": 4096,
             "minLength": 1,
             "title": "Code",
-            "description": "Short-lived code the account holder approved in the HEVN sign-in window."
+            "description": "Code the HEVN sign-in window returned on the redirect URI. It is valid for 5 minutes and only for your integrator account."
           }
         },
         "additionalProperties": false,
@@ -5825,7 +6405,7 @@
               }
             ],
             "title": "Phone",
-            "description": "Phone number in international E.164 format."
+            "description": "Phone number in international E.164 format. Omit it to keep the current phone."
           },
           "address": {
             "anyOf": [
@@ -5836,7 +6416,7 @@
                 "type": "null"
               }
             ],
-            "description": "Postal address of the account holder."
+            "description": "Postal address lines to change. Lines you omit keep their value, and the country is fixed at registration."
           }
         },
         "additionalProperties": false,
@@ -5849,7 +6429,7 @@
             "type": "string",
             "pattern": "^(?:cl_)?[A-Za-z0-9._:\\-]{1,216}$",
             "title": "Id",
-            "description": "Stable public identifier for this account.",
+            "description": "The `X-Hevn-Account` value for this client. Store it on your server and do not accept it from a browser.",
             "examples": [
               "cl_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
             ]
@@ -5868,7 +6448,7 @@
               }
             ],
             "title": "Name",
-            "description": "Legal or trading name of the account."
+            "description": "Legal or trading name of the account. A linked account often has none. Its company name is in the KYB document."
           },
           "email": {
             "anyOf": [
@@ -5880,7 +6460,7 @@
               }
             ],
             "title": "Email",
-            "description": "Email address associated with the account."
+            "description": "Email address of the account. For a linked account, the address the holder signed in with."
           },
           "phone": {
             "anyOf": [
@@ -5904,11 +6484,11 @@
               }
             ],
             "title": "Basesmartwallet",
-            "description": "Base smart-wallet address controlled by the account."
+            "description": "Address of the client's Base smart wallet. Routes select the client by `id`, sent as `X-Hevn-Account`."
           },
           "kybStatus": {
             "$ref": "#/components/schemas/PlatformKybStatus",
-            "description": "Current business-verification status.",
+            "description": "Business-verification status, the same value as `status` on `GET /client/kyb`. For an individual, read `verifiedAt`.",
             "default": "notStarted"
           },
           "kybApplicationId": {
@@ -5925,7 +6505,7 @@
               }
             ],
             "title": "Kybapplicationid",
-            "description": "Latest immutable business-verification application identifier."
+            "description": "Identifier of the latest business-verification application."
           },
           "verifiedAt": {
             "anyOf": [
@@ -5938,7 +6518,7 @@
               }
             ],
             "title": "Verifiedat",
-            "description": "When the account was verified: identity verification for a person, KYB for a business."
+            "description": "When the account was verified: identity verification for a person, KYB for a business. Poll this field to follow an individual's verification."
           },
           "createdAt": {
             "type": "string",
@@ -5955,7 +6535,7 @@
                 "type": "null"
               }
             ],
-            "description": "Provisioning failure details, when present."
+            "description": "Provisioning failure details. Present when `status` is `failed`."
           },
           "pollUrl": {
             "anyOf": [
@@ -5996,7 +6576,7 @@
             "maxLength": 2048,
             "minLength": 1,
             "title": "Signature",
-            "description": "Base64 DER ECDSA P-256/SHA-256 signature over base64decode(approval.payload)."
+            "description": "Base64 DER ECDSA P-256 signature over SHA-256 of `base64decode(approval.payload)`, in the standard alphabet with padding. A wrong signature returns `400 signature_invalid` and the approval stays usable."
           },
           "publicKey": {
             "anyOf": [
@@ -6010,7 +6590,7 @@
               }
             ],
             "title": "Publickey",
-            "description": "Registered P-256 public key; omit when the signature uniquely identifies the key."
+            "description": "Base64 DER public key of the developer key. Omit it to try each key on your account. A signature that no key on your account verifies returns `400 signature_invalid`."
           }
         },
         "additionalProperties": false,
@@ -6049,7 +6629,7 @@
               }
             ],
             "title": "Payoutid",
-            "description": "The payout the account holder approves. Required for `sign`, not accepted for `link`."
+            "description": "The payout the account holder approves. Required for `sign` and refused for other actions."
           },
           "clientId": {
             "anyOf": [
@@ -6065,14 +6645,14 @@
               }
             ],
             "title": "Clientid",
-            "description": "The connected individual client whose holder verifies their identity. Required for `verify`, not accepted otherwise. The holder must sign in to this account in the window."
+            "description": "The linked individual client whose holder verifies their identity. Required for `verify` and refused for other actions. The holder must sign in to this account in the window."
           },
           "redirectUri": {
             "type": "string",
             "maxLength": 2048,
             "minLength": 1,
             "title": "Redirecturi",
-            "description": "Page the sign-in window returns to with the result and `state`. Its origin must be one of the allowed origins in the sign-in window settings."
+            "description": "Page the sign-in window returns to with the result and `state`. An `https://` URL, or an `http://` URL on `localhost` or `127.0.0.1`, with no fragment. An origin outside the allowed origins in the sign-in window settings returns 403 `redirect_uri_not_allowed`."
           }
         },
         "additionalProperties": false,
@@ -6088,18 +6668,18 @@
           "url": {
             "type": "string",
             "title": "Url",
-            "description": "Open this URL in the sign-in window. It works once per result and expires."
+            "description": "Open this URL in the sign-in window. It works once per result until `expiresAt`."
           },
           "state": {
             "type": "string",
             "title": "State",
-            "description": "Comes back as `state` on the redirect URI; match it before trusting the result."
+            "description": "Random value issued for this session. It comes back as `state` on the redirect URI, so match it before trusting the result."
           },
           "expiresAt": {
             "type": "string",
             "format": "date-time",
             "title": "Expiresat",
-            "description": "When the session URL stops working."
+            "description": "When the session URL stops working, 10 minutes after creation."
           }
         },
         "type": "object",
@@ -6187,7 +6767,7 @@
             },
             "type": "array",
             "title": "Options",
-            "description": "Available transfer options."
+            "description": "Payout options for this contact. Each names a payment method and the client account that pays it."
           },
           "blockers": {
             "items": {
@@ -6221,7 +6801,7 @@
               }
             ],
             "title": "Bankid",
-            "description": "Receiving-account route identifier, when applicable."
+            "description": "Client account (`bnk_`) this option pays through. Send it as `bankId` on `POST /dapi/v1/payouts`."
           },
           "method": {
             "type": "string",
@@ -6279,19 +6859,19 @@
           "purposeRequired": {
             "type": "boolean",
             "title": "Purposerequired",
-            "description": "Whether a transfer purpose must be supplied.",
+            "description": "Whether the payout must include `purpose`.",
             "default": false
           },
           "memoRequired": {
             "type": "boolean",
             "title": "Memorequired",
-            "description": "Whether a payment reference or memo must be supplied.",
+            "description": "Whether the payout must include `paymentReference`.",
             "default": false
           },
           "documentsRequired": {
             "type": "boolean",
             "title": "Documentsrequired",
-            "description": "Whether supporting documents must be supplied.",
+            "description": "Whether the payout must include `documentIds`.",
             "default": false
           },
           "blockers": {
@@ -6357,7 +6937,7 @@
               }
             ],
             "title": "Email",
-            "description": "Email used to resolve an existing HEVN contact."
+            "description": "Email to pay. The contact pays the wallet of the HEVN account with that email. An email with no HEVN account gets an invitation to sign up."
           },
           "crypto": {
             "anyOf": [
@@ -6368,7 +6948,7 @@
                 "type": "null"
               }
             ],
-            "description": "Legacy on-chain destination details."
+            "description": "Wallet destination. A wallet contact needs no postal address."
           },
           "account": {
             "anyOf": [
@@ -6401,7 +6981,7 @@
                 "type": "null"
               }
             ],
-            "description": "Legacy payment-account destination details."
+            "description": "Account-based destination. `fields` and `holder` take the shape of `requisites` in `GET /dapi/v1/banks`."
           },
           "address": {
             "anyOf": [
@@ -6412,7 +6992,7 @@
                 "type": "null"
               }
             ],
-            "description": "Postal address of the contact or account holder."
+            "description": "Postal address of the account holder. Most account-based contacts need `country`, `city`, `streetAddress` and `zip`, else `422 validation_failed` names the missing fields. On an account-based contact, a sent address must be complete."
           },
           "isExternal": {
             "anyOf": [
@@ -6435,7 +7015,7 @@
         "properties": {
           "chain": {
             "$ref": "#/components/schemas/ChainCode",
-            "description": "Blockchain network identifier."
+            "description": "Chain code of the network the address receives on."
           },
           "token": {
             "type": "string",
@@ -6594,7 +7174,7 @@
           },
           "fields": {
             "$ref": "#/components/schemas/RequisiteFields-Input",
-            "description": "Structured destination account details."
+            "description": "Account identifiers of the destination. Which ones are needed depends on `method`."
           },
           "holder": {
             "$ref": "#/components/schemas/RequisiteHolder-Input",
@@ -6610,7 +7190,7 @@
               }
             ],
             "title": "Bankname",
-            "description": "Name of the destination financial institution; required for ACH and Fedwire contacts."
+            "description": "Name of the destination institution. Required for `ach`, `fedwire`, `sepa`, `swift`, `uaefts` and `ukfps`, else `422 validation_failed`."
           },
           "bankAddress": {
             "anyOf": [
@@ -7250,7 +7830,7 @@
           "amount": {
             "type": "string",
             "title": "Amount",
-            "description": "Human-readable token amount debited.",
+            "description": "Token amount debited, decoded from the operation you sign. Compare it with the payment in your system before you sign.",
             "example": "500.00"
           },
           "amountAtomic": {
@@ -7287,7 +7867,7 @@
             },
             "type": "object",
             "title": "Fields",
-            "description": "Typed values extracted from or supplied for the document."
+            "description": "Values to write onto the document, keyed by the snake_case field path without the slot prefix, such as `registration_number` or `address.street_address`. Keys you omit keep their stored value."
           }
         },
         "additionalProperties": false,
@@ -7303,7 +7883,7 @@
             "type": "string",
             "pattern": "^(?:doc_)?[A-Za-z0-9._:\\-]{1,216}$",
             "title": "Id",
-            "description": "Stable public identifier for this document.",
+            "description": "Stable public identifier for this document. File it into a KYB slot as `uploadId`.",
             "examples": [
               "doc_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
             ]
@@ -7468,13 +8048,13 @@
         "properties": {
           "slot": {
             "$ref": "#/components/schemas/DocumentType",
-            "description": "Verification requirement this file satisfies."
+            "description": "Verification requirement this file satisfies. An unknown slot returns 422 `document_type_unsupported`."
           },
           "content": {
             "type": "string",
             "minLength": 1,
             "title": "Content",
-            "description": "Base64-encoded document bytes."
+            "description": "Base64-encoded file bytes, at most 20 MB once decoded."
           },
           "fileName": {
             "anyOf": [
@@ -7531,7 +8111,7 @@
         "properties": {
           "action": {
             "$ref": "#/components/schemas/EscrowVerb",
-            "description": "Escrow state transition to prepare."
+            "description": "Action to prepare. The buyer signs `approve` and `reclaim`, so sending either returns 422."
           },
           "amount": {
             "anyOf": [
@@ -7553,14 +8133,14 @@
               }
             ],
             "title": "Amount",
-            "description": "Token amount affected by this action, when required."
+            "description": "Required and greater than zero for every action except `void`. Sending it with `void` returns 409 `amount_not_allowed`. The cap is `maxAmount` for `authorize` and `charge`, `capturableAmount` for `capture` and `refundableAmount` for `refund`."
           },
           "feeBps": {
             "type": "integer",
             "maximum": 10000.0,
             "minimum": 0.0,
             "title": "Feebps",
-            "description": "Variable fee in basis points for charge or capture actions.",
+            "description": "Fee for `charge` or `capture`, up to the deal's `feeBps` ceiling. The fee is amount × feeBps / 10000 and is paid to your wallet. Other actions ignore it.",
             "default": 0
           }
         },
@@ -7587,7 +8167,7 @@
             },
             "type": "array",
             "title": "Events",
-            "description": "Observed on-chain events for this action."
+            "description": "On-chain events of this action, once it is mined."
           },
           "pollUrl": {
             "anyOf": [
@@ -7599,7 +8179,7 @@
               }
             ],
             "title": "Pollurl",
-            "description": "Relative API URL to poll while processing continues."
+            "description": "Deal path to read while the action is `submitted`. Set when confirm returns 202."
           }
         },
         "type": "object",
@@ -7618,7 +8198,7 @@
           "idempotencyKey": {
             "type": "string",
             "title": "Idempotencykey",
-            "description": "Key that binds retries to the prepared action."
+            "description": "The `Idempotency-Key` sent to prepare, or a key HEVN derives when none was sent. Use it in the confirm path."
           },
           "status": {
             "$ref": "#/components/schemas/PlatformEscrowActionStatus",
@@ -7647,7 +8227,7 @@
               }
             ],
             "title": "Feebps",
-            "description": "Variable fee in basis points, when charged."
+            "description": "Fee in basis points, set for `charge` and `capture`."
           },
           "transactionHash": {
             "anyOf": [
@@ -7670,7 +8250,7 @@
                 "type": "null"
               }
             ],
-            "description": "Authorization to sign before execution."
+            "description": "Approval to sign and confirm. Absent on a replay once the action was submitted."
           }
         },
         "type": "object",
@@ -7730,7 +8310,7 @@
               }
             ],
             "title": "Publickey",
-            "description": "Registered P-256 public key; omit when the signature uniquely identifies the key."
+            "description": "Registered P-256 public key. Omit it when the signature identifies the key."
           }
         },
         "additionalProperties": false,
@@ -7746,7 +8326,7 @@
             "type": "string",
             "pattern": "^(?:cl_)?[A-Za-z0-9._:\\-]{1,216}$",
             "title": "Senderclientid",
-            "description": "Account funding the escrow.",
+            "description": "Your client who funds the deal, the buyer. An id that is not your client returns 404 `client_not_found`.",
             "examples": [
               "cl_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
             ]
@@ -7755,7 +8335,7 @@
             "type": "string",
             "pattern": "^(?:cl_)?[A-Za-z0-9._:\\-]{1,216}$",
             "title": "Receiverclientid",
-            "description": "Account entitled to receive captured funds.",
+            "description": "Your client who receives captured funds, the seller. An id that is not your client returns 422 `receiver_not_a_client`.",
             "examples": [
               "cl_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
             ]
@@ -7765,7 +8345,7 @@
             "maxLength": 16,
             "minLength": 1,
             "title": "Token",
-            "description": "Digital asset held in escrow.",
+            "description": "Token symbol such as `USDC` or `EURC`, case-insensitive. An unsupported symbol returns 422 `token_not_supported`.",
             "examples": [
               "USDC"
             ]
@@ -7782,14 +8362,14 @@
             ],
             "type": "string",
             "title": "Maxamount",
-            "description": "Maximum token amount that may be authorized.",
+            "description": "Upper limit for `authorize` or `charge`, greater than zero. It cannot change after creation.",
             "example": "500.00"
           },
           "approveWithin": {
             "type": "string",
             "pattern": "^\\d{1,4}[smhd]$",
             "title": "Approvewithin",
-            "description": "Time allowed for the sender to approve funding.",
+            "description": "Starts at creation and ends at `windows.approveBy`. Covers the buyer's approval, then `authorize` or `charge`.",
             "default": "1h",
             "examples": [
               "14d"
@@ -7799,7 +8379,7 @@
             "type": "string",
             "pattern": "^\\d{1,4}[smhd]$",
             "title": "Holdfor",
-            "description": "Time captured funds remain held after approval.",
+            "description": "Starts when `approveWithin` ends and ends at `windows.holdUntil`, the capture deadline. After it the buyer can reclaim what is still held.",
             "default": "14d",
             "examples": [
               "14d"
@@ -7809,7 +8389,7 @@
             "type": "string",
             "pattern": "^\\d{1,4}[smhd]$",
             "title": "Refundablefor",
-            "description": "Time during which a refund remains available.",
+            "description": "Starts when `holdFor` ends and ends at `windows.refundableUntil`, the refund deadline.",
             "default": "90d",
             "examples": [
               "14d"
@@ -7820,14 +8400,14 @@
             "maximum": 10000.0,
             "minimum": 0.0,
             "title": "Feebps",
-            "description": "Variable fee in basis points; 100 basis points equals 1 percent.",
+            "description": "Your fee ceiling in basis points, `100` is 1%. It cannot change after creation, so `0` means the deal takes no fee. A value above `0` returns 409 `wallet_not_linked` when your account has no wallet.",
             "default": 0
           },
           "reference": {
             "additionalProperties": true,
             "type": "object",
             "title": "Reference",
-            "description": "Caller reference stored with the escrow."
+            "description": "Your reference object, stored with the deal."
           },
           "description": {
             "anyOf": [
@@ -7910,7 +8490,7 @@
           "clientId": {
             "type": "string",
             "title": "Clientid",
-            "description": "Account represented by this escrow party."
+            "description": "Client id of this party."
           }
         },
         "type": "object",
@@ -7947,15 +8527,15 @@
             },
             "type": "array",
             "title": "Availableactions",
-            "description": "Actions permitted by current state and deadlines."
+            "description": "Actions allowed now, computed from the amounts, the windows and the recorded buyer approval. It includes the buyer's `approve` and `reclaim`, and is empty for a draft past `approveBy`."
           },
           "sender": {
             "$ref": "#/components/schemas/EscrowPartyView",
-            "description": "Account sending or authorizing escrow funds."
+            "description": "The buyer, who funds the deal."
           },
           "receiver": {
             "$ref": "#/components/schemas/EscrowPartyView",
-            "description": "Account entitled to captured escrow funds."
+            "description": "The seller, who receives captured funds."
           },
           "onchainEscrowUrl": {
             "type": "string",
@@ -7989,30 +8569,30 @@
           "token": {
             "type": "string",
             "title": "Token",
-            "description": "Digital asset held in escrow."
+            "description": "Token symbol."
           },
           "maxAmount": {
             "type": "string",
             "title": "Maxamount",
-            "description": "Maximum token amount that may be authorized.",
+            "description": "Upper limit for `authorize` or `charge`.",
             "example": "500.00"
           },
           "authorizedAmount": {
             "type": "string",
             "title": "Authorizedamount",
-            "description": "Token amount currently authorized for capture.",
+            "description": "Sum of `capturableAmount` and `refundableAmount`.",
             "example": "500.00"
           },
           "capturableAmount": {
             "type": "string",
             "title": "Capturableamount",
-            "description": "Token amount that may currently be captured.",
+            "description": "Held in the escrow contract. `capture` pays it to the seller, `void` and `reclaim` return it to the buyer.",
             "example": "500.00"
           },
           "refundableAmount": {
             "type": "string",
             "title": "Refundableamount",
-            "description": "Token amount that may currently be refunded.",
+            "description": "Paid to the seller and still refundable. `refund` returns up to this amount to the buyer from your wallet.",
             "example": "500.00"
           },
           "windows": {
@@ -8040,7 +8620,7 @@
               }
             ],
             "title": "Consistent",
-            "description": "Whether persisted state matches the latest chain state."
+            "description": "Whether the stored deal matches the chain. Set only by the sync operation."
           },
           "createdAt": {
             "type": "string",
@@ -8080,19 +8660,19 @@
             "type": "string",
             "format": "date-time",
             "title": "Approveby",
-            "description": "UTC deadline for escrow approval."
+            "description": "UTC deadline for the buyer's approval and for `authorize` or `charge`."
           },
           "holdUntil": {
             "type": "string",
             "format": "date-time",
             "title": "Holduntil",
-            "description": "UTC timestamp until which captured funds remain held."
+            "description": "UTC deadline for `capture`. After it the buyer can reclaim what is still held."
           },
           "refundableUntil": {
             "type": "string",
             "format": "date-time",
             "title": "Refundableuntil",
-            "description": "UTC deadline for a refund."
+            "description": "UTC deadline for `refund`."
           }
         },
         "type": "object",
@@ -8120,6 +8700,83 @@
           "receipt"
         ],
         "title": "ExportKind"
+      },
+      "ExternalAccountView": {
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "pattern": "^(?:acc_)?[A-Za-z0-9._:\\-]{1,216}$",
+            "title": "Accountid",
+            "description": "Stable public identifier of this external account, as an `acc_` id.",
+            "examples": [
+              "acc_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+            ]
+          },
+          "chain": {
+            "type": "string",
+            "enum": [
+              "base",
+              "arb",
+              "eth",
+              "op",
+              "pol",
+              "sol"
+            ],
+            "title": "WalletNetwork",
+            "description": "Network the address holds USDC on."
+          },
+          "address": {
+            "type": "string",
+            "title": "Address",
+            "description": "Address on `chain`."
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label",
+            "description": "Name shown for this address."
+          },
+          "balance": {
+            "type": "string",
+            "title": "Balance",
+            "description": "USDC held at the address on `chain`, read from the network when older than a minute and kept as last read when the network does not answer.",
+            "example": "500.00"
+          },
+          "syncedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Syncedat",
+            "description": "UTC timestamp of the last successful balance read."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat",
+            "description": "UTC timestamp when the address was added."
+          }
+        },
+        "type": "object",
+        "required": [
+          "accountId",
+          "chain",
+          "address",
+          "balance",
+          "createdAt"
+        ],
+        "title": "ExternalAccountView"
       },
       "FiatBusinessType": {
         "type": "string",
@@ -8343,7 +9000,7 @@
           "digest": {
             "type": "string",
             "title": "Digest",
-            "description": "EIP-712 digest of the terms authorized by this approval."
+            "description": "EIP-712 digest of the terms authorized by this approval. Recompute it to check the terms."
           },
           "settles": {
             "type": "string",
@@ -8482,7 +9139,7 @@
           "written": {
             "type": "integer",
             "title": "Written",
-            "description": "Transactions the refresh created or updated in the client's ledger."
+            "description": "Ledger entries the refresh created or updated. Can be `0`."
           }
         },
         "type": "object",
@@ -8512,7 +9169,7 @@
               }
             ],
             "title": "Nextcursor",
-            "description": "Opaque cursor for the next page; absent when this is the final page."
+            "description": "Opaque cursor for the next page. Send it unchanged as `cursor` with the same query. Absent on the last page."
           }
         },
         "type": "object",
@@ -8541,7 +9198,7 @@
               }
             ],
             "title": "Nextcursor",
-            "description": "Opaque cursor for the next page; absent when this is the final page."
+            "description": "Opaque cursor for the next page. Send it unchanged as `cursor` with the same query. Absent on the last page."
           }
         },
         "type": "object",
@@ -8570,7 +9227,7 @@
               }
             ],
             "title": "Nextcursor",
-            "description": "Opaque cursor for the next page; absent when this is the final page."
+            "description": "Opaque cursor for the next page. Send it unchanged as `cursor` with the same query. Absent on the last page."
           }
         },
         "type": "object",
@@ -8578,6 +9235,35 @@
           "items"
         ],
         "title": "Page[EscrowView]"
+      },
+      "Page_ExternalAccountView_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ExternalAccountView"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "Resources in this page, in stable server-defined order."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nextcursor",
+            "description": "Opaque cursor for the next page. Send it unchanged as `cursor` with the same query. Absent on the last page."
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "Page[ExternalAccountView]"
       },
       "Page_TransactionView_": {
         "properties": {
@@ -8599,7 +9285,7 @@
               }
             ],
             "title": "Nextcursor",
-            "description": "Opaque cursor for the next page; absent when this is the final page."
+            "description": "Opaque cursor for the next page. Send it unchanged as `cursor` with the same query. Absent on the last page."
           }
         },
         "type": "object",
@@ -8630,7 +9316,7 @@
               }
             ],
             "title": "Amount",
-            "description": "Exact amount funded in the source currency."
+            "description": "Amount the payer sends in `currency`. Send this or `amountTo`, not both."
           },
           "amountTo": {
             "anyOf": [
@@ -8652,7 +9338,7 @@
               }
             ],
             "title": "Amountto",
-            "description": "Exact amount to settle to the account."
+            "description": "Amount that arrives on the account. Send this or `amount`, not both."
           },
           "currency": {
             "type": "string",
@@ -8668,7 +9354,7 @@
                 "type": "null"
               }
             ],
-            "description": "Local payment method; provide exactly one of rail or originChainId."
+            "description": "Payment method the payer uses, such as `sepa` or `ach`. Send this or `originChainId`, not both. Product codes of `POST /banks` are a different value set."
           },
           "originChainId": {
             "anyOf": [
@@ -8679,12 +9365,38 @@
                 "type": "null"
               }
             ],
-            "description": "Network from which an on-chain incoming transfer is funded."
+            "description": "Network the payer funds an on-chain transfer from. Send this or `rail`, not both."
           },
           "destinationAccount": {
-            "$ref": "#/components/schemas/AccountKey",
-            "description": "Account credited after settlement. Incoming transfers settle to a token account.",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccountKey"
+              },
+              {
+                "type": "string",
+                "pattern": "^acc_[A-Za-z0-9._:\\-]{1,216}$",
+                "examples": [
+                  "acc_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+                ]
+              }
+            ],
+            "title": "Destinationaccount",
+            "description": "Account credited after settlement, `USDC` by default. One of the client's matching payment methods must settle into it, or the call returns `422 payin_not_available`. `FDIC_USD`, `FDIC_EUR` and `USDC_ARB` return `422 account_not_supported`, and `KYC_CARDS` returns `422 validation_failed`. An `acc_` id names an external account. It takes an on-chain transfer only (`originChainId`), delivered as USDC on the account's network to its address, and requires `refundAddress`.",
             "default": "USDC"
+          },
+          "refundAddress": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refundaddress",
+            "description": "Address on `originChainId` that receives the funds back when the transfer cannot be completed. Required when `destinationAccount` is an external account, and accepted only then."
           }
         },
         "additionalProperties": false,
@@ -8715,7 +9427,7 @@
                 "type": "null"
               }
             ],
-            "description": "Originator information required by payment methods that validate the sending account."
+            "description": "Account the payer sends from. Required on payment methods that check the sender. Without it such a method returns `400 invalid_request`, and `details.fields` lists the identifiers it needs."
           }
         },
         "additionalProperties": false,
@@ -8744,7 +9456,7 @@
               }
             ],
             "title": "Kind",
-            "description": "Kind of funding instruction returned."
+            "description": "Kind of funding instruction. `bank_transfer` fills `requisites`, `qr_code` fills `qrPayload`, `hosted_page` fills `url`, and `onchain` fills `address`, `chainId` and `memo` when the network needs one. `manual` fills none of them, and the payer completes the payment with the amount and reference."
           },
           "amount": {
             "type": "string",
@@ -8767,12 +9479,12 @@
               }
             ],
             "title": "Paymentreference",
-            "description": "Reference that must accompany the account transfer."
+            "description": "Reference the payer must include. On a pooled account it attributes the money to this incoming transfer."
           },
           "singleUse": {
             "type": "boolean",
             "title": "Singleuse",
-            "description": "Whether these instructions may fund only this incoming transfer once."
+            "description": "Whether these instructions fund this incoming transfer alone. Treat them as single use either way. The amount, the reference and `expiresAt` apply to this incoming transfer only."
           },
           "expiresAt": {
             "anyOf": [
@@ -8785,7 +9497,7 @@
               }
             ],
             "title": "Expiresat",
-            "description": "UTC timestamp after which these instructions expire."
+            "description": "UTC timestamp when the payment window ends. Money that arrives later can be returned to the payer."
           },
           "requisites": {
             "anyOf": [
@@ -8796,7 +9508,7 @@
                 "type": "null"
               }
             ],
-            "description": "Receiving payment-account details."
+            "description": "Receiving account details. Give them to the payer unchanged."
           },
           "qrPayload": {
             "anyOf": [
@@ -8844,7 +9556,7 @@
               }
             ],
             "title": "Memo",
-            "description": "Memo or destination tag required by the on-chain transfer."
+            "description": "Memo or destination tag the network routes on. When it is set, a transfer without it cannot be attributed."
           },
           "chainId": {
             "anyOf": [
@@ -8910,7 +9622,7 @@
               }
             ],
             "title": "Feeamount",
-            "description": "Fee charged in feeCurrency."
+            "description": "Fee charged in `feeCurrency`. On an on-chain transfer, the USD value sent minus the USD value delivered."
           },
           "feeCurrency": {
             "anyOf": [
@@ -8935,7 +9647,7 @@
               }
             ],
             "title": "Rate",
-            "description": "Conversion rate from source amount to settlement amount."
+            "description": "Conversion rate from `amount` to `settlementAmount`. Absent when no rate was quoted. `1.0000` is a conversion at par and does not mean that no rate was quoted."
           }
         },
         "type": "object",
@@ -8973,7 +9685,7 @@
           },
           "status": {
             "$ref": "#/components/schemas/PayinState",
-            "description": "Current public lifecycle status of the incoming transfer."
+            "description": "Lifecycle status of the incoming transfer. Poll until it is final."
           },
           "rail": {
             "anyOf": [
@@ -8984,11 +9696,11 @@
                 "type": "null"
               }
             ],
-            "description": "Local payment method, when account-funded."
+            "description": "Payment method of a quoted local payment. Absent on an on-chain transfer."
           },
           "quote": {
             "$ref": "#/components/schemas/PayinQuoteView",
-            "description": "Price, fee and conversion terms fixed for this incoming transfer."
+            "description": "Price, fee and conversion terms, binding until `expiresAt`."
           },
           "paymentReference": {
             "anyOf": [
@@ -9000,7 +9712,7 @@
               }
             ],
             "title": "Paymentreference",
-            "description": "Reference that must accompany the account transfer."
+            "description": "Reference the payer must include. On a pooled account it attributes the money to this incoming transfer. On an on-chain transfer it is the memo."
           },
           "originChainId": {
             "anyOf": [
@@ -9012,7 +9724,7 @@
               }
             ],
             "title": "Originchainid",
-            "description": "Network from which an on-chain transfer is funded."
+            "description": "Network the payer funds an on-chain transfer from."
           },
           "destinationChainId": {
             "anyOf": [
@@ -9024,7 +9736,23 @@
               }
             ],
             "title": "Destinationchainid",
-            "description": "Network on which the transfer settles."
+            "description": "Network the on-chain transfer settles on."
+          },
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?:acc_)?[A-Za-z0-9._:\\-]{1,216}$",
+                "examples": [
+                  "acc_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accountid",
+            "description": "External account the transfer is delivered to. Absent for the client's wallet."
           },
           "expiresAt": {
             "anyOf": [
@@ -9037,7 +9765,7 @@
               }
             ],
             "title": "Expiresat",
-            "description": "UTC timestamp after which the quote is no longer valid."
+            "description": "UTC timestamp when the quote stops holding, at most 2 minutes after creation on a `rail` quote. Request the instructions before it, or the call returns `410 payin_expired`. Do not cache the quote."
           },
           "createdAt": {
             "type": "string",
@@ -9066,12 +9794,12 @@
         "properties": {
           "kind": {
             "$ref": "#/components/schemas/PayoutAttentionKind",
-            "description": "Additional action required before processing can continue."
+            "description": "Action that holds the payout. `rfi` is an information request."
           },
           "url": {
             "type": "string",
             "title": "Url",
-            "description": "URL where the required action can be completed."
+            "description": "API path of the information request to answer."
           }
         },
         "type": "object",
@@ -9121,7 +9849,7 @@
               }
             ],
             "title": "Address",
-            "description": "On-chain destination address, when applicable."
+            "description": "Wallet address the payout is sent to, on a wallet payout. Check it before you sign."
           },
           "chainId": {
             "anyOf": [
@@ -9133,7 +9861,7 @@
               }
             ],
             "title": "Chainid",
-            "description": "Network on which the contact receives funds."
+            "description": "Chain code of the network the contact receives on."
           },
           "token": {
             "anyOf": [
@@ -9157,7 +9885,7 @@
             "type": "string",
             "pattern": "^(?:ct_)?[A-Za-z0-9._:\\-]{1,216}$",
             "title": "Contactid",
-            "description": "Saved contact to receive this transfer.",
+            "description": "Saved contact to pay. An unknown, deleted or foreign contact returns `404 contact_not_found`.",
             "examples": [
               "ct_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
             ]
@@ -9182,7 +9910,7 @@
               }
             ],
             "title": "Amount",
-            "description": "Exact amount to debit in the source currency."
+            "description": "Amount to debit, in the source currency. Send one of `amount` and `amountTo`, and HEVN prices the other side. Both or neither return `422 validation_failed`. More fractional digits than the source token allows return `422 validation_failed` with `details.fields[].code: amount_precision`."
           },
           "amountTo": {
             "anyOf": [
@@ -9204,7 +9932,7 @@
               }
             ],
             "title": "Amountto",
-            "description": "Exact amount the contact should receive."
+            "description": "Amount the contact receives. A payout to a HEVN account or to a Base wallet in the source token has no fee, so `amountTo` equals `amount`. A payment method that prices from the debit takes `amount` only and returns `400 invalid_request` for `amountTo`."
           },
           "publicKey": {
             "anyOf": [
@@ -9218,7 +9946,7 @@
               }
             ],
             "title": "Publickey",
-            "description": "Base64 DER SubjectPublicKeyInfo for the registered P-256 developer key. Required unless the account holder signs their own transfers."
+            "description": "Base64 DER SubjectPublicKeyInfo of the registered P-256 developer key that signs a payout from your account. Without it that payout returns `422 validation_failed` with `details.field: publicKey`. Not used when the client signs or `sourceAccount` is an `acc_` id."
           },
           "paymentReference": {
             "anyOf": [
@@ -9231,7 +9959,7 @@
               }
             ],
             "title": "Paymentreference",
-            "description": "Reference or memo delivered with the transfer."
+            "description": "Text the beneficiary sees with the payment. Required when the contact's capabilities return `memoRequired`."
           },
           "purpose": {
             "anyOf": [
@@ -9244,7 +9972,7 @@
               }
             ],
             "title": "Purpose",
-            "description": "Business purpose or reason for the transfer."
+            "description": "Purpose of the payment. Required when the contact's capabilities return `purposeRequired`."
           },
           "documentIds": {
             "items": {
@@ -9257,7 +9985,7 @@
             "type": "array",
             "maxItems": 10,
             "title": "Documentids",
-            "description": "Supporting document identifiers returned by POST /dapi/v1/documents."
+            "description": "Supporting documents uploaded with `POST /dapi/v1/documents`. Required when the contact's capabilities return `documentsRequired`."
           },
           "bankId": {
             "anyOf": [
@@ -9273,11 +10001,23 @@
               }
             ],
             "title": "Bankid",
-            "description": "Optional receiving-account identifier used to select a specific funding route."
+            "description": "Client account (`bnk_`) to pay through, from `options[].bankId` of the contact's capabilities. Omit it to let HEVN pick an active one for the contact's currency. An inactive or unknown id returns `400`."
           },
           "sourceAccount": {
-            "$ref": "#/components/schemas/AccountKey",
-            "description": "Account this payout is paid from. `USDC` and `EURC` debit the client's wallet; `FDIC_USD` spends the custodial USD balance and is authorized by an intent signature instead of a debit.",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccountKey"
+              },
+              {
+                "type": "string",
+                "pattern": "^acc_[A-Za-z0-9._:\\-]{1,216}$",
+                "examples": [
+                  "acc_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+                ]
+              }
+            ],
+            "title": "Sourceaccount",
+            "description": "Account the payout is paid from. `USDC` and `EURC` debit the wallet. `FDIC_USD` debits the fiat balance held for the account and returns `authorization: intent`. It returns `409 payout_not_fundable` with `details.reason: holder_signature_unsupported` when the client signs, `422 account_unavailable` without that balance, and `422 account_not_supported` when `bankId` is another account. `USDC_ARB` returns `422 account_not_supported`. An `acc_` id names an external account on Base that pays `USDC` with `authorization: wallet` and needs no developer key.",
             "default": "USDC"
           }
         },
@@ -9288,12 +10028,23 @@
         ],
         "title": "PayoutCreateRequest"
       },
+      "PayoutFailureCode": {
+        "type": "string",
+        "enum": [
+          "user_operation_reverted",
+          "payout_rejected",
+          "payout_canceled",
+          "route_failed",
+          "route_refunded",
+          "quote_expired"
+        ],
+        "title": "PayoutFailureCode"
+      },
       "PayoutFailureView": {
         "properties": {
           "code": {
-            "type": "string",
-            "title": "Code",
-            "description": "Stable machine-readable code for the transfer failure."
+            "$ref": "#/components/schemas/PayoutFailureCode",
+            "description": "Why the payout failed. `user_operation_reverted`: the funding transaction reverted onchain, nothing left the wallet. `payout_rejected`: the payment was refused, check the contact's account details. `payout_canceled`: the payout was canceled before it was sent. `route_failed`: the onchain route failed. `route_refunded`: the route returned the funds to the wallet. `quote_expired`: the route was not funded before `quote.expiresAt`. Create a new payout in every case."
           }
         },
         "type": "object",
@@ -9402,13 +10153,13 @@
           "fromAmount": {
             "type": "string",
             "title": "Fromamount",
-            "description": "Amount debited in the source currency.",
+            "description": "Amount debited, in `fromCurrency`.",
             "example": "500.00"
           },
           "fromCurrency": {
             "type": "string",
             "title": "Fromcurrency",
-            "description": "Currency debited by the quote."
+            "description": "Pricing currency of `fromAmount`, a token symbol on a wallet payout. Read the debited account from `sourceAccount`."
           },
           "sourceAccount": {
             "anyOf": [
@@ -9419,7 +10170,7 @@
                 "type": "null"
               }
             ],
-            "description": "Account the payout is paid from. `USDC`, `EURC` and `USDC_ARB` debit the client's wallet; `FDIC_USD` debits the custodial USD balance, whose quote is priced in `USD`."
+            "description": "Account the payout is paid from. `USDC` and `EURC` debit the wallet. `FDIC_USD` debits the fiat balance held for the account."
           },
           "toAmount": {
             "type": "string",
@@ -9430,7 +10181,7 @@
           "toCurrency": {
             "type": "string",
             "title": "Tocurrency",
-            "description": "Currency delivered by the quote."
+            "description": "Currency delivered, a token symbol on a wallet payout."
           },
           "rate": {
             "anyOf": [
@@ -9443,7 +10194,7 @@
               }
             ],
             "title": "Rate",
-            "description": "Conversion rate from source to destination amount."
+            "description": "Conversion rate from `fromAmount` to `toAmount`. Absent on a wallet payout."
           },
           "feeAmount": {
             "anyOf": [
@@ -9456,7 +10207,7 @@
               }
             ],
             "title": "Feeamount",
-            "description": "Fee charged in feeCurrency."
+            "description": "Fee charged in `feeCurrency`. On a routed wallet payout it is the route cost in `USD`."
           },
           "feeCurrency": {
             "anyOf": [
@@ -9481,7 +10232,7 @@
               }
             ],
             "title": "Expiresat",
-            "description": "UTC timestamp after which the quote is no longer valid."
+            "description": "UTC timestamp when the quote expires. Authorize the payout before it."
           },
           "fromChainId": {
             "anyOf": [
@@ -9493,7 +10244,7 @@
               }
             ],
             "title": "Fromchainid",
-            "description": "Network from which the transfer is funded."
+            "description": "Chain code of the network debited. Present on wallet payouts."
           },
           "toChainId": {
             "anyOf": [
@@ -9505,7 +10256,7 @@
               }
             ],
             "title": "Tochainid",
-            "description": "Network on which the contact receives the transfer."
+            "description": "Chain code of the network the contact receives on. Present on wallet payouts."
           }
         },
         "type": "object",
@@ -9534,7 +10285,7 @@
           },
           "status": {
             "$ref": "#/components/schemas/PayoutStatus",
-            "description": "Current public lifecycle status of the transfer."
+            "description": "Current lifecycle status. `refunded` occurs on `fiat` payouts, and a refunded `onchain` payout reads `failed`."
           },
           "quote": {
             "anyOf": [
@@ -9557,7 +10308,7 @@
               }
             ],
             "title": "Transactionhash",
-            "description": "On-chain transaction hash, when broadcast."
+            "description": "Hash of the on-chain operation, once broadcast. On an `onchain` payout it is the delivery hash when known, else the funding hash."
           },
           "transactionId": {
             "anyOf": [
@@ -9573,7 +10324,7 @@
               }
             ],
             "title": "Transactionid",
-            "description": "Ledger transaction identifier, when created."
+            "description": "Ledger transaction, present once the payout is in the ledger. Read it with `GET /dapi/v1/transactions/{transactionId}`."
           },
           "contact": {
             "anyOf": [
@@ -9584,7 +10335,7 @@
                 "type": "null"
               }
             ],
-            "description": "Contact snapshot fixed at creation."
+            "description": "Contact of the payout. On a `fiat` payout it shows the saved contact, including later edits. On an `onchain` payout it has the address, chain and token the payout was booked with."
           },
           "paymentReference": {
             "anyOf": [
@@ -9615,7 +10366,7 @@
               }
             ],
             "title": "Settledat",
-            "description": "UTC timestamp when settlement completed."
+            "description": "UTC timestamp of the last update to the payout, present when `status` is `settled`."
           },
           "attention": {
             "anyOf": [
@@ -9626,7 +10377,7 @@
                 "type": "null"
               }
             ],
-            "description": "Additional action required before processing."
+            "description": "Present while an information request holds the payout in `submitted`. Signing again does not release it."
           },
           "failure": {
             "anyOf": [
@@ -9637,7 +10388,7 @@
                 "type": "null"
               }
             ],
-            "description": "Terminal or actionable failure details."
+            "description": "Present when `status` is `failed`."
           }
         },
         "type": "object",
@@ -9713,7 +10464,7 @@
                 "type": "null"
               }
             ],
-            "description": "Terminal or actionable failure details."
+            "description": "Present when `status` is `failed`."
           }
         },
         "type": "object",
@@ -9737,12 +10488,12 @@
           },
           "status": {
             "$ref": "#/components/schemas/PayoutStatus",
-            "description": "Current public lifecycle status of the transfer."
+            "description": "Lifecycle status. A new payout is `awaitingSignature`. With `authorization: wallet` it means the external account has not sent `transfer` yet, and there is no HEVN signing step."
           },
           "idempotencyKey": {
             "type": "string",
             "title": "Idempotencykey",
-            "description": "Caller-supplied key that makes an identical retry return this result."
+            "description": "`Idempotency-Key` of the booking, or a key HEVN derives from the terms when none was sent. A retry with the same key and terms returns this payout."
           },
           "quote": {
             "anyOf": [
@@ -9757,7 +10508,7 @@
           },
           "authorization": {
             "$ref": "#/components/schemas/AuthorizationKind",
-            "description": "Whether the approval authorizes a balance debit or a signature over the transfer's terms, or whether the account holder signs it themselves in the HEVN sign-in window.",
+            "description": "Who authorizes the payout. With `client` the holder signs in the HEVN sign-in window and the response has no `approval` or `debit`. With `debit` your developer key signs the wallet debit in `debit`, and with `intent` it signs the terms in `intent`. With `wallet` the external account sends `transfer`.",
             "default": "debit"
           },
           "approval": {
@@ -9769,7 +10520,7 @@
                 "type": "null"
               }
             ],
-            "description": "Authorization to sign before execution."
+            "description": "Approval to sign with your developer key and post to `POST /dapi/v1/payouts/{payoutId}/confirm`. Absent with `authorization: client` or `wallet`, and on a replay of a payout that is already funded."
           },
           "debit": {
             "anyOf": [
@@ -9780,7 +10531,7 @@
                 "type": "null"
               }
             ],
-            "description": "Exact on-chain debit used to fund this transfer."
+            "description": "Wallet debit that funds the payout. Compare it with your record before you sign. On a wallet payout, `address` is the contact's address when sent directly and a one-time address when routed."
           },
           "intent": {
             "anyOf": [
@@ -9791,7 +10542,18 @@
                 "type": "null"
               }
             ],
-            "description": "Terms authorized by the signature, when this transfer is not funded by a debit."
+            "description": "Terms the signature authorizes with `authorization: intent`. It replaces `debit`."
+          },
+          "transfer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WalletTransferView"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "On-chain transfer the external account sends to fund the payout, with `authorization: wallet`. There is nothing to sign with HEVN and no confirm call. The payout proceeds once that transfer is seen."
           },
           "contact": {
             "anyOf": [
@@ -9802,7 +10564,7 @@
                 "type": "null"
               }
             ],
-            "description": "Contact snapshot fixed at creation."
+            "description": "Contact the payout was booked to."
           }
         },
         "type": "object",
@@ -9869,7 +10631,7 @@
         "properties": {
           "code": {
             "$ref": "#/components/schemas/PlatformErrorCode",
-            "description": "Stable machine-readable error code."
+            "description": "Stable machine-readable error code to branch on."
           },
           "message": {
             "type": "string",
@@ -9887,7 +10649,7 @@
               }
             ],
             "title": "Details",
-            "description": "Structured context for this error, when available."
+            "description": "Structured context for this error, with camelCase keys. `validation_failed` lists `fields`, plus `location` for a query, path or header. A `5xx` adds `requestId`."
           }
         },
         "type": "object",
@@ -9978,7 +10740,6 @@
           "quote_expired",
           "bundler_rejected",
           "bundler_unavailable",
-          "contact_details_invalid",
           "contact_in_use",
           "kyb_incomplete",
           "kyb_documents_processing",
@@ -10013,7 +10774,15 @@
           "swap_not_confirmable",
           "intent_not_signable",
           "sandbox_amount_limit_exceeded",
-          "sandbox_faucet_balance_too_high"
+          "sandbox_faucet_balance_too_high",
+          "account_address_taken",
+          "account_address_refused",
+          "account_not_spendable",
+          "account_destination_unsupported",
+          "source_account_unsupported",
+          "account_funding_invalid",
+          "account_spend_forbidden",
+          "refund_address_required"
         ],
         "title": "PlatformErrorCode"
       },
@@ -10073,7 +10842,7 @@
               }
             ],
             "title": "Streetaddress",
-            "description": "Street name and building number."
+            "description": "Street name and building number. Required for completion."
           },
           "addressLine2": {
             "anyOf": [
@@ -10101,7 +10870,7 @@
               }
             ],
             "title": "City",
-            "description": "City or locality."
+            "description": "City or locality. Required for completion."
           },
           "state": {
             "anyOf": [
@@ -10115,7 +10884,7 @@
               }
             ],
             "title": "State",
-            "description": "State, province or administrative area."
+            "description": "State, province or administrative area as an ISO 3166-2 code, for example US-IL. A code sent without the country prefix is stored with it."
           },
           "zip": {
             "anyOf": [
@@ -10129,7 +10898,7 @@
               }
             ],
             "title": "Zip",
-            "description": "Postal or ZIP code."
+            "description": "Postal or ZIP code. Required for completion."
           },
           "country": {
             "anyOf": [
@@ -10140,7 +10909,7 @@
                 "type": "null"
               }
             ],
-            "description": "ISO 3166-1 alpha-2 country code."
+            "description": "ISO 3166-1 alpha-2 country code. Required for completion."
           }
         },
         "additionalProperties": false,
@@ -10239,7 +11008,7 @@
           "attemptNo": {
             "type": "integer",
             "title": "Attemptno",
-            "description": "One-based submission attempt number for this account."
+            "description": "One-based attempt number. It increments with each new application."
           },
           "status": {
             "$ref": "#/components/schemas/PlatformKybStatus",
@@ -10255,7 +11024,7 @@
               }
             ],
             "title": "Comment",
-            "description": "Review comment safe to show to the account holder."
+            "description": "Review comment safe to show to the account holder. Each review replaces it."
           },
           "submittedAt": {
             "type": "string",
@@ -10300,7 +11069,7 @@
               }
             ],
             "title": "Legalname",
-            "description": "Registered legal name of the business applicant."
+            "description": "Registered legal name of the business applicant. Required for completion. It also sets name on the client record."
           },
           "tradeName": {
             "anyOf": [
@@ -10325,7 +11094,7 @@
                 "type": "null"
               }
             ],
-            "description": "ISO 3166-1 alpha-2 jurisdiction of incorporation."
+            "description": "ISO 3166-1 alpha-2 jurisdiction of incorporation. Required for completion. US makes a tax_identification_document required, and AE makes a vat_registration document required."
           },
           "registrationNumber": {
             "anyOf": [
@@ -10367,7 +11136,7 @@
               }
             ],
             "title": "Taxid",
-            "description": "Business tax identifier exactly as issued."
+            "description": "Business tax identifier as issued. When country is US it is required for completion and must be a nine-digit EIN, for example 12-3456789."
           },
           "phone": {
             "anyOf": [
@@ -10380,7 +11149,7 @@
               }
             ],
             "title": "Phone",
-            "description": "Business phone number in E.164 format."
+            "description": "Business phone number. Required for completion unless the client account already has a phone."
           },
           "email": {
             "anyOf": [
@@ -10405,7 +11174,7 @@
                 "type": "null"
               }
             ],
-            "description": "Registered business address."
+            "description": "Registered business address. Required for completion."
           },
           "entityType": {
             "anyOf": [
@@ -10416,7 +11185,7 @@
                 "type": "null"
               }
             ],
-            "description": "Legal form of the business applicant."
+            "description": "Legal form of the business applicant. Required for completion."
           },
           "entityTypeDescription": {
             "anyOf": [
@@ -10512,7 +11281,7 @@
               }
             ],
             "title": "Expectedmonthlyvolumeusd",
-            "description": "Expected total monthly transaction volume in USD."
+            "description": "Expected total monthly transaction volume in USD major units, for example 250000. Required for completion."
           },
           "expectedCryptoMonthlyVolumeUsd": {
             "anyOf": [
@@ -10535,7 +11304,7 @@
               }
             ],
             "title": "Expectedcryptomonthlyvolumeusd",
-            "description": "Expected monthly digital-asset transaction volume in USD."
+            "description": "Part of expectedMonthlyVolumeUsd expected in digital assets, in USD."
           },
           "expectedMonthlyAchUsd": {
             "anyOf": [
@@ -10558,7 +11327,7 @@
               }
             ],
             "title": "Expectedmonthlyachusd",
-            "description": "Expected monthly ACH volume in USD."
+            "description": "Part of expectedMonthlyVolumeUsd expected over ACH, in USD."
           },
           "expectedMonthlyWireUsd": {
             "anyOf": [
@@ -10581,7 +11350,7 @@
               }
             ],
             "title": "Expectedmonthlywireusd",
-            "description": "Expected monthly wire-transfer volume in USD."
+            "description": "Part of expectedMonthlyVolumeUsd expected by wire transfer, in USD."
           },
           "cryptoIndustrySubtype": {
             "anyOf": [
@@ -10604,7 +11373,7 @@
               }
             ],
             "title": "Hasintermediateentityownership",
-            "description": "Whether another legal entity exists between this applicant and an ultimate beneficial owner."
+            "description": "Whether another legal entity exists between this applicant and an ultimate beneficial owner. Set it to true when a holding company stands in the ownership chain."
           },
           "primaryTargetMarket": {
             "anyOf": [
@@ -10778,7 +11547,7 @@
               }
             ],
             "title": "Isregulated",
-            "description": "Whether the business is regulated or licensed."
+            "description": "Whether the business is regulated or licensed. When true, a regulatory_license document is required for completion."
           },
           "regulatorCountry": {
             "anyOf": [
@@ -10789,7 +11558,7 @@
                 "type": "null"
               }
             ],
-            "description": "ISO 3166-1 alpha-2 country of the authority that licenses the business. Required by some banking providers when is_regulated is true."
+            "description": "ISO 3166-1 alpha-2 country of the authority that licenses the business. Review may ask for it when isRegulated is true."
           },
           "regulatoryLicenseType": {
             "anyOf": [
@@ -10803,7 +11572,7 @@
               }
             ],
             "title": "Regulatorylicensetype",
-            "description": "Type of regulatory license the business holds, e.g. Electronic Money Institution. Required by some banking providers when is_regulated is true."
+            "description": "Type of regulatory license the business holds, for example Electronic Money Institution. Review may ask for it when isRegulated is true."
           },
           "verifiesCustomerIdentity": {
             "anyOf": [
@@ -10815,7 +11584,7 @@
               }
             ],
             "title": "Verifiescustomeridentity",
-            "description": "Whether the business verifies the identity of its own customers. Required by some banking providers when is_regulated is true."
+            "description": "Whether the business verifies the identity of its customers. Review may ask for it when isRegulated is true."
           },
           "hasTransactionMonitoring": {
             "anyOf": [
@@ -10827,7 +11596,7 @@
               }
             ],
             "title": "Hastransactionmonitoring",
-            "description": "Whether the business monitors its customers' transactions. Required by some banking providers when is_regulated is true."
+            "description": "Whether the business monitors its customers' transactions. Review may ask for it when isRegulated is true."
           },
           "productsServices": {
             "anyOf": [
@@ -10858,7 +11627,7 @@
               }
             ],
             "title": "Businessdescription",
-            "description": "Plain-language description of what the business does."
+            "description": "Plain-language description of what the business does. Required for completion."
           },
           "businessType": {
             "anyOf": [
@@ -10869,7 +11638,7 @@
                 "type": "null"
               }
             ],
-            "description": "High-level business category."
+            "description": "High-level business category. Required for completion."
           },
           "businessIndustry": {
             "anyOf": [
@@ -10882,7 +11651,7 @@
               }
             ],
             "title": "Businessindustry",
-            "description": "Six-digit NAICS-style industry code."
+            "description": "Six-digit NAICS-style industry code, for example 424990."
           },
           "verifierRole": {
             "anyOf": [
@@ -10893,7 +11662,7 @@
                 "type": "null"
               }
             ],
-            "description": "Role of the person providing the business verification information."
+            "description": "Role of the person who filled in the verification information."
           },
           "sourceOfFunds": {
             "anyOf": [
@@ -10904,7 +11673,7 @@
                 "type": "null"
               }
             ],
-            "description": "Primary economic source of funds entering the account."
+            "description": "Primary economic source of funds entering the account. Required for completion, and the source_of_funds document is the evidence for it."
           },
           "sourceOfFundsDetails": {
             "anyOf": [
@@ -10929,7 +11698,7 @@
                 "type": "null"
               }
             ],
-            "description": "Primary intended use of funds in the account."
+            "description": "Primary intended use of funds in the account. Required for completion."
           },
           "purposeOfFundsDetails": {
             "anyOf": [
@@ -10957,7 +11726,7 @@
               }
             ],
             "title": "Flowoffunds",
-            "description": "Expected origin, movement and destination of funds."
+            "description": "How money reaches the business and where it goes. Required for completion."
           },
           "complianceScreening": {
             "anyOf": [
@@ -11082,7 +11851,7 @@
               }
             ],
             "title": "Identitydocuments",
-            "description": "Identification metadata issued to the business, when the jurisdiction provides it."
+            "description": "Identification metadata issued to the business, when the jurisdiction provides it. Upload the file separately and file it into a document slot."
           }
         },
         "additionalProperties": false,
@@ -11805,13 +12574,13 @@
         "properties": {
           "slot": {
             "$ref": "#/components/schemas/DocumentType",
-            "description": "Verification requirement this file satisfies."
+            "description": "Verification requirement this file satisfies. An unknown slot returns 422 document_type_unsupported with the accepted values in details.allowed, and nothing is written."
           },
           "uploadId": {
             "type": "string",
             "pattern": "^(?:doc_)?[A-Za-z0-9._:\\-]{1,216}$",
             "title": "Uploadid",
-            "description": "Document id returned by POST /dapi/v1/documents.",
+            "description": "Document id returned by POST /dapi/v1/documents. Filing another upload into an occupied slot replaces the previous file. An unknown id, or one that belongs to another client, returns 404 document_not_found.",
             "examples": [
               "doc_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
             ]
@@ -11892,7 +12661,7 @@
                 "type": "null"
               }
             ],
-            "description": "Identity document type. Upload the corresponding file separately and reference its uploadId."
+            "description": "Identity document type. Upload the file separately and file it into a document slot."
           },
           "issuingCountry": {
             "anyOf": [
@@ -11917,7 +12686,7 @@
               }
             ],
             "title": "Number",
-            "description": "Document number exactly as printed by the issuer."
+            "description": "Document number as printed on the document."
           }
         },
         "additionalProperties": false,
@@ -11978,7 +12747,7 @@
               }
             ],
             "title": "Key",
-            "description": "Stable caller-chosen key used to address the same child applicant on later writes."
+            "description": "Stable caller-chosen key. The person's id is derived from it, so a repeated write with the same key updates the same person."
           },
           "id": {
             "anyOf": [
@@ -11991,7 +12760,7 @@
               }
             ],
             "title": "Id",
-            "description": "Entity id returned by an earlier write; use either id or key."
+            "description": "Id of a person already in the client's graph, as returned by an earlier response. It takes precedence over key. A person with neither returns 422 validation_failed."
           },
           "firstName": {
             "anyOf": [
@@ -12097,7 +12866,7 @@
                 "type": "null"
               }
             ],
-            "description": "ISO 3166-1 alpha-2 country of residence."
+            "description": "ISO 3166-1 alpha-2 country of residence. It is separate from taxIdCountry and address.country."
           },
           "linkedinUrl": {
             "anyOf": [
@@ -12138,7 +12907,7 @@
               }
             ],
             "title": "Phone",
-            "description": "Applicant phone number in E.164 format."
+            "description": "Applicant phone number. Required for completion."
           },
           "address": {
             "anyOf": [
@@ -12149,7 +12918,7 @@
                 "type": "null"
               }
             ],
-            "description": "Applicant residential address."
+            "description": "Applicant residential address. Required for completion."
           },
           "taxIdCountry": {
             "anyOf": [
@@ -12160,7 +12929,7 @@
                 "type": "null"
               }
             ],
-            "description": "ISO 3166-1 alpha-2 tax-residence country; it is not inferred from nationality or address."
+            "description": "ISO 3166-1 alpha-2 country of tax residence. Required for completion. It is not inferred from nationality or address."
           },
           "taxId": {
             "anyOf": [
@@ -12174,7 +12943,7 @@
               }
             ],
             "title": "Taxid",
-            "description": "Personal tax identifier exactly as issued."
+            "description": "Personal tax identifier as issued. When taxIdCountry is US it is required for completion and must be an SSN, for example 123-45-6789."
           },
           "identityDocuments": {
             "anyOf": [
@@ -12189,7 +12958,7 @@
               }
             ],
             "title": "Identitydocuments",
-            "description": "Identity-document metadata. Files are attached through documents."
+            "description": "Passport or ID metadata. Upload the file separately and file it into a document slot."
           },
           "ownershipPercentage": {
             "anyOf": [
@@ -12258,7 +13027,7 @@
               }
             ],
             "title": "Documents",
-            "description": "Files attached to this child applicant, referenced by uploadId."
+            "description": "Files attached to this person, referenced by uploadId. A proof_of_address file is required for completion."
           }
         },
         "additionalProperties": false,
@@ -12304,7 +13073,7 @@
               }
             ],
             "title": "Key",
-            "description": "Caller-chosen stable key for this related applicant."
+            "description": "Caller-chosen stable key. Null for a person added outside this route."
           },
           "id": {
             "type": "string",
@@ -12542,7 +13311,7 @@
           "ready": {
             "type": "boolean",
             "title": "Ready",
-            "description": "Whether all known requirements are satisfied and completion can be attempted."
+            "description": "True when missing is empty and completion can be attempted."
           },
           "missing": {
             "items": {
@@ -12550,11 +13319,11 @@
             },
             "type": "array",
             "title": "Missing",
-            "description": "Outstanding applicant fields or document slots."
+            "description": "Outstanding fields and document slots as paths into the document, for example company.address.zip or people[0].documents.proof_of_address. A people index is the position in document.people of GET /dapi/v1/client/kyb."
           },
           "status": {
             "$ref": "#/components/schemas/PlatformKybStatus",
-            "description": "Current public review status.",
+            "description": "Review status of the latest application. It equals kybStatus on the client record.",
             "default": "notStarted"
           },
           "application": {
@@ -12636,7 +13405,7 @@
                 "type": "null"
               }
             ],
-            "description": "Business-applicant fields to merge into the editable verification submission."
+            "description": "Business-applicant fields to merge into the editable submission. Omitted fields keep their stored value."
           },
           "people": {
             "anyOf": [
@@ -12651,7 +13420,7 @@
               }
             ],
             "title": "People",
-            "description": "Related individual applicants; omit to retain the current roster."
+            "description": "The client's owners, directors and signers. At least one is required for completion. Omit it to keep the roster. Sending it removes people created through this route that it leaves out."
           },
           "documents": {
             "anyOf": [
@@ -12666,7 +13435,7 @@
               }
             ],
             "title": "Documents",
-            "description": "Business-level documents previously uploaded through POST /dapi/v1/documents."
+            "description": "Business-level files uploaded through POST /dapi/v1/documents. Omit it to keep the filed set."
           }
         },
         "additionalProperties": false,
@@ -12678,7 +13447,7 @@
           "ready": {
             "type": "boolean",
             "title": "Ready",
-            "description": "Whether all known requirements are satisfied and completion can be attempted."
+            "description": "True when missing is empty and completion can be attempted."
           },
           "missing": {
             "items": {
@@ -12686,7 +13455,7 @@
             },
             "type": "array",
             "title": "Missing",
-            "description": "Outstanding applicant fields or document slots."
+            "description": "Outstanding fields and document slots as paths into the document, for example company.address.zip or people[0].documents.proof_of_address. A people index is the position in document.people of GET /dapi/v1/client/kyb."
           },
           "people": {
             "items": {
@@ -12694,7 +13463,7 @@
             },
             "type": "array",
             "title": "People",
-            "description": "Stable references for related applicants."
+            "description": "Key and id of each person on the roster."
           }
         },
         "type": "object",
@@ -12752,11 +13521,11 @@
         "properties": {
           "method": {
             "$ref": "#/components/schemas/FiatPaymentType",
-            "description": "Local payment method used by the originator."
+            "description": "Payment method the payer sends over. It must equal `requisites.method`."
           },
           "requisites": {
             "$ref": "#/components/schemas/ContactPaymentAccount",
-            "description": "Originator payment-account identity and account details."
+            "description": "Account the payer sends from, with its holder and identifiers."
           }
         },
         "additionalProperties": false,
@@ -12773,27 +13542,27 @@
             "type": "string",
             "format": "email",
             "title": "Email",
-            "description": "Email address of the account that owns the registered developer key."
+            "description": "Email address of the HEVN account that holds the developer key."
           },
           "publicKey": {
             "type": "string",
             "title": "Publickey",
-            "description": "Base64 DER SubjectPublicKeyInfo for the registered P-256 developer key."
+            "description": "Base64 DER SubjectPublicKeyInfo of the P-256 developer key, in the standard alphabet with padding. PEM armor and base64url are refused."
           },
           "nonce": {
             "type": "integer",
             "title": "Nonce",
-            "description": "Caller-generated single-use number included in the signed authentication proof."
+            "description": "A new integer for each login. It is part of the signed proof string."
           },
           "requestExpiry": {
             "type": "integer",
             "title": "Requestexpiry",
-            "description": "Unix time in milliseconds after which the signed request is refused."
+            "description": "Unix time in milliseconds when the signed proof expires. It must be in the future and at most 5 minutes ahead, or the call returns `400 request_expired`."
           },
           "signature": {
             "type": "string",
             "title": "Signature",
-            "description": "Base64 DER ECDSA P-256/SHA-256 signature over the login proof message."
+            "description": "Base64 DER ECDSA signature over SHA-256 of `hevn-developer-key-login:{email}:{nonce}:{requestExpiry}`. A raw 64-byte `r‖s` signature is refused."
           }
         },
         "additionalProperties": false,
@@ -12812,17 +13581,17 @@
           "code": {
             "type": "string",
             "title": "Code",
-            "description": "Stable machine-readable code for this blocker."
+            "description": "Stable machine-readable code: `kyb_required`, `verification_required` or `terms_required`. A blocker clears without another call once the client meets it."
           },
           "field": {
             "type": "string",
             "title": "Field",
-            "description": "Profile or verification field associated with this blocker."
+            "description": "Requirement this blocker is about: `kyb`, `verification` or `terms`."
           },
           "message": {
             "type": "string",
             "title": "Message",
-            "description": "Human-readable explanation safe to show to an end user."
+            "description": "Human-readable explanation you can show to the end user unchanged."
           },
           "url": {
             "anyOf": [
@@ -12853,7 +13622,7 @@
             },
             "type": "array",
             "title": "Rails",
-            "description": "Payment methods and virtual-account configurations available to the account."
+            "description": "One record per product this client can request, requested or not, plus records opened on external accounts. A product no rail serves for this client is absent."
           }
         },
         "type": "object",
@@ -12866,7 +13635,23 @@
         "properties": {
           "product": {
             "$ref": "#/components/schemas/RailProduct",
-            "description": "Region product to request."
+            "description": "Region product to request. The codes are the same in each environment."
+          },
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?:acc_)?[A-Za-z0-9._:\\-]{1,216}$",
+                "examples": [
+                  "acc_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accountid",
+            "description": "External account the receiving account delivers deposits to, as USDC on its network. Omit it for the client's wallet. Only some products can deliver to an external account. The others return `409 account_destination_unsupported`."
           }
         },
         "additionalProperties": false,
@@ -12944,7 +13729,7 @@
               }
             ],
             "title": "Rate",
-            "description": "Conversion rate net of markup, when currently available."
+            "description": "Conversion rate net of markup. Absent when no rate is available or the product is not requested."
           },
           "fixedFee": {
             "anyOf": [
@@ -12957,7 +13742,7 @@
               }
             ],
             "title": "Fixedfee",
-            "description": "Fixed fee component, when charged."
+            "description": "Fixed fee component. Absent when none applies or the product is not requested."
           },
           "fixedFeeCurrency": {
             "anyOf": [
@@ -12982,11 +13767,11 @@
         "properties": {
           "fields": {
             "$ref": "#/components/schemas/RequisiteFields-Output",
-            "description": "Structured receiving details for this payment method."
+            "description": "Identifiers the payment method uses, such as `iban` and `bic`."
           },
           "holder": {
             "$ref": "#/components/schemas/RequisiteHolder-Output",
-            "description": "Identity and address of the receiving account holder."
+            "description": "Holder of the receiving account. On a named rail it is the client, in its legal name. On a pooled account it is the institution that holds the account for many clients."
           },
           "bankName": {
             "anyOf": [
@@ -13010,7 +13795,7 @@
               }
             ],
             "title": "Paymentreference",
-            "description": "Reference or memo that must accompany the account transfer."
+            "description": "Reference the payer must include, when set. On a pooled account it attributes the money to the client."
           },
           "state": {
             "$ref": "#/components/schemas/RequisiteState",
@@ -13044,7 +13829,7 @@
           "rail": {
             "type": "string",
             "title": "Rail",
-            "description": "Rail serving this product. Informational; address the account by product."
+            "description": "Opaque route serving this product. Do not store it, branch on it or show it. It can change while the record is `preparing`. Address the account by `product`."
           },
           "currency": {
             "type": "string",
@@ -13053,7 +13838,7 @@
           },
           "railCurrency": {
             "$ref": "#/components/schemas/BankDepositCurrency",
-            "description": "Asset credited after funds arrive through this rail."
+            "description": "Settlement token the rail delivers. It depends on the rail, so read it each time."
           },
           "method": {
             "$ref": "#/components/schemas/FiatPaymentType",
@@ -13062,7 +13847,7 @@
           "opened": {
             "type": "boolean",
             "title": "Opened",
-            "description": "Whether receiving details have been provisioned for this payment method."
+            "description": "Whether the product has been requested. Account details can still be pending."
           },
           "status": {
             "anyOf": [
@@ -13073,12 +13858,12 @@
                 "type": "null"
               }
             ],
-            "description": "Current virtual-account lifecycle status."
+            "description": "Virtual-account lifecycle status. Absent on a product not requested. Only `active` is payable."
           },
           "feeBps": {
             "type": "integer",
             "title": "Feebps",
-            "description": "Variable fee in basis points; 100 basis points equals 1 percent."
+            "description": "Payin fee for this product in whole basis points, from the client's plan. `100` is 1%. Indicative until a quote fixes the fee."
           },
           "supportedAccounts": {
             "items": {
@@ -13086,7 +13871,7 @@
             },
             "type": "array",
             "title": "Supportedaccounts",
-            "description": "Accounts this payment method can settle to."
+            "description": "Client accounts this rail can deliver into. It depends on the rail, so read it each time."
           },
           "destinationAccount": {
             "anyOf": [
@@ -13097,7 +13882,7 @@
                 "type": "null"
               }
             ],
-            "description": "Account credited on settlement."
+            "description": "Account the rail delivers into now, present once account details are published. Choose one per payment with `destinationAccount` on `POST /payins`."
           },
           "minimumDeposit": {
             "anyOf": [
@@ -13110,7 +13895,7 @@
               }
             ],
             "title": "Minimumdeposit",
-            "description": "Minimum amount accepted through this method."
+            "description": "Smallest amount accepted on this rail, in `currency`. Absent when the rail sets none."
           },
           "id": {
             "anyOf": [
@@ -13126,7 +13911,23 @@
               }
             ],
             "title": "Id",
-            "description": "Opened virtual-account identifier."
+            "description": "Virtual-account id, present once the product is requested. Transaction filters and reports use it, so store it with the product."
+          },
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?:acc_)?[A-Za-z0-9._:\\-]{1,216}$",
+                "examples": [
+                  "acc_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accountid",
+            "description": "External account deposits are delivered to, as USDC on its network. Absent for an account that delivers to the client's wallet or holds fiat, and for one not opened yet."
           },
           "requisites": {
             "anyOf": [
@@ -13137,7 +13938,7 @@
                 "type": "null"
               }
             ],
-            "description": "Receiving details, present after the virtual account becomes active."
+            "description": "Account details to give the payer, present once the virtual account is active. Read them before each use, since they can be republished."
           },
           "blockers": {
             "items": {
@@ -13145,7 +13946,7 @@
             },
             "type": "array",
             "title": "Blockers",
-            "description": "What still stands between this request and active receiving details."
+            "description": "What is pending before account details are published. Set only while the record is `preparing`."
           }
         },
         "type": "object",
@@ -13182,7 +13983,7 @@
           "indicative": {
             "type": "boolean",
             "title": "Indicative",
-            "description": "Always true: this is a market reference rate. A payout or incoming transfer is priced by its own quote.",
+            "description": "True on each response, since this is a market reference rate. A payment settles at the rate in its quote.",
             "default": true
           }
         },
@@ -13210,7 +14011,7 @@
               }
             ],
             "title": "Userid",
-            "description": "Account to act for; omit it to continue acting as the authenticated account."
+            "description": "`cl_…` id of a client linked to you. The new access token acts for that client. Omit it for a token that acts for your integrator account."
           }
         },
         "additionalProperties": false,
@@ -13797,27 +14598,27 @@
           },
           "status": {
             "$ref": "#/components/schemas/PayoutStatus",
-            "description": "Current public lifecycle status of the emulated credit."
+            "description": "`settled` once the credit lands. `submitted` while the transfer is unconfirmed."
           },
           "token": {
             "$ref": "#/components/schemas/BalanceAccount",
-            "description": "Digital asset credited after settlement."
+            "description": "Token credited."
           },
           "amount": {
             "type": "string",
             "title": "Amount",
-            "description": "Source amount supplied to the emulator.",
+            "description": "Source amount of the credit, in `currency`.",
             "example": "500.00"
           },
           "currency": {
             "type": "string",
             "title": "Currency",
-            "description": "Source currency or digital asset."
+            "description": "Currency or token of `amount`."
           },
           "idempotencyKey": {
             "type": "string",
             "title": "Idempotencykey",
-            "description": "Caller-supplied key that binds retries to this credit."
+            "description": "The `Idempotency-Key` you sent, or the key HEVN derived from the request when you sent none."
           },
           "payinId": {
             "anyOf": [
@@ -13833,7 +14634,7 @@
               }
             ],
             "title": "Payinid",
-            "description": "Incoming-transfer identifier, when completing a pay-in."
+            "description": "`pi_…` id of the payin this credit settles."
           },
           "transactionId": {
             "anyOf": [
@@ -13862,7 +14663,7 @@
               }
             ],
             "title": "Credited",
-            "description": "Amount delivered in the settlement asset."
+            "description": "Amount delivered, in `token`."
           },
           "fee": {
             "anyOf": [
@@ -13875,7 +14676,7 @@
               }
             ],
             "title": "Fee",
-            "description": "Fee charged by the emulated route."
+            "description": "Fee charged by the emulated route. Set for a payin credit."
           },
           "feeCurrency": {
             "anyOf": [
@@ -13887,7 +14688,7 @@
               }
             ],
             "title": "Feecurrency",
-            "description": "Currency in which the fee is charged."
+            "description": "Currency of `fee`."
           },
           "rate": {
             "anyOf": [
@@ -13900,7 +14701,7 @@
               }
             ],
             "title": "Rate",
-            "description": "Conversion rate from source to settlement amount."
+            "description": "Conversion rate from `currency` to `token`. Set for a payin credit."
           },
           "txHash": {
             "anyOf": [
@@ -13924,7 +14725,7 @@
               }
             ],
             "title": "Pollurl",
-            "description": "Relative API URL to poll while processing continues."
+            "description": "Path of the payin to poll while it settles, from the host root including `/dapi/v1`."
           }
         },
         "type": "object",
@@ -13952,7 +14753,7 @@
             ],
             "type": "string",
             "title": "Amount",
-            "description": "Test amount to credit.",
+            "description": "Test amount to credit. With `bankId` it is in the virtual account's currency with at most 2 decimals, without it in `token` with at most 6.",
             "example": "500.00"
           },
           "bankId": {
@@ -13969,7 +14770,7 @@
               }
             ],
             "title": "Bankid",
-            "description": "Virtual-account identifier for an emulated account transfer."
+            "description": "`bnk_…` virtual account to credit. The emulator books an unquoted payin at a fixed rate."
           },
           "token": {
             "anyOf": [
@@ -13980,7 +14781,7 @@
                 "type": "null"
               }
             ],
-            "description": "Digital asset for an emulated on-chain transfer, on Base."
+            "description": "Token for a faucet transfer to the client's wallet on Base. Defaults to `USDC`. Omit it with `bankId`, which sets the token."
           },
           "remitter": {
             "anyOf": [
@@ -13993,7 +14794,7 @@
               }
             ],
             "title": "Remitter",
-            "description": "Originator name reported with the credit."
+            "description": "Payer name reported with the credit. Needs `bankId`."
           },
           "paymentReference": {
             "anyOf": [
@@ -14006,7 +14807,7 @@
               }
             ],
             "title": "Paymentreference",
-            "description": "Reference reported with the credit."
+            "description": "Payer message reported with the credit. Needs `bankId`."
           }
         },
         "additionalProperties": false,
@@ -14020,7 +14821,7 @@
         "properties": {
           "status": {
             "$ref": "#/components/schemas/KybApplicationStatus",
-            "description": "The reviewer's decision: `approved`, `rfi` or `rejected`."
+            "description": "The reviewer's decision: `approved`, `rfi` or `rejected`. `approved` needs a `pending` application, the other two a `pending` or `approved` one."
           },
           "comment": {
             "anyOf": [
@@ -14034,7 +14835,7 @@
               }
             ],
             "title": "Comment",
-            "description": "What the reviewer tells the client. Required for `rfi` and `rejected`."
+            "description": "What the reviewer tells the client, returned as `application.comment`. Required for `rfi` and `rejected`."
           }
         },
         "additionalProperties": false,
@@ -14057,7 +14858,7 @@
               }
             ],
             "title": "Remitter",
-            "description": "Originator name reported with the credit."
+            "description": "Payer name reported with the credit."
           }
         },
         "additionalProperties": false,
@@ -14093,7 +14894,7 @@
           "idempotencyKey": {
             "type": "string",
             "title": "Idempotencykey",
-            "description": "Caller-supplied key that binds retries to this update."
+            "description": "The `Idempotency-Key` you sent, or the key HEVN derived from the request when you sent none."
           },
           "transactionId": {
             "anyOf": [
@@ -14133,7 +14934,7 @@
               }
             ],
             "title": "Refundtxhash",
-            "description": "Refund transaction hash, when applicable."
+            "description": "Hash of the transfer that returns the source token on `refunded`. Set while it is unconfirmed too."
           }
         },
         "type": "object",
@@ -14150,7 +14951,7 @@
         "properties": {
           "status": {
             "$ref": "#/components/schemas/PayoutStatus",
-            "description": "Next externally reportable lifecycle status for the emulated transfer."
+            "description": "Status to move the payout to: `submitted`, `settled`, `failed` or `refunded`. Only `failed` is accepted before the payout's on-chain debit lands."
           }
         },
         "additionalProperties": false,
@@ -14196,7 +14997,7 @@
           "address": {
             "type": "string",
             "title": "Address",
-            "description": "Sandbox treasury address."
+            "description": "Address of the shared testnet faucet account."
           },
           "gasBalance": {
             "type": "string",
@@ -14207,7 +15008,7 @@
           "maxCredit": {
             "type": "string",
             "title": "Maxcredit",
-            "description": "Maximum test amount allowed in one credit.",
+            "description": "Largest token amount one payin credit may deliver, with `bankId` or on a completed payin.",
             "example": "500.00"
           },
           "balances": {
@@ -14234,18 +15035,18 @@
           "accessToken": {
             "type": "string",
             "title": "Accesstoken",
-            "description": "Short-lived bearer token used to authorize API requests."
+            "description": "Send it as `Authorization: Bearer <accessToken>` on each call. It lasts 1 hour."
           },
           "expiresIn": {
             "type": "integer",
             "title": "Expiresin",
-            "description": "Number of seconds until the access token expires."
+            "description": "Seconds until the access token expires, `3600`."
           },
           "userId": {
             "type": "string",
             "pattern": "^(?:cl_)?[A-Za-z0-9._:\\-]{1,216}$",
             "title": "Userid",
-            "description": "Account selected for the issued session.",
+            "description": "`cl_…` id of the account the new access token acts for.",
             "examples": [
               "cl_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
             ]
@@ -14263,11 +15064,11 @@
         "properties": {
           "sourceAccount": {
             "$ref": "#/components/schemas/AccountKey",
-            "description": "Account the money leaves."
+            "description": "Account the money leaves. It must differ from `destinationAccount`. An `FDIC_*` account the owner does not hold returns `422 account_unavailable`."
           },
           "destinationAccount": {
             "$ref": "#/components/schemas/AccountKey",
-            "description": "Account the money lands on."
+            "description": "Account the money lands on. An `FDIC_*` account the owner does not hold returns `422 account_unavailable`."
           },
           "amount": {
             "anyOf": [
@@ -14289,7 +15090,7 @@
               }
             ],
             "title": "Amount",
-            "description": "Exact amount to debit from the source account."
+            "description": "Amount debited from the source account. Send `amount` or `amountTo`. Both or neither returns `422 validation_failed`."
           },
           "amountTo": {
             "anyOf": [
@@ -14311,7 +15112,7 @@
               }
             ],
             "title": "Amountto",
-            "description": "Exact amount the destination account should receive."
+            "description": "Amount the destination account receives. Send `amount` or `amountTo`."
           },
           "publicKey": {
             "type": "string",
@@ -14335,7 +15136,7 @@
           "code": {
             "type": "string",
             "title": "Code",
-            "description": "Stable machine-readable code for the swap failure."
+            "description": "Machine-readable failure code, `swap_not_settled` for a swap that did not settle."
           }
         },
         "type": "object",
@@ -14348,11 +15149,11 @@
         "properties": {
           "sourceAccount": {
             "$ref": "#/components/schemas/AccountKey",
-            "description": "Account the money leaves."
+            "description": "Account the money leaves. It must differ from `destinationAccount`. An `FDIC_*` account the owner does not hold returns `422 account_unavailable`."
           },
           "destinationAccount": {
             "$ref": "#/components/schemas/AccountKey",
-            "description": "Account the money lands on."
+            "description": "Account the money lands on. An `FDIC_*` account the owner does not hold returns `422 account_unavailable`."
           },
           "amount": {
             "anyOf": [
@@ -14374,7 +15175,7 @@
               }
             ],
             "title": "Amount",
-            "description": "Exact amount to debit from the source account."
+            "description": "Amount debited from the source account. Send `amount` or `amountTo`. Both or neither returns `422 validation_failed`."
           },
           "amountTo": {
             "anyOf": [
@@ -14396,7 +15197,7 @@
               }
             ],
             "title": "Amountto",
-            "description": "Exact amount the destination account should receive."
+            "description": "Amount the destination account receives. Send `amount` or `amountTo`."
           }
         },
         "additionalProperties": false,
@@ -14482,12 +15283,12 @@
               }
             ],
             "title": "Minimumtoamount",
-            "description": "Worst-case amount credited when the route carries slippage."
+            "description": "Lowest amount credited to the destination account on a route with slippage."
           },
           "estimated": {
             "type": "boolean",
             "title": "Estimated",
-            "description": "Whether the delivered amount is an estimate settled later, rather than a locked price.",
+            "description": "When `true`, `toAmount` is an estimate and the delivered amount is known on arrival.",
             "default": false
           },
           "etaHours": {
@@ -14574,7 +15375,7 @@
                 "type": "null"
               }
             ],
-            "description": "Terms fixed when the swap was created."
+            "description": "Terms fixed when the swap was created. On this read `minimumToAmount` and `etaHours` are null and `estimated` is `false`."
           },
           "transactionHash": {
             "anyOf": [
@@ -14602,7 +15403,7 @@
               }
             ],
             "title": "Transactionid",
-            "description": "Ledger transaction identifier, when projected."
+            "description": "Ledger transaction id, set once a swap that involves an `FDIC_*` account is on the ledger. Null for a swap between token accounts."
           },
           "createdAt": {
             "type": "string",
@@ -14621,7 +15422,7 @@
               }
             ],
             "title": "Settledat",
-            "description": "UTC timestamp when settlement completed."
+            "description": "UTC timestamp of the swap's last update, set once `status` is `settled`."
           },
           "failure": {
             "anyOf": [
@@ -14632,7 +15433,7 @@
                 "type": "null"
               }
             ],
-            "description": "Terminal or actionable failure details."
+            "description": "Set when `status` is `failed`."
           }
         },
         "type": "object",
@@ -14680,7 +15481,7 @@
               }
             ],
             "title": "Pollurl",
-            "description": "Relative API URL to poll while processing continues."
+            "description": "Relative URL of `GET /dapi/v1/swaps/{swapId}`. Read it until `status` is `settled` or `failed`."
           },
           "failure": {
             "anyOf": [
@@ -14691,7 +15492,7 @@
                 "type": "null"
               }
             ],
-            "description": "Terminal or actionable failure details."
+            "description": "Set when `status` is `failed`."
           }
         },
         "type": "object",
@@ -14714,7 +15515,7 @@
           },
           "status": {
             "$ref": "#/components/schemas/SwapState",
-            "description": "Current public lifecycle status of the swap."
+            "description": "`awaitingSignature` on create."
           },
           "idempotencyKey": {
             "type": "string",
@@ -14735,7 +15536,7 @@
           },
           "authorization": {
             "$ref": "#/components/schemas/AuthorizationKind",
-            "description": "Whether the approval authorizes a balance debit or a signature over the swap's terms."
+            "description": "`debit`: the approval covers a transfer of tokens from the wallet that funds the swap, and `debit` is set. `intent`: the approval covers a signature over the swap's terms that the swap settles against, and `intent` is set."
           },
           "approval": {
             "$ref": "#/components/schemas/ApprovalView",
@@ -14750,7 +15551,7 @@
                 "type": "null"
               }
             ],
-            "description": "Exact on-chain debit used to fund this swap."
+            "description": "Set when `authorization` is `debit`. The address, amount and token decoded from the operation to sign. Check it before signing."
           },
           "intent": {
             "anyOf": [
@@ -14761,7 +15562,7 @@
                 "type": "null"
               }
             ],
-            "description": "Terms authorized by the signature, when this swap is not funded by a debit."
+            "description": "Set when `authorization` is `intent`. The EIP-712 digest of the swap's terms and how it settles."
           }
         },
         "type": "object",
@@ -14792,23 +15593,23 @@
           "accessToken": {
             "type": "string",
             "title": "Accesstoken",
-            "description": "Short-lived bearer token used to authorize API requests."
+            "description": "Send it as `Authorization: Bearer <accessToken>` on each call. It lasts 1 hour."
           },
           "refreshToken": {
             "type": "string",
             "title": "Refreshtoken",
-            "description": "Long-lived device-bound token used only at POST /dapi/v1/auth/refresh."
+            "description": "Token for `POST /dapi/v1/auth/refresh` and no other route. It lasts 60 days."
           },
           "expiresIn": {
             "type": "integer",
             "title": "Expiresin",
-            "description": "Number of seconds until the access token expires."
+            "description": "Seconds until the access token expires, `3600`."
           },
           "userId": {
             "type": "string",
             "pattern": "^(?:cl_)?[A-Za-z0-9._:\\-]{1,216}$",
             "title": "Userid",
-            "description": "Account selected for the issued session.",
+            "description": "`cl_…` id of the account the session acts for. After login it is your integrator account.",
             "examples": [
               "cl_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
             ]
@@ -14893,7 +15694,7 @@
           "type": {
             "type": "string",
             "title": "Type",
-            "description": "Public transaction type."
+            "description": "Transaction type, for example a payment method slug such as `sepa`, `ach` or `swift`, `crypto` for an on-chain movement or `refund` for a returned payment."
           },
           "status": {
             "$ref": "#/components/schemas/TransactionStatus",
@@ -14902,7 +15703,7 @@
           "isIncome": {
             "type": "boolean",
             "title": "Isincome",
-            "description": "Whether this transaction increases the selected account's balance."
+            "description": "`true` for money coming into the selected account."
           },
           "from": {
             "anyOf": [
@@ -14913,7 +15714,7 @@
                 "type": "null"
               }
             ],
-            "description": "Source side of the transaction."
+            "description": "Amount and asset that left the source."
           },
           "to": {
             "anyOf": [
@@ -14924,7 +15725,7 @@
                 "type": "null"
               }
             ],
-            "description": "Destination side of the transaction."
+            "description": "Amount and asset that arrived at the destination."
           },
           "fee": {
             "anyOf": [
@@ -14958,7 +15759,7 @@
               }
             ],
             "title": "Counterparty",
-            "description": "Human-readable counterparty name."
+            "description": "Resolved name of the other party."
           },
           "paymentReference": {
             "anyOf": [
@@ -14994,7 +15795,7 @@
               }
             ],
             "title": "Txhash",
-            "description": "On-chain transaction hash associated with this ledger entry."
+            "description": "Hash of the on-chain leg, when the transaction has one."
           },
           "tag": {
             "anyOf": [
@@ -15006,13 +15807,29 @@
               }
             ],
             "title": "Tag",
-            "description": "Public transaction classification tag."
+            "description": "Category from a fixed set such as `PAYROLL` or `CONTRACTORS`. Null when untagged."
           },
           "hasAttachments": {
             "type": "boolean",
             "title": "Hasattachments",
             "description": "Whether supporting documents are attached.",
             "default": false
+          },
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?:acc_)?[A-Za-z0-9._:\\-]{1,216}$",
+                "examples": [
+                  "acc_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accountid",
+            "description": "External account this transaction moved. Null for any other account."
           },
           "createdAt": {
             "type": "string",
@@ -15062,7 +15879,7 @@
             },
             "type": "array",
             "title": "Attachmentids",
-            "description": "Supporting document identifiers."
+            "description": "Ids (`doc_…`) of supporting documents."
           }
         },
         "type": "object",
@@ -15200,7 +16017,7 @@
           "type": {
             "type": "string",
             "title": "Type",
-            "description": "Public transaction type."
+            "description": "Transaction type, for example a payment method slug such as `sepa`, `ach` or `swift`, `crypto` for an on-chain movement or `refund` for a returned payment."
           },
           "status": {
             "$ref": "#/components/schemas/TransactionStatus",
@@ -15209,7 +16026,7 @@
           "isIncome": {
             "type": "boolean",
             "title": "Isincome",
-            "description": "Whether this transaction increases the selected account's balance."
+            "description": "`true` for money coming into the selected account."
           },
           "from": {
             "anyOf": [
@@ -15220,7 +16037,7 @@
                 "type": "null"
               }
             ],
-            "description": "Source side of the transaction."
+            "description": "Amount and asset that left the source."
           },
           "to": {
             "anyOf": [
@@ -15231,7 +16048,7 @@
                 "type": "null"
               }
             ],
-            "description": "Destination side of the transaction."
+            "description": "Amount and asset that arrived at the destination."
           },
           "fee": {
             "anyOf": [
@@ -15265,7 +16082,7 @@
               }
             ],
             "title": "Counterparty",
-            "description": "Human-readable counterparty name."
+            "description": "Resolved name of the other party."
           },
           "paymentReference": {
             "anyOf": [
@@ -15301,7 +16118,7 @@
               }
             ],
             "title": "Txhash",
-            "description": "On-chain transaction hash associated with this ledger entry."
+            "description": "Hash of the on-chain leg, when the transaction has one."
           },
           "tag": {
             "anyOf": [
@@ -15313,13 +16130,29 @@
               }
             ],
             "title": "Tag",
-            "description": "Public transaction classification tag."
+            "description": "Category from a fixed set such as `PAYROLL` or `CONTRACTORS`. Null when untagged."
           },
           "hasAttachments": {
             "type": "boolean",
             "title": "Hasattachments",
             "description": "Whether supporting documents are attached.",
             "default": false
+          },
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?:acc_)?[A-Za-z0-9._:\\-]{1,216}$",
+                "examples": [
+                  "acc_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accountid",
+            "description": "External account this transaction moved. Null for any other account."
           },
           "createdAt": {
             "type": "string",
@@ -15563,6 +16396,71 @@
         ],
         "title": "UserAddress",
         "description": "Provider-neutral postal address used across domain and API schemas."
+      },
+      "WalletTransferView": {
+        "properties": {
+          "chain": {
+            "type": "string",
+            "const": "base",
+            "title": "Chain",
+            "description": "Network the transfer is sent on.",
+            "default": "base"
+          },
+          "chainId": {
+            "type": "integer",
+            "title": "Chainid",
+            "description": "Numeric network identifier of that network."
+          },
+          "token": {
+            "type": "string",
+            "title": "Token",
+            "description": "Digital asset to send."
+          },
+          "tokenAddress": {
+            "type": "string",
+            "title": "Tokenaddress",
+            "description": "Contract address of that asset on the network."
+          },
+          "fromAddress": {
+            "type": "string",
+            "title": "Fromaddress",
+            "description": "Address of the source external account. A transfer from any other address does not count."
+          },
+          "toAddress": {
+            "type": "string",
+            "title": "Toaddress",
+            "description": "Address to send the asset to."
+          },
+          "amount": {
+            "type": "string",
+            "title": "Amount",
+            "description": "Exact human-readable amount to send.",
+            "example": "500.00"
+          },
+          "amountAtomic": {
+            "type": "string",
+            "title": "Amountatomic",
+            "description": "The same amount as an integer in the asset's smallest unit."
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expiresat",
+            "description": "UTC timestamp after which a transfer no longer funds this payout."
+          }
+        },
+        "type": "object",
+        "required": [
+          "chainId",
+          "token",
+          "tokenAddress",
+          "fromAddress",
+          "toAddress",
+          "amount",
+          "amountAtomic",
+          "expiresAt"
+        ],
+        "title": "WalletTransferView"
       }
     },
     "securitySchemes": {
@@ -15575,11 +16473,15 @@
   "tags": [
     {
       "name": "auth",
-      "description": "Authenticate an integration and issue short-lived account sessions."
+      "description": "Log in with a developer key and refresh the access token. Developer keys are created in the HEVN app."
     },
     {
       "name": "accounts",
       "description": "Create and manage business or individual customer accounts."
+    },
+    {
+      "name": "external accounts",
+      "description": "Register addresses a client holds on supported networks to receive and pay USDC through."
     },
     {
       "name": "verification",
@@ -15611,7 +16513,7 @@
     },
     {
       "name": "sandbox",
-      "description": "Emulate funding and lifecycle events in the sandbox environment."
+      "description": "Emulate funding and lifecycle events in the sandbox. These routes return `404` in production."
     }
   ]
 }

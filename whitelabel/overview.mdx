@@ -1,97 +1,176 @@
 ---
 title: "Overview"
-description: "Link your customers' own HEVN accounts through a sign-in popup on your site, open partner-bank payment details for them, and move their money with their approval."
+description: "Link customers' HEVN accounts, see how their money moves and learn who signs each payout."
 ---
 
-With the whitelabel API your customers get partner-bank payment details, a balance and outgoing payments inside your product. Each customer owns their HEVN account: they create it in a HEVN sign-in popup on your site, your backend operates it, and they approve every payment that leaves it.
+The whitelabel API lets your backend operate HEVN accounts that your customers hold. Start with the [Quickstart](/whitelabel/quickstart), which links one client through `POST /dapi/v1/clients/link` in the sandbox.
 
 ```mermaid
 flowchart TB
     K["Your backend<br/>holds the developer key"]
     I["Your integrator account"]
-    P["Sign in with HEVN<br/>popup on your site"]
+    P["Sign in with HEVN<br/>window on your site"]
     K -->|"logs in, books, configures"| I
     P -->|"the customer creates the account<br/>and links it to you"| Wallet
     I -->|"acts for linked accounts"| Wallet
-    subgraph Wallet["Client account — one per customer, owned by them"]
-        W["Base smart wallet<br/>the balance lives here"]
-        B["Bank rails<br/>account details in the client's legal name"]
+    subgraph Wallet["Client account, one per customer"]
+        W["Base smart wallet<br/>USDC and EURC"]
+        B["Virtual accounts<br/>opened by a partner bank"]
         T["Contacts<br/>saved payout destinations"]
-        B -->|"deposits settle into"| W
+        B -->|"payins settle into"| W
         W -->|"payouts the holder approves"| T
     end
 ```
 
-## What you can build
+Your integrator account and each client are HEVN accounts: a profile plus a Base smart wallet. HEVN activates your integrator account on request, in the sandbox and in production ([Going live](/whitelabel/sandbox#what-hevn-must-enable)).
 
-- **A payroll or payables platform.** Collect from an employer, pay contractors to their own bank
-  accounts in their own currencies.
-- **An embedded payments account.** Give each of your customers payment details in their own company
-  name, a balance, a statement and outgoing payments, under your brand.
-- **A marketplace with on-chain escrow.** Lock a buyer's funds in a contract while a seller
-  delivers, then capture them minus your fee. Escrow approvals by linked buyers are not available
-  yet — see [Escrow](/whitelabel/escrow).
+A client is a customer's HEVN account linked to your integrator account. The holder creates it in the [sign-in window](/whitelabel/sign-in-with-hevn). When the holder allows your product there, the client is linked to you.
 
-All three are assembled from the same five moves, in different orders —
-[What you can build](/whitelabel/use-cases) takes each one end to end.
+## Integration steps
 
-## How it works
+| Step | Calls | Page |
+| --- | --- | --- |
+| Link a client | `POST /dapi/v1/connect/sessions` with `action: "link"`, the sign-in window, then `POST /dapi/v1/clients/link` | [Sign in with HEVN](/whitelabel/sign-in-with-hevn), [Clients](/whitelabel/clients) |
+| Verify the client | `PUT /dapi/v1/client/kyb` until `ready: true`, then `POST /dapi/v1/client/kyb/complete` | [Clients and verification](/whitelabel/clients#write-the-document) |
+| Take money in | `POST /dapi/v1/banks` requests a virtual account, `POST /dapi/v1/payins` quotes an incoming payment | [Virtual accounts](/whitelabel/virtual-accounts), [Payins](/whitelabel/payins) |
+| Pay money out | `POST /dapi/v1/contacts`, then `POST /dapi/v1/payouts` and a `sign` session the holder approves | [Payouts](/whitelabel/payouts) |
+| Read the ledger | `GET /dapi/v1/transactions`, `/summary`, `/export` | [Balances and transactions](/whitelabel/balances-and-transactions) |
+| Hold funds in escrow | `POST /dapi/v1/escrow`, then `POST /dapi/v1/escrow/{escrowId}/actions` (enabled per integrator) | [Escrow](/whitelabel/escrow) |
 
-You hold one HEVN account — your **integrator account**. Your customers' accounts are linked to it,
-one per customer. Those are your **clients**. Each client is a real account that belongs to its
-holder: it has a legal identity you submit for review once, **rails** that produce account details in
-its own name, a balance, and a ledger.
+The customer links the account and approves payouts in the sign-in window. The remaining steps are backend calls.
 
-A client comes from [Sign in with HEVN](/whitelabel/sign-in-with-hevn). Your page opens a
-HEVN-hosted popup, your customer signs in — with Google, or with a one-time code sent to an email you
-pass — and your backend exchanges the code that comes back for the client's id. The popup can carry
-your title, logo and colours, and shows no HEVN product screens.
+A buyer linked through Sign in with HEVN cannot approve an escrow deal yet. `POST /dapi/v1/escrow` with a linked buyer returns `403 account_not_controlled` ([Escrow](/whitelabel/escrow)).
 
-Every client balance is a stablecoin balance on that client's own Base smart wallet. Fiat arriving
-over a rail is converted by a partner bank and settles into that wallet; fiat leaving is the same
-journey in reverse. See [How money moves](/whitelabel/how-money-moves).
+## Base URLs
 
-Your backend authenticates with a **developer key** — a P-256 keypair whose private half never leaves
-your server. You register its public half once, together with the source IPs it may be used from,
-and the session it mints reaches this API and nothing else. With it you read and configure every
-client and book their payouts. You never sign them: a client's payout comes back with
-`authorization: "client"`, and its holder approves it in the same popup. Your key signs only for your
-own account. See [Accounts and control](/whitelabel/accounts-and-control).
+| Environment | Base URL |
+| --- | --- |
+| Sandbox | `https://sandbox-api.hevn.finance/dapi/v1` |
+| Production | `https://api.hevn.finance/dapi/v1` |
 
-A client becomes usable by passing four gates in order — linked, verification document complete,
-application approved, rail active. After that, one payment is two calls and one click:
-`POST /dapi/v1/payouts` books and prices it, `POST /dapi/v1/connect/sessions` opens the window for
-it, and the holder approves.
+Browse the spec at [`/dapi/v1/docs`](https://sandbox-api.hevn.finance/dapi/v1/docs) or fetch the schema from `/dapi/v1/openapi.json`.
 
-Every route on these pages sits under `https://api.hevn.finance/dapi/v1`, or
-`https://sandbox-api.hevn.finance/dapi/v1` in the sandbox. The spec is served by the API itself:
-browse it at [`/dapi/v1/docs`](https://sandbox-api.hevn.finance/dapi/v1/docs) and fetch the schema
-from `/dapi/v1/openapi.json`.
+## How money moves
 
-## What you get from HEVN, and what you keep
+A client's balance is USDC and EURC on its Base smart wallet, plus any balance held at the partner bank. Read it with `GET /dapi/v1/client/balance`.
+
+```mermaid
+flowchart LR
+    W["Client's Base smart wallet<br/>USDC / EURC"]
+    subgraph In["Fiat in"]
+        P["Payer's bank"] --> R["Virtual account<br/>POST /dapi/v1/banks"]
+    end
+    subgraph Crypto["Crypto in"]
+        S["Any sender on Base"]
+    end
+    subgraph Out["Fiat out"]
+        D["debit.address<br/>payout funding address"] --> RB["Beneficiary's bank"]
+    end
+    R -->|"partner bank converts<br/>POST /dapi/v1/payins"| W
+    S -->|"USDC or EURC"| W
+    W -->|"POST /dapi/v1/payouts, approved by the holder"| D
+    B["GET /dapi/v1/client/balance"] -.->|"reads this address"| W
+```
+
+### Accounts
+
+`GET /dapi/v1/client/balance` returns one row per account in `accounts[]`.
+
+| Account | Held | Currency |
+| --- | --- | --- |
+| `USDC` | On the client's Base smart wallet, `baseSmartWallet` | USD |
+| `EURC` | On the same wallet | EUR |
+| `USDC_ARB` | The same wallet address on Arbitrum | USD |
+| `FDIC_USD` | At the partner bank, when the client holds it | USD |
+
+The token rows are read on chain. `FDIC_USD` is an account identifier for a balance held at a partner bank. The name says nothing about deposit insurance.
+
+A payin's `destinationAccount` is the account credited, `USDC` by default ([Payins](/whitelabel/payins)). A payout's `sourceAccount` is the account debited: `USDC`, `EURC`, `FDIC_USD` or an external `acc_` account ([Payouts](/whitelabel/payouts)). A swap takes two different accounts ([Swaps](/whitelabel/swaps)). `USDC_ARB` holds and receives only, so payins and payouts refuse it.
+
+A virtual account record has `destinationAccount`, the account its rail settles into, and `supportedAccounts`.
+
+### Money in
+
+| Path | Result | Page |
+| --- | --- | --- |
+| Bank transfer to a virtual account | The partner bank converts it at the rail's rate and delivers the settlement token, minus the rail's `feeBps`. A payin quote is optional. | [Virtual accounts](/whitelabel/virtual-accounts) |
+| Quoted payin | `POST /dapi/v1/payins` takes either `rail` or `originChainId`. `POST /dapi/v1/payins/{payinId}/instructions` returns what the payer needs. | [Payins](/whitelabel/payins) |
+| Transfer to `baseSmartWallet` | The amount is in the balance once the transfer confirms. No payin record is created. | [Payins](/whitelabel/payins) |
+
+<Warning>
+  Send USDC or EURC on Base to `baseSmartWallet`. A token HEVN does not track does not become a balance or a transaction.
+</Warning>
+
+### Money out
+
+`POST /dapi/v1/payouts` books a payout. Its `quote` has the amount that leaves the balance and the amount that arrives.
+
+| Contact | The wallet pays | Then |
+| --- | --- | --- |
+| Bank | The funding address for this payout | The partner bank pays the beneficiary's bank. |
+| Wallet on Base | The contact's address, from the `sourceAccount` you name | No conversion, so both quote amounts are equal. |
+| Wallet on another chain or token | A one-time address for the route | The payout is routed across chains and priced in `quote` ([Payouts](/whitelabel/payouts)). |
+| Email of a HEVN account | The wallet of the HEVN account with that email | See [Payouts](/whitelabel/payouts). |
+
+A client payout returns `authorization: "client"`, and the holder approves it in the sign-in window ([Payouts](/whitelabel/payouts)). A payout from your integrator account returns `approval`, with the `debit` or `intent` it authorizes, and your developer key signs it ([Signing](/whitelabel/signing)).
+
+Send `amount` or `amountTo`, as described in [Money](/whitelabel/conventions#money).
+
+### Status
+
+The sign-in window returns `submitted` once the holder's wallet has sent the debit, before the on-chain receipt. A payout is complete when `GET /dapi/v1/payouts/{payoutId}` returns `settled`.
+
+Fiat timing is set by the partner bank. Poll as described in [Status codes](/whitelabel/conventions#status-codes).
+
+Completed payins and payouts are rows in `GET /dapi/v1/transactions` ([Balances and transactions](/whitelabel/balances-and-transactions)).
+
+## Accounts and control
+
+A client account belongs to its holder, and the holder's key signs each spend from it. Your integrator account reads it, configures it and books its payouts with `POST /dapi/v1/payouts`.
+
+### Who can spend
+
+The holder's key is an embedded wallet managed by [Privy](/general/security-model#keys-and-privy), and it is the signer on the client's Base smart wallet. HEVN holds no key to that wallet. See [Account structure](/general/what-is-hevn#account-structure).
+
+| Operation | Who signs |
+| --- | --- |
+| A payout or swap from your integrator account | Your developer key, co-signed by HEVN. See [Signing](/whitelabel/signing). |
+| An operator action on an escrow deal you run | Your developer key, co-signed by HEVN. See [Escrow](/whitelabel/escrow#the-matrix). |
+| A payout for a client | The client's holder, in the [sign-in window](/whitelabel/sign-in-with-hevn#approve-a-payout). |
+
+To pay out for a client:
+
+1. Book the payout with `POST /dapi/v1/payouts` and the client's id in `X-Hevn-Account`. The response has `authorization: "client"` and no `approval`.
+2. Open the sign-in window for that payout. The holder sees the amount and the contact, and signs the debit.
+
+Confirming a client's payout or swap with your key returns `403 account_not_controlled`.
+
+| Question | Answer |
+| --- | --- |
+| Can you move a client's money? | No. Your developer key is not a signer on a client wallet. |
+| Can HEVN move a client's money without the holder? | No. HEVN holds no key to the client's wallet. |
+| Can the holder move their balance? | Yes. They sign each payout you book, and they can sign in to HEVN without your product. |
+| What can HEVN do to a client balance? | HEVN can stop building new operations for a paused integrator. It cannot spend the balance or reverse a payment. |
+| Who decides which beneficiaries a client may pay? | The partner bank, through the refusals a payout returns. HEVN does not choose beneficiaries. |
+
+### What this means for your product
+
+HEVN authenticates your key and does not see your user. Your server chooses the client for each request and sends it in `X-Hevn-Account` (see [Acting as a client](/whitelabel/authentication#acting-as-a-client)):
+
+- Bind each sign-in to the browser that started it. See [Bind the session to this browser](/whitelabel/sign-in-with-hevn#3-bind-the-session-to-this-browser).
+- Exchange the link code on your server.
+- Keep the `cl_…` in your signed session. Do not accept a client id from a request body or a query string.
+
+A leaked developer key works from addresses on its [IP allowlist](/whitelabel/authentication#the-ip-allowlist) until you delete it. Whoever has it can read and configure all clients linked to you, book client payouts that wait for the holder's signature, and spend from your integrator wallet. The key cannot spend a client balance.
+
+To recover, create a new key, deploy it and delete the old one. HEVN refuses the next request made with a deleted key. See [Rotate a key](/whitelabel/authentication#rotate-a-key).
+
+## Responsibilities
 
 | You build | HEVN provides |
 | --- | --- |
-| Your product, your UI, your customer relationship | The account records, the sign-in window, the partner-bank rails, the on-chain balances, the ledger |
-| The onboarding form your customer fills in | The submission to the partner bank, and the review status you read back from it |
-| The decision to pay, and the moment you ask the holder | The pricing, the approval screen, the execution and the receipt |
+| Your product UI | Account records, the sign-in window, virtual accounts through the partner bank, on-chain balances, the ledger |
+| The onboarding form | Submission to the partner bank and the review status |
+| The decision to pay and the prompt to the holder | Pricing, the approval screen, execution and the receipt |
 
-One thing HEVN switches on for you rather than the API: your integrator account itself. It is a
-conversation, in the sandbox as in production — see [Going live](/whitelabel/going-live).
-
-## Where to start
-
-<CardGroup cols={3}>
-  <Card title="What you can build" icon="blocks" href="/whitelabel/use-cases">
-    Three products assembled out of the five moves every integration is made of.
-  </Card>
-  <Card title="Quickstart" icon="rocket" href="/whitelabel/quickstart">
-    Ten steps in the sandbox: a linked client that holds testnet USDC and has sent some of it out, approved by its holder.
-  </Card>
-  <Card title="Sign in with HEVN" icon="log-in" href="/whitelabel/sign-in-with-hevn">
-    The popup that links a customer's account and approves their payouts.
-  </Card>
-  <Card title="Accounts and control" icon="shield" href="/whitelabel/accounts-and-control">
-    Who owns a client account, who can move its money, and what happens if your key leaks.
-  </Card>
-</CardGroup>
+<Card title="Next: Quickstart" icon="rocket" href="/whitelabel/quickstart" />
