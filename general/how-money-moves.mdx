@@ -38,15 +38,12 @@ Each one-time address serves one payout. The transfer is public on [Basescan](ht
 
 ## Cross-chain
 
-Payins from other chains and payouts to them (BTC, ETH, SOL, USDT on TRON and others) run through the [NEAR Intents 1Click API](https://docs.near-intents.org/integration/distribution-channels/1click-api/about-1click-api).
+Payins from other chains and payouts to them (BTC, ETH, SOL, USDT on TRON and others) are routed swaps.
 
-| Step | Who | What happens |
-| --- | --- | --- |
-| Quote | HEVN | Requests a quote. 1Click returns a one-time address on the origin chain. |
-| Check | The app | Validates the address against the quote before showing it. |
-| Settle | 1Click | Manages the one-time address, settles the swap and delivers the destination asset. |
-| Refund | 1Click | If a swap fails, for example on an expired quote or a mismatched transfer, refunds a payin to the sender's refund address and a payout to the wallet. |
+1. HEVN requests a quote and returns a one-time address on the origin chain. The fee is in the quote.
+2. The app validates the address against the quote before showing it.
+3. The sender pays the one-time address, and the route delivers the destination asset.
 
-Fees follow the [1Click fee calculation](https://docs.near-intents.org/near-intents/integration/distribution-channels/1click-app-fees-calculation).
+If a swap fails, for example on an expired quote or a mismatched transfer, a payin is refunded to the sender's refund address and a payout to the wallet.
 
 <Card title="Next: Security model" icon="arrow-right" href="/general/security-model" />

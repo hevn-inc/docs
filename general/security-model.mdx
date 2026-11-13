@@ -7,13 +7,13 @@ Funds in a HEVN account move by a signature from a wallet owner key, which HEVN 
 
 ## Who can do what
 
-| Action | Holder (email + Privy) | HEVN | Partner bank | 1Click |
-| --- | --- | --- | --- | --- |
-| Spend from the smart wallet | Yes, by signature | No | No | No |
-| Add or remove wallet owners | Yes, onchain | No | No | No |
-| Create invoices and contacts, request a virtual account | Yes, with the JWT | Records them and requests the account details | Opens the virtual account | n/a |
-| Make a fiat payout | Initiates and funds | Passes the payout details to the partner bank | Pays the beneficiary | n/a |
-| Swap cross-chain | Initiates and funds | Requests the quote | n/a | Executes through a one-time address |
+| Action | Holder (email + Privy) | HEVN | Partner bank |
+| --- | --- | --- | --- |
+| Spend from the smart wallet | Yes, by signature | No | No |
+| Add or remove wallet owners | Yes, onchain | No | No |
+| Create invoices and contacts, request a virtual account | Yes, with the JWT | Records them and requests the account details | Opens the virtual account |
+| Make a fiat payout | Initiates and funds | Passes the payout details to the partner bank | Pays the beneficiary |
+| Swap cross-chain | Initiates and funds | Requests the quote and returns a one-time address for the route | n/a |
 
 A co-owner signs like the holder. A remote transfer key or teammate with limited access is capped by its [spend permission](#shared-access).
 
@@ -90,7 +90,7 @@ A compromised backend can delay or drop this data. A substituted address or acco
 | Base | Transactions wait until Base resumes. | Public L2 with public explorers. |
 | Privy (key management and the email-to-key mapping) | An outage or shutdown delays signing. | Sign with an exported key. |
 | Partner bank (fiat leg of payins and payouts) | It holds fiat in transit, so a payin or payout in progress waits. | One one-time address per payout. |
-| NEAR Intents 1Click | A failed or expired swap is refunded to the sender. | One swap at a time, bound to a quote. |
+| Cross-chain routing | A failed or expired swap is refunded to the sender. | One swap at a time, bound to a quote. |
 | Paymaster | Operations wait until it resumes. | It cannot initiate or alter an operation. |
 
 ## Protect your email

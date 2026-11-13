@@ -176,7 +176,7 @@ The `FDIC_*` sentence appears once, on `whitelabel/overview`:
 | Compliance | States and what the client must submit: "under review", "rejected" | "HEVN compliance", "our compliance team" |
 
 - Do not make a financial provider identifiable. Examples use `"bankName": "Example Bank"`, `BANKDEFFXXX` and `DE89370400440532013000`, with no real bank name, real BIC or partner-country IBAN. Treat `rail` values as opaque. Do not describe how a partner operates.
-- Privy, Coinbase Smart Wallet, Base and NEAR Intents (1Click) stay named. Attribute key-handling claims to Privy.
+- Privy, Coinbase Smart Wallet and Base stay named. Attribute key-handling claims to Privy. Do not name the cross-chain swap route: write "routed" or "the route".
 - Scope "non-custodial" to the wallet. The partner bank holds fiat in transit, pooled accounts and `FDIC_*` balances.
 - "In the client's legal name" needs "on a named rail" and "the partner bank opens it".
 - First use of "HEVN account" in a tab: "a profile plus a Base smart wallet".
