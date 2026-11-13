@@ -9,10 +9,14 @@ Each tab has a different reader:
 
 | Tab | Reader | What it answers |
 | --- | --- | --- |
-| General | anyone evaluating HEVN | How the platform is built and who can sign for the wallet |
-| Remote Transfers | an engineer automating their own account | How to let a server or script send USDC from that account with a capped key. For advanced use |
-| Whitelabel | a backend engineer integrating HEVN | How to create accounts for your customers and move their money from code |
-| REST API | the same engineer, mid-integration | The contract of each operation |
+| General | anyone evaluating HEVN | How the platform is built, who can sign for the wallet, and which developer section to read. Remote transfers is a page here, for an engineer automating their own account with a capped key |
+| For developers | a backend engineer starting an integration | How to get API access, log in, sign a payment, verify a client, and what is common to both integration kinds. The first page is the fork between them |
+| HEVN Connect | the same engineer, on the recommended integration | How to link customers' HEVN accounts through the sign-in window and get their payouts approved there |
+| External wallets | an engineer at an integrator with its own wallet infrastructure | How to create clients through the API and deliver their money to wallets they hold, with no HEVN window |
+| Sub Accounts | an engineer running many balances in their own account | How to open sub accounts of the integrator account and move money through them with the developer key |
+| REST API | the same engineers, mid-integration | The contract of each operation |
+
+The directories are `general/`, `developers/`, `connect/`, `external-wallets/`, `sub-accounts/` and `api-reference/`. A tab page holds what differs for that tab and links to `developers/` for what is common. Do not copy a common page into a tab.
 
 ## Terminology
 
@@ -38,12 +42,22 @@ details, returned as `requisites`".
 
 | Term | What it is |
 | --- | --- |
-| integrator account | The reader's HEVN account. It creates and controls clients |
-| client | An account the integrator creates, one per customer. Also the `cl_…` id and the `X-Hevn-Account` header value |
+| integrator account | The reader's HEVN account. It links or creates clients and acts for them. Its own `cl_…` id is the `userId` that `POST /auth/token` returns |
+| client | A customer's account the integrator acts for, one per customer. Linked through HEVN Connect or created with `POST /clients`. Also the `cl_…` id and the `X-Hevn-Account` header value |
 | your customer | The business or person behind a client, in the reader's product |
 | developer key | The P-256 keypair the integrator's backend holds |
+| HEVN Connect | The integration kind in which the customer links a HEVN account in the sign-in window and approves payouts there. The window itself is the "sign-in window", and its feature name is "Sign in with HEVN" |
+| external account | The API object for a wallet address a client holds and signs for: an `acc_…` id with `kind: "external"`. In prose about the product, "external wallet" names the wallet and the integration kind ("External wallets" is the tab title). Write "external account" when you mean the object or its id |
+| sub account | A further wallet of the integrator's own account on Base that HEVN opens and the developer key signs for: an `acc_…` id with `kind: "sub"`. Two words in prose |
+| main wallet | The Base smart wallet of an account, as opposed to its sub accounts. Use it where a page has to tell the two apart |
 
-Do not write "end user", "sub-account", "merchant" or "tenant".
+Do not write "end user", "sub-account", "subaccount", "merchant" or "tenant". Do not call an external account an "external wallet account" or a "linked wallet".
+
+"Account" has three uses, and each needs its qualifier on first use in a page:
+
+- A HEVN account, integrator account or client: a profile, named by a `cl_…` id.
+- An account key: one of `USDC`, `EURC`, `RD`, `USDC_ARB`, `FDIC_USD`, `FDIC_EUR`. A balance of an account, named by its key in `sourceAccount`, `destinationAccount` and each balance row.
+- An `acc_…` id: an external account or a sub account. It goes in the same `sourceAccount` and `destinationAccount` fields as an account key, and in `accountId` on virtual accounts, balances, payins and transactions. A balance on the main wallet has an account key and no `acc_…` id.
 
 ### Money movement
 
@@ -56,8 +70,9 @@ Do not write "end user", "sub-account", "merchant" or "tenant".
 | quote | The priced terms of one payin or payout | "estimate", "rate" |
 | approval | The bytes HEVN builds for the integrator to sign | "transaction", "payload" on its own |
 | settlement token | The stablecoin a rail delivers: USDC or EURC | "coin", "asset" |
-| account | One of `USDC`, `EURC`, `FDIC_USD`, `FDIC_EUR`. The value of `sourceAccount`, `destinationAccount` and each balance row | "wallet". Do not call `FDIC_USD` or `FDIC_EUR` a token |
-| swap | A move between two accounts the same client owns. The `swp_…` resource | "conversion", "exchange", "transfer" |
+| account | An account key (`USDC`, `EURC`, `RD`, `USDC_ARB`, `FDIC_USD`, `FDIC_EUR`) or an `acc_…` id. The value of `sourceAccount`, `destinationAccount` and each balance row. See Accounts above | "wallet" for an account key. Do not call `FDIC_USD` or `FDIC_EUR` a token |
+| swap | A move between two accounts of one integrator account. The `swp_…` resource | "conversion", "exchange", "transfer" |
+| move | A swap with a sub account on either side: one token, one for one, no fee. Same `swp_…` resource and routes | "internal transfer", "sweep" |
 
 "Recipient" is not used anywhere. It is ambiguous between the contact, the
 beneficiary and the client.
@@ -90,20 +105,30 @@ Define a term or a rule on one page. On other pages write one clause and a link.
 
 | Topic | Owner |
 | --- | --- |
-| Product, rail, virtual account, account details | `whitelabel/virtual-accounts`, tables in `whitelabel/reference/rails` |
-| Accounts (`USDC`, `EURC`, `FDIC_USD`, `FDIC_EUR`) | `whitelabel/overview` (How money moves) |
-| Developer key, IP allowlist, login, tokens, `X-Hevn-Account` | `whitelabel/authentication` |
-| Who signs what | `whitelabel/overview` (Accounts and control) |
-| Prepare, sign, confirm | `whitelabel/signing`, code in `whitelabel/reference/client` |
-| Money format, ids, idempotency, pagination, polling | `whitelabel/conventions` |
-| Error envelope and codes | `whitelabel/reference/errors` |
-| Numeric limits | `whitelabel/conventions` (Rate limits, Lifetimes, Setting limits) |
-| Fees and rates | `whitelabel/reference/rails` (Fees) |
-| Sandbox differences and limits | `whitelabel/sandbox` |
+| The two integration kinds and how to choose | `developers/overview` (the fork). `general/build-on-hevn` is the short version for the General tab |
+| Product, rail, virtual account, account details | `developers/virtual-accounts`, tables in `developers/reference/rails` |
+| Account keys (`USDC`, `EURC`, `RD`, `USDC_ARB`, `FDIC_USD`, `FDIC_EUR`) | `developers/overview` (Account keys) |
+| `acc_…` ids, external account and sub account compared | `developers/accounts` |
+| Developer key, IP allowlist, login, tokens, `X-Hevn-Account` | `developers/authentication` |
+| Who signs what, the `authorization` values | `developers/overview` (Accounts and control), values in `developers/signing` (Authorization values). `developers/payouts` (Authorization) routes each paying account to its page |
+| Prepare, sign, confirm | `developers/signing`, code in `developers/reference/client` |
+| What a `debit` contains, the checks before signing | `developers/signing` (Debit contents) |
+| Money format, ids, idempotency, pagination, polling | `developers/conventions` |
+| Error envelope and codes | `developers/reference/errors` |
+| Numeric limits | `developers/conventions` (Rate limits, Lifetimes, Setting limits) |
+| Fees and rates | `developers/reference/rails` (Fees) |
+| Sandbox differences and limits | `developers/sandbox` |
+| Sign-in window: sessions, link, sign, verify, callback | `connect/sign-in-with-hevn` |
+| Payouts the holder approves (`authorization: "client"`) | `connect/money-movement` |
+| Creating a client through the API, access to external wallets | `external-wallets/overview` |
+| External account resource: address rules, balance, archive | `external-wallets/external-accounts` |
+| Payouts funded by a wallet transfer (`authorization: "wallet"`), `refundAddress` | `external-wallets/money-movement` |
+| Sub account rules: who can open one, token, label, limits | `sub-accounts/overview` |
+| Payouts, moves, payins and virtual accounts of a sub account | `sub-accounts/money-movement` |
 | Non-custodial wallet model | `general/what-is-hevn` (Account structure), `general/security-model` (Smart wallet) |
 | Self-serve payins, fiat payouts, cross-chain, JWT and signature authorization | `general/how-money-moves` |
 | Spend permissions | `general/security-model` (Shared access) |
-| KYB document fields, enums and slots | Backend schema descriptions (REST API tab). Flow, missing paths and complex ownership: `whitelabel/clients` |
+| KYB document fields, enums and slots | Backend schema descriptions (REST API tab). Flow, missing paths and complex ownership: `developers/clients` |
 | Fields of a request or response | Backend schema descriptions (REST API tab) |
 | Statuses | The page of the resource |
 
@@ -159,7 +184,7 @@ The positioning statement appears once, on `general/what-is-hevn`:
 
 > HEVN is payments software: an API and app over a Base smart wallet that only its holder's key can sign for. HEVN is not a bank. Virtual accounts, fiat payins and fiat payouts are provided by partner banks, which hold fiat while it is in transit.
 
-The `FDIC_*` sentence appears once, on `whitelabel/overview`:
+The `FDIC_*` sentence appears once, on `developers/overview`:
 
 > `FDIC_USD` and `FDIC_EUR` are account identifiers for a balance held at a partner bank. The name is an identifier and says nothing about deposit insurance.
 
@@ -190,4 +215,4 @@ The `FDIC_*` sentence appears once, on `whitelabel/overview`:
 - Code samples keep their behaviour, request bodies and tab order (cURL, Python, Node, Go). Allowed edits: a variable rename (use `client` for a variable that holds a client), neutral example values, comments.
 - Keep frontmatter keys, `title`, Mintlify components and their props, file paths and link targets. Remove an MDX `import` line only with its last use.
 - A heading that another page links to keeps its text. When you rename one, fix the inbound links in the same change.
-- When you delete a page, add a redirect in `docs.json`.
+- When you delete or move a page, add a redirect in `docs.json` and fix the inbound links in the same change.

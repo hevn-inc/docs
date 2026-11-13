@@ -1,0 +1,90 @@
+---
+title: "Accounts"
+description: "Account keys, acc_ ids, and how external accounts and sub accounts differ."
+---
+
+An `acc_…` id names an external account or a sub account: an address of its own, apart from the main wallet. List the ones a client or your own account has with `GET /dapi/v1/client/accounts`.
+
+## Uses of the word
+
+| Use | Named by | Example |
+| --- | --- | --- |
+| A HEVN account: your integrator account or a client | A `cl_…` id, sent in `X-Hevn-Account` | `cl_7YQ2Kf3mN8` |
+| A balance on the main wallet or at the partner bank | An [account key](/developers/overview#account-keys) | `USDC`, `EURC`, `FDIC_USD` |
+| An external account or a sub account | An `acc_…` id | `acc_5Jd8Qw2LmX` |
+
+A balance on the main wallet has an account key and no `acc_…` id.
+
+## Kinds
+
+`kind` on the record is `external` or `sub`. The two kinds share the `/dapi/v1/client/accounts` routes and the id space.
+
+| | External account | Sub account |
+| --- | --- | --- |
+| What it is | A wallet address a client holds and signs for | A further wallet of your own integrator account that HEVN opens |
+| Whose account | A client's, selected by `X-Hevn-Account` | Yours. A request that acts for a client returns `403 account_not_controlled`. |
+| Created with | `POST /dapi/v1/client/accounts` and `chain`, `address`, optional `label` | `POST /dapi/v1/client/accounts` and `kind: "sub"`, optional `asset`, `label` |
+| Network | `base`, `arb`, `eth`, `op`, `pol` or `sol` | Base |
+| Token, returned as `asset` | `USDC` | `USDC` or `RD`, fixed at creation |
+| Who signs a spend | The customer's wallet. HEVN and your developer key hold no key to it. | Your developer key, co-signed by HEVN |
+| Payout `authorization` | `wallet`. The response has `transfer`, and there is no confirm call. | `debit`. Sign `approval.payload` and confirm. |
+| Payout source | A Base account, paying USDC | The token the account holds |
+| Swaps and moves | `404 account_not_found` | A move to or from the main wallet or another sub account of the same token, one for one, no fee |
+| Payins | On-chain (`originChainId`). `refundAddress` is required. | On-chain (`originChainId`). No `refundAddress`. |
+| Virtual accounts | Products whose rail delivers USDC to the address | Products whose rail delivers the account's token to the address |
+| Balance | `balance` on the account record | `balance` on the account record, plus a row in `GET /dapi/v1/client/balance` |
+| Ledger | Rows for the transfers HEVN arranged | Rows for each transfer the address sends or receives, except `RD` sent from outside HEVN to an `RD` sub account ([RD sub accounts](/sub-accounts/money-movement#rd-sub-accounts)) |
+| Archive | `DELETE /dapi/v1/client/accounts/{accountId}` | `409 account_archive_unsupported` |
+
+The rules of each kind are on [External accounts](/external-wallets/external-accounts) and [Sub accounts](/sub-accounts/overview).
+
+## Header
+
+The `/dapi/v1/client/accounts` routes require `X-Hevn-Account`. Send a client's `cl_…` id for its external accounts. For your own sub accounts, send your own `cl_…` id, the `userId` that `POST /dapi/v1/auth/token` returns ([Acting as a client](/developers/authentication#acting-as-a-client)).
+
+<CodeGroup>
+
+```bash cURL
+curl "$HEVN_API/client/accounts" \
+  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+  -H "X-Hevn-Account: $HEVN_USER_ID"
+```
+
+```python Python
+mine = hevn.acting_as(USER_ID).get("/client/accounts")["items"]
+```
+
+```javascript Node
+const { items: mine } = await hevn.actingAs(userId).get("/client/accounts");
+```
+
+```go Go
+page, err := api.ActingAs(userID).Get("/client/accounts")
+mine := page.List("items")
+```
+
+</CodeGroup>
+
+```json Response 200
+{ "items": [
+    { "accountId": "acc_5Jd8Qw2LmX", "kind": "sub", "asset": "USDC", "chain": "base",
+      "address": "0x61c2…", "label": "Payroll", "balance": "250.0",
+      "syncedAt": "2026-11-13T09:41:07Z", "createdAt": "2026-11-13T09:12:30Z" } ] }
+```
+
+The list is ordered oldest first and holds both kinds ([List accounts](/api-reference/client-accounts/list-accounts)). `balance` is read from the network when the stored value is older than a minute. When the network does not respond, the route returns the last value read, with its time in `syncedAt`.
+
+## Accepted fields
+
+| Field | Route | Accepts |
+| --- | --- | --- |
+| `sourceAccount` | `POST /dapi/v1/payouts` | An account key, an external account on Base or a sub account ([Payouts](/developers/payouts#authorization)) |
+| `sourceAccount`, `destinationAccount` | `POST /dapi/v1/swaps`, `POST /dapi/v1/swaps/preview` | An account key or a sub account ([Swaps](/developers/swaps#sub-account-moves)) |
+| `destinationAccount` | `POST /dapi/v1/payins` | An account key, an external account or a sub account ([Payins](/developers/payins#deliver-to-an-account)) |
+| `accountId` | `POST /dapi/v1/banks`, `GET /dapi/v1/banks/{product}` | An external account or a sub account ([Virtual accounts](/developers/virtual-accounts#deliver-to-an-account)) |
+| `accountId` | `GET /dapi/v1/transactions`, `/summary`, `/export` | An external account or a sub account, archived ones included ([Balances and transactions](/developers/balances-and-transactions#filters)) |
+| `accountId` | `POST /dapi/v1/sandbox/deposits` | A sub account ([Sandbox](/developers/sandbox#accounts)) |
+
+Responses return the id as `accountId` on a virtual account, a payin, a balance row and a transaction. The refusals of these fields are in [Errors](/developers/reference/errors#accounts).
+
+<Card title="Next: Clients and verification" icon="arrow-right" href="/developers/clients" />

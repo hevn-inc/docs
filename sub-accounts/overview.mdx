@@ -1,0 +1,73 @@
+---
+title: "Sub accounts"
+description: "Open further wallets of your own account, each with its own address, balance and virtual accounts."
+---
+
+A sub account is a further Base smart wallet of your integrator account, with its own address, balance, ledger and virtual accounts. Open one with `POST /dapi/v1/client/accounts` and `kind: "sub"`, sending your own `cl_…` id in `X-Hevn-Account`.
+
+A typical use is one sub account per customer of yours, each with a wallet address and account details. Your developer key signs payouts and moves from a sub account as it does for your main wallet ([Signing](/developers/signing)).
+
+```json Response 201, Location: /dapi/v1/client/accounts/acc_9f2c…
+{ "accountId": "acc_9f2c…", "kind": "sub", "asset": "USDC", "chain": "base",
+  "address": "0x51c7…", "label": "customer-1042", "balance": "0.0",
+  "createdAt": "2026-11-13T09:14:02Z" }
+```
+
+The wallet has the same owners as your main wallet. Its `address` accepts transfers on Base as soon as the call returns, and the wallet is deployed with the first operation it sends. Field rules are on [Add an account](/api-reference/client-accounts/add-an-account).
+
+## Ownership
+
+Sub accounts exist on your integrator account, which is a HEVN account: a profile plus a Base smart wallet. `/client/accounts` requires `X-Hevn-Account`, so send your own id, the `userId` that [login](/developers/authentication#sessions) returns.
+
+| Header value | `POST /client/accounts` with `kind: "sub"` |
+| --- | --- |
+| Your own `cl_…` id | Opens the sub account. |
+| The id of a client linked through [HEVN Connect](/connect/overview) | `403 account_not_controlled`, with the client in `details.clientId` |
+| The id of a client created for [External wallets](/external-wallets/overview) | `403 account_not_controlled`, with the client in `details.clientId` |
+
+The developer key signs for your own wallet and its sub accounts, and for no client's wallet, so a sub account on a client could not be spent with it. For a wallet your customer holds and signs for, register an [external account](/external-wallets/external-accounts). The two kinds are compared in [Accounts](/developers/accounts).
+
+A client that opened sub accounts in the HEVN app has them listed under its id on `GET /dapi/v1/client/accounts`. A move from one of them through the API returns `403 account_not_controlled`.
+
+## Token
+
+A sub account holds one token on Base, set by `asset` at creation: `USDC` (the default) or `RD`. Any other value returns `422 validation_failed`, and the token of an existing sub account cannot be changed.
+
+Virtual accounts, payins, payouts and moves of the sub account run in that token. `RD` is the account key of the same name on your main wallet ([Account keys](/developers/overview#account-keys)), and what it changes is in [RD sub accounts](/sub-accounts/money-movement#rd-sub-accounts).
+
+## Label
+
+`label` is optional, at most 64 characters, and together with `asset` it identifies the sub account on a retry. Use your own customer id as the label.
+
+| Request | Result |
+| --- | --- |
+| A `label` and `asset` that no sub account of yours has | `201` with a new sub account |
+| The same `label` and `asset` again | `200` with `Idempotency-Replayed: true` and the existing sub account |
+| The same `label` with the other `asset` | `201` with a second sub account |
+| No `label` | `201` with a new sub account on each call |
+
+An `Idempotency-Key` does not change the result. A body field other than `kind`, `label` and `asset` returns `422 validation_failed`.
+
+## Refusals
+
+| Error | Cause |
+| --- | --- |
+| `403 account_not_controlled` | `X-Hevn-Account` names a client. |
+| `409 safe_mode_required` | The main wallet of your account is not protected by co-signing. |
+| `409 account_address_taken` | No address could be allocated after a retry. Send the request again. |
+| `409 account_destination_unsupported` | `asset` is `RD` in the [sandbox](/sub-accounts/money-movement#sandbox). |
+| `409 account_archive_unsupported` | `DELETE /dapi/v1/client/accounts/{accountId}` on a sub account. A sub account cannot be archived or deleted. |
+| `404 account_not_found` | The `acc_…` id is unknown or belongs to another account. |
+
+## Limits
+
+| Area | Sub account |
+| --- | --- |
+| Network | Base |
+| Tokens | `USDC` or `RD`. No EURC sub account. |
+| Spend limits and dual approval | Not evaluated per sub account. The transfer policy of your account applies to each source. |
+| Escrow and cards issued by a partner | Not available on a sub account |
+| Archive | None |
+| A token the sub account does not hold | Left out of `balance`. It can be moved to your main wallet ([Other tokens](/sub-accounts/money-movement#other-tokens)). |
+
+<Card title="Next: Quickstart" icon="arrow-right" href="/sub-accounts/quickstart" />

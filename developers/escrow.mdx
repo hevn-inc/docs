@@ -24,10 +24,10 @@ stateDiagram-v2
     charged --> refunded: refund
 ```
 
-Escrow routes are self-scoped and refuse `X-Hevn-Account` ([Acting as a client](/whitelabel/authentication#acting-as-a-client)).
+Escrow routes are self-scoped and refuse `X-Hevn-Account` ([Acting as a client](/developers/authentication#acting-as-a-client)). A deal moves money between main wallets, and a sub account takes no part in it.
 
 <Warning>
-  The buyer approves a deal with their key, and the [sign-in window](/whitelabel/sign-in-with-hevn) does not offer escrow approvals. `POST /dapi/v1/escrow` with a buyer linked through Sign in with HEVN returns `403 account_not_controlled`. Contact HEVN before you build on escrow.
+  The buyer approves a deal with their key, and the [sign-in window](/connect/sign-in-with-hevn) does not offer escrow approvals. `POST /dapi/v1/escrow` with a buyer linked through Sign in with HEVN returns `403 account_not_controlled`. Contact HEVN before you build on escrow.
 </Warning>
 
 ## Parties
@@ -38,7 +38,7 @@ Escrow routes are self-scoped and refuse `X-Hevn-Account` ([Acting as a client](
 | Receiver | Another client, the seller. Receives what you capture. |
 | Operator | You. Signs `authorize`, `charge`, `capture`, `void` and `refund` with your developer key on your wallet. |
 
-The parties are different accounts. Sender and receiver are `ready` [clients](/whitelabel/clients) linked to you through [Sign in with HEVN](/whitelabel/sign-in-with-hevn). A referred account does not qualify. HEVN enables escrow for your account in both environments ([What HEVN must enable](/whitelabel/sandbox#what-hevn-must-enable)).
+The parties are different accounts. Sender and receiver are `ready` [clients](/developers/clients) linked to you through [Sign in with HEVN](/connect/sign-in-with-hevn). A referred account does not qualify. HEVN enables escrow for your account in both environments ([What HEVN must enable](/developers/sandbox#what-hevn-must-enable)).
 
 The deal uses each party's Base smart wallet address at creation. Its terms are hashed into an on-chain payment record and cannot be changed.
 
@@ -48,7 +48,7 @@ The deal uses each party's Base smart wallet address at creation. Its terms are 
 
 A draft not approved before `approveBy` stays `draft` with an empty `availableActions`. There is no `expired` status.
 
-Amounts use the [money format](/whitelabel/conventions#money), for example `"100.000000"` for USDC. Field meanings are on [Read one escrow](/api-reference/escrow/read-one-escrow).
+Amounts use the [money format](/developers/conventions#money), for example `"100.000000"` for USDC. Field meanings are on [Read one escrow](/api-reference/escrow/read-one-escrow).
 
 ## Windows
 
@@ -128,7 +128,7 @@ Defaults, the duration format and the create refusals are on [Open an escrow](/a
   </Step>
 
   <Step title="Authorize the hold">
-    Prepare `authorize` with `POST /dapi/v1/escrow/{escrowId}/actions`, then sign and confirm it as described in [Signing](/whitelabel/signing). It moves the amount from the buyer's wallet into the contract. The wallet must hold the token when you confirm.
+    Prepare `authorize` with `POST /dapi/v1/escrow/{escrowId}/actions`, then sign and confirm it as described in [Signing](/developers/signing). It moves the amount from the buyer's wallet into the contract. The wallet must hold the token when you confirm.
 
     A deal accepts `authorize` once. An amount below `maxAmount` leaves the remainder unusable.
 
@@ -221,11 +221,11 @@ Prepare an operator action with `POST /dapi/v1/escrow/{escrowId}/actions` and si
 }
 ```
 
-Confirm with `action.idempotencyKey` in the path. A replayed key returns the same record ([Idempotency-Key](/whitelabel/conventions#idempotency-key)).
+Confirm with `action.idempotencyKey` in the path. A replayed key returns the same record ([Idempotency-Key](/developers/conventions#idempotency-key)).
 
 ## Confirm an action
 
-Sign the decoded bytes of `approval.payload` as described in [Signing](/whitelabel/signing), then send the signature.
+Sign the decoded bytes of `approval.payload` as described in [Signing](/developers/signing), then send the signature.
 
 ```json Request: POST /dapi/v1/escrow/esc_5Qb4e17c9d/actions/order-A-1187-capture/confirm
 { "signature": "MEUCIQDk3f8Zc0xq2w1Yv7pB9nH4mJ6sR2tL5uD8aE0cQ1oXgAIg…" }
@@ -235,13 +235,13 @@ Sign the decoded bytes of `approval.payload` as described in [Signing](/whitelab
 | --- | --- | --- |
 | `200` | Mined. The body has the deal and its `events`. | Read `action.status`: `confirmed` or `reverted`. |
 | `202` with `pollUrl` | The action is `submitted`. `pollUrl` is the deal read. | Call `POST /dapi/v1/escrow/{escrowId}/sync` while the action is `signing` or `submitted`. |
-| `403 forbidden` | The developer key was deleted, or the IP is outside its [allowlist](/whitelabel/authentication#the-ip-allowlist). The prepared action is unchanged. | Confirm from an allowlisted host. |
+| `403 forbidden` | The developer key was deleted, or the IP is outside its [allowlist](/developers/authentication#the-ip-allowlist). The prepared action is unchanged. | Confirm from an allowlisted host. |
 | `403 account_not_controlled` | The action would sign on the buyer's wallet. | Confirm operator actions only. |
 | `410 approval_expired` | The approval closed, or none is open. | Prepare again with the same key. |
 | `409 approval_consumed` | The approval was already used. | Read the deal, then prepare again with the same key. |
 | `409 escrow_state_changed` | No capturable amount is left, or the payment was already collected. | Read the deal. Pick from `availableActions`. |
 
-`400 signature_invalid`, `503 bundler_rejected` and `503 bundler_unavailable` are handled as in [Retrying a confirm](/whitelabel/signing#retrying-a-confirm).
+`400 signature_invalid`, `503 bundler_rejected` and `503 bundler_unavailable` are handled as in [Retrying a confirm](/developers/signing#retrying-a-confirm).
 
 ### Action in flight
 
@@ -311,6 +311,6 @@ Write a repeated `status` into the path, because the HTTP client's parameter map
 
 ## Errors
 
-A closed window, a fee above the ceiling or an amount above the cap returns `400 invalid_request` with no `details`. There is no `window_closed` or `amount_out_of_range` code. Read the deal and pick from `availableActions`. Other codes are in [Errors](/whitelabel/reference/errors#escrow).
+A closed window, a fee above the ceiling or an amount above the cap returns `400 invalid_request` with no `details`. There is no `window_closed` or `amount_out_of_range` code. Read the deal and pick from `availableActions`. Other codes are in [Errors](/developers/reference/errors#escrow).
 
-<Card title="Next: Sandbox" icon="flask" href="/whitelabel/sandbox" />
+<Card title="Next: Sandbox" icon="flask" href="/developers/sandbox" />

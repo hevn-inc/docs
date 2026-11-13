@@ -1,0 +1,430 @@
+---
+title: "Quickstart"
+description: "Open a sub account, request its virtual account, fund it and pay out from it in the sandbox."
+---
+
+Open a sub account in the sandbox, fund it, pay a contact from it and move the rest to your main wallet. Start by logging in with `POST /dapi/v1/auth/challenge` and `POST /dapi/v1/auth/token`.
+
+## Before you start
+
+1. Sign up at [`https://sandbox.gethevn.com`](https://sandbox.gethevn.com) and create a [developer key](/developers/authentication#developer-key).
+2. Save the private key to `$HEVN_KEY_PEM` with mode `0600`.
+3. Set the environment and install the dependencies.
+
+import Env from "/snippets/env.mdx";
+import Install from "/snippets/install.mdx";
+import SandboxCaps from "/snippets/sandbox-caps.mdx";
+
+<Env />
+
+<Install />
+
+<SandboxCaps />
+
+The Python, Node and Go tabs use the [reference client](/developers/reference/client). `me` is the client bound to your own `cl_…` id, which `/client/accounts` and `/client/balance` require.
+
+## Steps
+
+<Steps>
+  <Step title="Log in">
+    Run the login code in [Sessions](/developers/authentication#sessions). Export `accessToken` as `HEVN_ACCESS_TOKEN` and `userId` as `HEVN_USER_ID`.
+
+    <CodeGroup>
+
+    ```bash cURL
+    export HEVN_ACCESS_TOKEN="eyJ…"   # accessToken from login
+    export HEVN_USER_ID="cl_…"        # userId from login
+    ```
+
+    ```python Python
+    key = Key()
+    hevn = Hevn(Session(key))
+    me = hevn.acting_as(os.environ["HEVN_USER_ID"])
+    ```
+
+    ```javascript Node
+    const key = new Key();
+    const hevn = new Hevn(new Session(key));
+    const me = hevn.actingAs(process.env.HEVN_USER_ID);
+    ```
+
+    ```go Go
+    key, err := hevn.NewKey()
+    api := &hevn.Client{API: os.Getenv("HEVN_API"), HTTP: http.DefaultClient, Session: &hevn.Session{Key: key}}
+    me := api.ActingAs(os.Getenv("HEVN_USER_ID"))
+    ```
+
+    </CodeGroup>
+  </Step>
+
+  <Step title="Open a sub account">
+    Call `POST /dapi/v1/client/accounts` with `kind: "sub"` and a label.
+
+    <CodeGroup>
+
+    ```bash cURL
+    curl -s -X POST "$HEVN_API/client/accounts" \
+      -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+      -H "X-Hevn-Account: $HEVN_USER_ID" \
+      -H "Content-Type: application/json" \
+      -d '{"kind":"sub","label":"customer-1042"}'
+    ```
+
+    ```python Python
+    sub = me.post("/client/accounts", {"kind": "sub", "label": "customer-1042"})
+    ```
+
+    ```javascript Node
+    const sub = await me.post("/client/accounts", { kind: "sub", label: "customer-1042" });
+    ```
+
+    ```go Go
+    sub, err := me.Post("/client/accounts", hevn.Body{"kind": "sub", "label": "customer-1042"})
+    ```
+
+    </CodeGroup>
+
+    ```json Response 201, Location: /dapi/v1/client/accounts/acc_9f2c…
+    { "accountId": "acc_9f2c…", "kind": "sub", "asset": "USDC", "chain": "base",
+      "address": "0x51c7…", "label": "customer-1042", "balance": "0.0", … }
+    ```
+
+    A repeat with the same label returns `200` and the same sub account ([Label](/sub-accounts/overview#label)). Fields: [Add an account](/api-reference/client-accounts/add-an-account).
+  </Step>
+
+  <Step title="Request its virtual account">
+    Call `POST /dapi/v1/banks` with the product and the `accountId`.
+
+    <CodeGroup>
+
+    ```bash cURL
+    curl -s -X POST "$HEVN_API/banks" \
+      -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+      -H "X-Hevn-Account: $HEVN_USER_ID" \
+      -H "Content-Type: application/json" \
+      -d '{"product":"us","accountId":"acc_9f2c…"}'
+    ```
+
+    ```python Python
+    rail = me.post("/banks", {"product": "us", "accountId": sub["accountId"]})
+    ```
+
+    ```javascript Node
+    const rail = await me.post("/banks", { product: "us", accountId: sub.accountId });
+    ```
+
+    ```go Go
+    rail, err := me.Post("/banks", hevn.Body{"product": "us", "accountId": sub.Str("accountId")})
+    ```
+
+    </CodeGroup>
+
+    ```json Response 201, Location: /dapi/v1/banks/us?accountId=acc_9f2c…
+    { "product": "us", "opened": true, "status": "active", "id": "bnk_88Hq3T",
+      "accountId": "acc_9f2c…", "requisites": { … }, "blockers": [], … }
+    ```
+
+    While `status` is `preparing`, `blockers[]` lists what is pending ([What still blocks it](/developers/virtual-accounts#what-still-blocks-it)). The sandbox accepts `us` and `swift` for a sub account. Fields: [Request a receiving account for a product](/api-reference/virtual-accounts/request-a-receiving-account-for-a-product).
+  </Step>
+
+  <Step title="Fund the sub account">
+    Call `POST /dapi/v1/sandbox/deposits` with the `accountId` and no `bankId`. The faucet sends the token the sub account holds to its address.
+
+    <CodeGroup>
+
+    ```bash cURL
+    curl -s -X POST "$HEVN_API/sandbox/deposits" \
+      -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+      -H "X-Hevn-Account: $HEVN_USER_ID" \
+      -H "Idempotency-Key: fund-customer-1042" \
+      -H "Content-Type: application/json" \
+      -d '{"amount":"2.00","accountId":"acc_9f2c…"}'
+    ```
+
+    ```python Python
+    credit = me.post("/sandbox/deposits", {"amount": "2.00", "accountId": sub["accountId"]},
+                     idempotency_key="fund-customer-1042")
+    ```
+
+    ```javascript Node
+    const credit = await me.post("/sandbox/deposits",
+      { amount: "2.00", accountId: sub.accountId },
+      { idempotencyKey: "fund-customer-1042" });
+    ```
+
+    ```go Go
+    credit, err := me.Post("/sandbox/deposits",
+    	hevn.Body{"amount": "2.00", "accountId": sub.Str("accountId")},
+    	hevn.IdempotencyKey("fund-customer-1042"))
+    ```
+
+    </CodeGroup>
+
+    ```json Response 200
+    { "depositId": "sbx_cd_1b8e0f7a2c", "status": "settled", "token": "USDC",
+      "amount": "2.000000", "credited": "2.000000", "accountId": "acc_9f2c…",
+      "txHash": "0x08fa…", "transactionId": "txn_9e4…", … }
+    ```
+
+    On `202`, repeat the same request until `status` is `settled`. To emulate a bank transfer to an `active` virtual account, send `{"amount":"1.00","bankId":"bnk_88Hq3T"}` and omit `accountId`. Fields: [Emulate an incoming deposit](/api-reference/sandbox/emulate-an-incoming-deposit:-an-account-transfer-with-bankid-a-token-transfer-without).
+  </Step>
+
+  <Step title="Read the balance">
+    Call `GET /dapi/v1/client/balance`. The entry with your `accountId` is the sub account.
+
+    <CodeGroup>
+
+    ```bash cURL
+    curl -s "$HEVN_API/client/balance" \
+      -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+      -H "X-Hevn-Account: $HEVN_USER_ID"
+    ```
+
+    ```python Python
+    balance = me.get("/client/balance")
+    held = next(row for row in balance["accounts"] if row.get("accountId") == sub["accountId"])
+    ```
+
+    ```javascript Node
+    const balance = await me.get("/client/balance");
+    const held = balance.accounts.find((row) => row.accountId === sub.accountId);
+    ```
+
+    ```go Go
+    balance, err := me.Get("/client/balance")
+    ```
+
+    </CodeGroup>
+
+    ```json Response 200
+    { "clientId": "cl_9f2c1ab8…", "baseSmartWallet": "0x2f1c…",
+      "accounts": [ { "account": "USDC", "balance": "0.000000", "usdValue": "0.00" },
+                    { "account": "USDC", "accountId": "acc_9f2c…", "balance": "2.000000", "usdValue": "2.00" } ],
+      "totalUsd": "2.00" }
+    ```
+
+    The balance of a sub account is read from the network when the last read is older than a minute. Fields: [Read a client's balances](/api-reference/accounts/read-a-clients-balances).
+  </Step>
+
+  <Step title="Book a payout from it">
+    Save a USDC contact on Base with `POST /dapi/v1/contacts`, then call `POST /dapi/v1/payouts` with the sub account as `sourceAccount`. Use a Base Sepolia address you hold.
+
+    <CodeGroup>
+
+    ```bash cURL
+    curl -s -X POST "$HEVN_API/contacts" \
+      -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+      -H "X-Hevn-Account: $HEVN_USER_ID" \
+      -H "Content-Type: application/json" \
+      -d '{"name":"Ardenne treasury","crypto":{"chain":"base","token":"USDC","address":"0x7c1d…"}}'
+
+    curl -s -X POST "$HEVN_API/payouts" \
+      -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+      -H "X-Hevn-Account: $HEVN_USER_ID" \
+      -H "Idempotency-Key: redemption-1188" \
+      -H "Content-Type: application/json" \
+      -d '{"contactId":"ct_9a…","amount":"1.00","sourceAccount":"acc_9f2c…",
+           "publicKey":"'"$HEVN_PUBLIC_KEY"'"}'
+    ```
+
+    ```python Python
+    contact = me.post("/contacts", {
+        "name": "Ardenne treasury",
+        "crypto": {"chain": "base", "token": "USDC", "address": "0x7c1d…"},
+    })
+    payout = me.post("/payouts", {
+        "contactId": contact["id"],
+        "amount": "1.00",
+        "sourceAccount": sub["accountId"],
+        "publicKey": key.public_key,
+    }, idempotency_key="redemption-1188")
+    ```
+
+    ```javascript Node
+    const contact = await me.post("/contacts", {
+      name: "Ardenne treasury",
+      crypto: { chain: "base", token: "USDC", address: "0x7c1d…" },
+    });
+    const payout = await me.post("/payouts", {
+      contactId: contact.id,
+      amount: "1.00",
+      sourceAccount: sub.accountId,
+      publicKey: key.publicKey,
+    }, { idempotencyKey: "redemption-1188" });
+    ```
+
+    ```go Go
+    contact, err := me.Post("/contacts", hevn.Body{
+    	"name":   "Ardenne treasury",
+    	"crypto": hevn.Body{"chain": "base", "token": "USDC", "address": "0x7c1d…"},
+    })
+    payout, err := me.Post("/payouts", hevn.Body{
+    	"contactId":     contact.Str("id"),
+    	"amount":        "1.00",
+    	"sourceAccount": sub.Str("accountId"),
+    	"publicKey":     key.PublicKey,
+    }, hevn.IdempotencyKey("redemption-1188"))
+    ```
+
+    </CodeGroup>
+
+    ```json Response 201, Location: /dapi/v1/payouts/po_7e1b…
+    { "id": "po_7e1b…", "kind": "onchain", "status": "awaitingSignature",
+      "authorization": "debit",
+      "approval": { "id": "…", "payload": "eyJ…", "expiresAt": "2026-11-13T09:21:10Z" },
+      "debit": { "address": "0x7c1d…", "sourceAddress": "0x51c7…",
+                 "amount": "1.00", "amountAtomic": "1000000", "token": "USDC", "chainId": 84532,
+                 "operation": { "sender": "0x51c7…", "initCode": "0x3fAB…", "callData": "0x34fc…", … } } }
+    ```
+
+    Fields: [Create an outgoing transfer](/api-reference/transfers/create-an-outgoing-transfer).
+  </Step>
+
+  <Step title="Check, sign and confirm">
+    Compare `debit` with the payout you booked, sign `approval.payload` and call `POST /dapi/v1/payouts/{payoutId}/confirm` within 120 seconds.
+
+    <CodeGroup>
+
+    ```bash cURL
+    # APPROVAL_PAYLOAD is approval.payload from the previous response.
+    SIGNATURE=$(printf '%s' "$APPROVAL_PAYLOAD" | base64 --decode \
+      | openssl dgst -sha256 -sign "$HEVN_KEY_PEM" | base64 | tr -d '\n')
+
+    curl -s -X POST "$HEVN_API/payouts/po_7e1b…/confirm" \
+      -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+      -H "X-Hevn-Account: $HEVN_USER_ID" \
+      -H "Content-Type: application/json" \
+      -d '{"signature":"'"$SIGNATURE"'","publicKey":"'"$HEVN_PUBLIC_KEY"'"}'
+    ```
+
+    ```python Python
+    debit = payout["debit"]
+    assert payout["authorization"] == "debit"
+    assert debit["sourceAddress"].lower() == sub["address"].lower()
+    assert debit["operation"]["sender"] == debit["sourceAddress"]
+    assert debit["address"].lower() == contact["crypto"]["address"].lower()
+    assert (debit["amountAtomic"], debit["token"]) == ("1000000", "USDC")
+
+    signature = key.sign_payload(payout["approval"]["payload"])
+    receipt = me.confirm_until_settled(f"/payouts/{payout['id']}/confirm", signature)
+    ```
+
+    ```javascript Node
+    const { debit } = payout;
+    const same = (a, b) => a.toLowerCase() === b.toLowerCase();
+    if (payout.authorization !== "debit"
+      || !same(debit.sourceAddress, sub.address)
+      || debit.operation.sender !== debit.sourceAddress
+      || !same(debit.address, contact.crypto.address)
+      || debit.amountAtomic !== "1000000" || debit.token !== "USDC") {
+      throw new Error("debit does not match the payout");
+    }
+
+    const signature = key.signPayload(payout.approval.payload);
+    const receipt = await me.confirmUntilSettled(`/payouts/${payout.id}/confirm`, signature);
+    ```
+
+    ```go Go
+    if payout.Str("authorization") != "debit" ||
+    	!strings.EqualFold(payout.Str("debit.sourceAddress"), sub.Str("address")) ||
+    	payout.Str("debit.operation.sender") != payout.Str("debit.sourceAddress") ||
+    	!strings.EqualFold(payout.Str("debit.address"), contact.Str("crypto.address")) ||
+    	payout.Str("debit.amountAtomic") != "1000000" || payout.Str("debit.token") != "USDC" {
+    	log.Fatal("debit does not match the payout")
+    }
+
+    signature, err := key.SignPayload(payout.Str("approval.payload"))
+    receipt, err := me.ConfirmUntilSettled("/payouts/"+payout.Str("id")+"/confirm", signature)
+    ```
+
+    </CodeGroup>
+
+    ```json Response 200
+    { "id": "po_7e1b…", "kind": "onchain", "status": "settled", "transactionHash": "0x4f1c…" }
+    ```
+
+    `debit.sourceAddress` is the address of the sub account, and `debit.operation` is the operation the signature approves ([Payouts](/sub-accounts/money-movement#payouts)). Confirm outcomes are in [Retrying a confirm](/developers/signing#retrying-a-confirm).
+  </Step>
+
+  <Step title="Move the rest to your main wallet">
+    Call `POST /dapi/v1/swaps` with the sub account as `sourceAccount` and the account key `USDC` as `destinationAccount`. Sign and confirm with `POST /dapi/v1/swaps/{swapId}/confirm`, then read the swap until it settles.
+
+    <CodeGroup>
+
+    ```bash cURL
+    curl -s -X POST "$HEVN_API/swaps" \
+      -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+      -H "X-Hevn-Account: $HEVN_USER_ID" \
+      -H "Idempotency-Key: sweep-customer-1042" \
+      -H "Content-Type: application/json" \
+      -d '{"sourceAccount":"acc_9f2c…","destinationAccount":"USDC","amount":"1.00",
+           "publicKey":"'"$HEVN_PUBLIC_KEY"'"}'
+    ```
+
+    ```python Python
+    move = me.post("/swaps", {
+        "sourceAccount": sub["accountId"],
+        "destinationAccount": "USDC",
+        "amount": "1.00",
+        "publicKey": key.public_key,
+    }, idempotency_key="sweep-customer-1042")
+    assert move["debit"]["sourceAddress"].lower() == sub["address"].lower()
+    assert move["debit"]["address"].lower() == balance["baseSmartWallet"].lower()
+
+    me.post(f"/swaps/{move['id']}/confirm", {"signature": key.sign_payload(move["approval"]["payload"])})
+    done = poll_until(lambda: me.get(f"/swaps/{move['id']}"),
+                      lambda swap: swap["status"] in ("settled", "failed"))
+    ```
+
+    ```javascript Node
+    const move = await me.post("/swaps", {
+      sourceAccount: sub.accountId,
+      destinationAccount: "USDC",
+      amount: "1.00",
+      publicKey: key.publicKey,
+    }, { idempotencyKey: "sweep-customer-1042" });
+    if (!same(move.debit.sourceAddress, sub.address) || !same(move.debit.address, balance.baseSmartWallet)) {
+      throw new Error("debit does not match the move");
+    }
+
+    await me.post(`/swaps/${move.id}/confirm`, { signature: key.signPayload(move.approval.payload) });
+    const done = await pollUntil(() => me.get(`/swaps/${move.id}`),
+      (swap) => swap.status === "settled" || swap.status === "failed");
+    ```
+
+    ```go Go
+    move, err := me.Post("/swaps", hevn.Body{
+    	"sourceAccount":      sub.Str("accountId"),
+    	"destinationAccount": "USDC",
+    	"amount":             "1.00",
+    	"publicKey":          key.PublicKey,
+    }, hevn.IdempotencyKey("sweep-customer-1042"))
+    if !strings.EqualFold(move.Str("debit.sourceAddress"), sub.Str("address")) ||
+    	!strings.EqualFold(move.Str("debit.address"), balance.Str("baseSmartWallet")) {
+    	log.Fatal("debit does not match the move")
+    }
+
+    signature, err := key.SignPayload(move.Str("approval.payload"))
+    _, err = me.Post("/swaps/"+move.Str("id")+"/confirm", hevn.Body{"signature": signature})
+    done, err := hevn.PollUntil(
+    	func() (hevn.Payload, error) { return me.Get("/swaps/" + move.Str("id")) },
+    	func(swap hevn.Payload) bool { return swap.Str("status") == "settled" || swap.Str("status") == "failed" },
+    	2*time.Minute)
+    ```
+
+    </CodeGroup>
+
+    ```json Response 201, Location: /dapi/v1/swaps/swp_9f2c1ab84d
+    { "id": "swp_9f2c1ab84d", "status": "awaitingSignature",
+      "sourceAccount": "acc_9f2c…", "destinationAccount": "USDC",
+      "quote": { "fromAmount": "1.00", "fromCurrency": "USDC", "toAmount": "1.00", "toCurrency": "USDC", … },
+      "authorization": "debit",
+      "approval": { "id": "b1e7…", "payload": "eyJib2R5Ijp7…", "expiresAt": "2026-11-13T09:24:59Z" },
+      "debit": { "address": "0x2f1c…", "sourceAddress": "0x51c7…", "amount": "1.00", "token": "USDC", … } }
+    ```
+
+    In cURL, sign `approval.payload` as in the previous step. Fields: [Create a transfer between the client's own accounts](/api-reference/transfers/create-a-transfer-between-the-clients-own-accounts).
+  </Step>
+</Steps>
+
+<Card title="Next: Money movement" icon="arrow-right" href="/sub-accounts/money-movement" />

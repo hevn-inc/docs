@@ -33,7 +33,7 @@ The guides call one small HTTP client, shown here in Python, Node and Go. Copy i
 | Poll a read | `poll_until(read, done)` | `pollUntil(read, done)` | `hevn.PollUntil(read, done, deadline)` |
 | Download an export | `hevn.download(path, params, into)` | `hevn.download(path, params, into)` | `api.Download(path, hevn.Query{…}, into)` |
 
-The client reads `HEVN_API`, `HEVN_KEY_PEM` and `HEVN_EMAIL`, set in the [Quickstart](/whitelabel/quickstart). `HEVN_API` must end in `/dapi/v1`, for example `https://sandbox-api.hevn.finance/dapi/v1`. The old `/v1` base returns `404` with no redirect, so check the suffix at start-up.
+The client reads `HEVN_API`, `HEVN_KEY_PEM` and `HEVN_EMAIL`, listed in [Sandbox](/developers/sandbox). `HEVN_API` must end in `/dapi/v1`, for example `https://sandbox-api.hevn.finance/dapi/v1`. The old `/v1` base returns `404` with no redirect, so check the suffix at start-up.
 
 <Note>
   In the Go tabs `api` is the client variable and `hevn` is the package. A variable named `hevn` shadows the package and the file does not compile.
@@ -41,7 +41,7 @@ The client reads `HEVN_API`, `HEVN_KEY_PEM` and `HEVN_EMAIL`, set in the [Quicks
 
 ## Bind an account
 
-`acting_as` returns a bound copy of the HTTP client that sends `X-Hevn-Account` on each call. [Acting as a client](/whitelabel/authentication#acting-as-a-client) lists where the header is optional, required and refused.
+`acting_as` returns a bound copy of the HTTP client that sends `X-Hevn-Account` on each call. [Acting as a client](/developers/authentication#acting-as-a-client) lists where the header is optional, required and refused.
 
 The `/client*` routes require the header. To read your account, bind your `cl_…` id, the `userId` returned by login.
 
@@ -74,7 +74,7 @@ mine, err := me.Get("/client/balance")
 
 ## Sign bytes
 
-Signatures are ECDSA P-256 over SHA-256, DER-encoded, then base64. See [Signature format](/whitelabel/signing#signature-format).
+Signatures are ECDSA P-256 over SHA-256, DER-encoded, then base64. See [Signature format](/developers/signing#signature-format).
 
 <SignPayloadSnippet />
 
@@ -139,7 +139,7 @@ func (k *Key) SignPayload(payloadB64 string) (string, error) {
 
 ## Log in
 
-Token lifetimes are in [Sessions](/whitelabel/authentication#sessions).
+Token lifetimes are in [Sessions](/developers/authentication#sessions).
 
 <LoginSnippet />
 
@@ -282,7 +282,7 @@ func Bearer(token string) func(*http.Request) {
 
 ## Send a request
 
-`call` raises the [error envelope](/whitelabel/reference/errors) as a typed error, waits `Retry-After` on a `429`, refreshes the token once on a `401`, and adds `X-Hevn-Account` when the client is bound.
+`call` raises the [error envelope](/developers/reference/errors) as a typed error, waits `Retry-After` on a `429`, refreshes the token once on a `401`, and adds `X-Hevn-Account` when the client is bound.
 
 <RequestSnippet />
 
@@ -294,7 +294,7 @@ func Bearer(token string) func(*http.Request) {
 
 ## Confirm until it settles
 
-`confirm_until_settled` follows [Retrying a confirm](/whitelabel/signing#retrying-a-confirm). On `funding_attempt_expired` it raises `ReopenRequired` (Go returns `ErrReopenRequired`). Re-open with the same `Idempotency-Key`.
+`confirm_until_settled` follows [Retrying a confirm](/developers/signing#retrying-a-confirm). On `funding_attempt_expired` it raises `ReopenRequired` (Go returns `ErrReopenRequired`). Re-open with the same `Idempotency-Key`.
 
 <ConfirmLoopSnippet />
 

@@ -1,6 +1,6 @@
 ---
 title: "Quickstart"
-description: "Run the whitelabel flow end to end in the sandbox."
+description: "Link a client in the sandbox, fund its wallet and settle a payout the holder approves."
 ---
 
 Link one client, fund its wallet and settle one holder-approved payout in the sandbox. Start by logging in with `POST /dapi/v1/auth/challenge` and `POST /dapi/v1/auth/token`.
@@ -8,7 +8,7 @@ Link one client, fund its wallet and settle one holder-approved payout in the sa
 ## Before you start
 
 1. Sign up at [`https://sandbox.gethevn.com`](https://sandbox.gethevn.com).
-2. Open **Settings → Partner program → Developer** and create a developer key. Set its [IP allowlist](/whitelabel/authentication#the-ip-allowlist) to your machine's egress address.
+2. Open **Settings → Partner program → Developer** and create a developer key. Set its [IP allowlist](/developers/authentication#the-ip-allowlist) to your machine's egress address.
 3. Save the private key to `$HEVN_KEY_PEM` with mode `0600`.
 4. In the Sign-in window card, add `http://localhost:8080` under **Allowed sites** and save.
 5. Have a second Google account with no HEVN sandbox account. Linking an existing account fails with `already_registered`.
@@ -28,7 +28,7 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
 
 <Steps>
   <Step title="Log in">
-    Run the login code in [Sessions](/whitelabel/authentication#sessions). Export `accessToken` as `HEVN_ACCESS_TOKEN` and `userId` as `HEVN_USER_ID`. The Python, Node and Go tabs use the [reference client](/whitelabel/reference/client).
+    Run the login code in [Sessions](/developers/authentication#sessions). Export `accessToken` as `HEVN_ACCESS_TOKEN` and `userId` as `HEVN_USER_ID`. The Python, Node and Go tabs use the [reference client](/developers/reference/client).
   </Step>
 
   <Step title="Serve the two pages">
@@ -70,7 +70,7 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
     python3 -m http.server 8080
     ```
 
-    Open `http://localhost:8080`. A production page needs the checks in [Sign in with HEVN](/whitelabel/sign-in-with-hevn).
+    Open `http://localhost:8080`. A production page needs the checks in [Sign in with HEVN](/connect/sign-in-with-hevn).
   </Step>
 
   <Step title="Create a link session">
@@ -114,7 +114,7 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
     | Error | Cause |
     | --- | --- |
     | `403 redirect_uri_not_allowed` | `http://localhost:8080` is not an allowed site. |
-    | `403 client_creation_not_enabled` | Your account is [not an active integrator](/whitelabel/sandbox#what-hevn-must-enable). |
+    | `403 client_creation_not_enabled` | Your account is [not an active integrator](/developers/sandbox#what-hevn-must-enable). |
   </Step>
 
   <Step title="Sign in as the customer">
@@ -170,7 +170,7 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
   </Step>
 
   <Step title="Fund the wallet">
-    Call [`POST /dapi/v1/sandbox/deposits`](/whitelabel/sandbox#mint-money) with the client id in `X-Hevn-Account`.
+    Call [`POST /dapi/v1/sandbox/deposits`](/developers/sandbox#mint-money) with the client id in `X-Hevn-Account`.
 
     <CodeGroup>
 
@@ -292,7 +292,7 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
 
     `authorization: "client"` means the holder approves this payout. Export the id as `HEVN_PAYOUT_ID`.
 
-    A new [`Idempotency-Key`](/whitelabel/conventions#idempotency-key) books a second payout.
+    A new [`Idempotency-Key`](/developers/conventions#idempotency-key) books a second payout.
   </Step>
 
   <Step title="Approve the payout">
@@ -330,7 +330,7 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
 
     </CodeGroup>
 
-    Sign in with the second Google account and [approve the payout](/whitelabel/sign-in-with-hevn#approve-a-payout). The page shows:
+    Sign in with the second Google account and [approve the payout](/connect/sign-in-with-hevn#approve-a-payout). The page shows:
 
     ```json
     { "status": "submitted", "payout": "po_6d21…", … }
@@ -379,6 +379,6 @@ import SandboxCaps from "/snippets/sandbox-caps.mdx";
   </Step>
 </Steps>
 
-A transfer to `baseSmartWallet` and a payout to a wallet contact need a `ready` client and no KYB. Account details and bank payouts need an approved [KYB application](/whitelabel/clients#write-the-document) and an active [virtual account](/whitelabel/virtual-accounts).
+A transfer to `baseSmartWallet` and a payout to a wallet contact need a `ready` client and no verification. Account details and bank payouts need a verified client and an active [virtual account](/developers/virtual-accounts). A business verifies through a [KYB application](/developers/clients#write-the-document), and an individual in a [`verify` session](/connect/sign-in-with-hevn#verify-an-individual).
 
-<Card title="Next: Authentication" icon="key-round" href="/whitelabel/authentication" />
+<Card title="Next: Sign in with HEVN" icon="log-in" href="/connect/sign-in-with-hevn" />

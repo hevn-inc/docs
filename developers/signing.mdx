@@ -1,0 +1,185 @@
+---
+title: "Signing"
+description: "Prepare, check, sign and confirm a payment from your integrator account or its sub accounts with the developer key."
+---
+
+Signing is how your developer key approves a payment from your integrator account or one of its sub accounts. Open the payment with `POST /dapi/v1/payouts`, sign `approval.payload`, and post the signature to the confirm route.
+
+<Steps>
+  <Step title="Prepare" icon="file-text">
+    Call the prepare route. The response has `quote`, `approval` and `debit`.
+  </Step>
+  <Step title="Check" icon="scale">
+    Compare `debit` with the payment in your system and stop if they differ. `debit` is decoded from the operation you sign and returns that operation ([Debit contents](#debit-contents)).
+  </Step>
+  <Step title="Sign" icon="pen-tool">
+    Base64-decode `approval.payload` and sign the decoded bytes in the [signature format](#signature-format).
+  </Step>
+  <Step title="Confirm" icon="check">
+    Post the signature to the confirm route before `approval.expiresAt`. HEVN verifies it against the stored bytes, co-signs and submits.
+  </Step>
+</Steps>
+
+## Routes
+
+| What moves | Prepare, under `/dapi/v1` | Confirm | Approval window |
+| --- | --- | --- | --- |
+| Payout from your main wallet or a sub account: fiat over a bank rail, or a token on Base to a wallet contact | `POST /payouts` | `POST /payouts/{payoutId}/confirm` | 120 s |
+| Swap between two of your account keys, or a move with a sub account | `POST /swaps` | `POST /swaps/{swapId}/confirm` | 120 s |
+| Escrow action you operate | `POST /escrow/{escrowId}/actions` | `POST /escrow/{escrowId}/actions/{idempotencyKey}/confirm` | 60 s |
+| Payout for a client linked through HEVN Connect | `POST /payouts` with `X-Hevn-Account` | None. The holder signs in the [sign-in window](/connect/sign-in-with-hevn#approve-a-payout). | About 10 minutes (the sign-in window session) |
+| Payout from a client's external account | `POST /payouts` with `X-Hevn-Account` and an `acc_…` `sourceAccount` | None. The customer's wallet sends `transfer`. | Until `transfer.expiresAt` |
+
+On the signed routes, omit `X-Hevn-Account` or send your `cl_…`. See [Who can spend](/developers/overview#who-can-spend) and [Acting as a client](/developers/authentication#acting-as-a-client).
+
+## Authorization values
+
+`authorization` in the response of `POST /dapi/v1/payouts` and `POST /dapi/v1/swaps` names who authorizes the payment. Branch on it before you read `status`.
+
+| `authorization` | Who authorizes | Response has | Next |
+| --- | --- | --- | --- |
+| `debit` | Your developer key signs one token transfer from your main wallet or from a sub account. | `approval`, `debit` | Check [`debit`](#debit-contents), sign `approval.payload`, confirm. |
+| `intent` | Your developer key signs the terms of the payment. Returned for a payout from `FDIC_USD` and for some swaps. | `approval`, `intent` with `digest` and `settles` | Check `quote` and `intent`, sign `approval.payload`, confirm. |
+| `client` | The holder of a client linked through HEVN Connect signs in the sign-in window. | No `approval`, `debit` or `intent` | Open a `sign` session ([HEVN Connect](/connect/money-movement)). |
+| `wallet` | A client's external account funds the payout with a transfer it sends. | `transfer` | Have the customer's wallet send `transfer` ([External wallets](/external-wallets/money-movement)). |
+
+With `debit` and `intent`, the payload bytes, the confirm route and the retry rules are the same. With `client` and `wallet`, the confirm route is not used. A confirm on a `wallet` payout returns `400 invalid_request` with `details.reason = "funded_by_wallet_transfer"`.
+
+`status` is `awaitingSignature` after booking for each value. With `wallet` it means the transfer has not been seen yet.
+
+Which value a payout or a swap returns is on [Create an outgoing transfer](/api-reference/transfers/create-an-outgoing-transfer) and [Create a transfer between the client's own accounts](/api-reference/transfers/create-a-transfer-between-the-clients-own-accounts).
+
+The confirm body:
+
+```json
+{ "signature": "MEUCIQD…", "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE…" }
+```
+
+The field rules are on [Authorize an outgoing transfer](/api-reference/transfers/authorize-an-outgoing-transfer).
+
+HEVN re-checks the key and the source address before it co-signs. A key deleted after the prepare, or a confirm from outside [the IP allowlist](/developers/authentication#the-ip-allowlist), returns `403`.
+
+## Payload
+
+`approval.payload` is base64 of a canonical JSON document. A decoded payout payload, formatted for reading (the real bytes have no whitespace):
+
+```json
+{
+  "body": {
+    "method": "secp256k1_sign",
+    "params": { "hash": "0x9c1f7b4a2e5d80c6314fa7b95d0e28c4f61ab3907d5c2e84061bf39d7a2c5e18" }
+  },
+  "headers": {
+    "privy-idempotency-key": "quote-sign:5f3c…e1",
+    "privy-request-expiry": "1773679531000"
+  },
+  "method": "POST",
+  "url": "…",
+  "version": 1
+}
+```
+
+Sign `base64decode(payload)` unchanged. Do not parse and re-serialize the JSON. Reordered keys, a space after `:`, different escaping or a trailing newline return `400 signature_invalid`.
+
+HEVN builds the operation from the booking: one token transfer from the wallet in `debit.sourceAddress`. The approval is bound to your account, the target, the wallet and your signer.
+
+Prepare refuses a target that is not in a fundable state, a wallet whose on-chain owner is not your signer (`409 signer_not_attached`) and a balance below the transfer (`409 insufficient_funds`). See [Errors](/developers/reference/errors).
+
+## Debit contents
+
+With `authorization: "debit"`, the approval covers one ERC-4337 v0.6 user operation, returned as `debit.operation`.
+
+```json
+"debit": {
+  "address": "0x8f3b…",
+  "sourceAddress": "0x2f1c…",
+  "amount": "500.00",
+  "amountAtomic": "500000000",
+  "token": "USDC",
+  "chainId": 8453,
+  "operation": {
+    "sender": "0x2f1c…", "nonce": "0x…", "initCode": "0x", "callData": "0x…",
+    "callGasLimit": "0x…", "verificationGasLimit": "0x…", "preVerificationGas": "0x…",
+    "maxFeePerGas": "0x…", "maxPriorityFeePerGas": "0x…", "paymasterAndData": "0x…",
+    "entryPoint": "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"
+  }
+}
+```
+
+| Field | Content |
+| --- | --- |
+| `address` | The address that receives the tokens: the payout's funding address, a wallet contact's address, or the receiving account of a move. |
+| `sourceAddress` | The wallet the tokens leave: your main wallet, or the sub account named as `sourceAccount`. It equals `operation.sender`. |
+| `amount`, `amountAtomic`, `token`, `chainId` | The transfer, decoded from the operation. |
+| `operation` | The operation's fields in hex, without its signature. |
+
+The `hash` in the decoded payload is the hash of that operation:
+
+```
+keccak256(abi.encode(keccak256(packed operation), entryPoint, chainId))
+```
+
+`chainId` is `debit.chainId`. The packed operation is the ABI encoding of `sender`, `nonce`, `keccak256(initCode)`, `keccak256(callData)`, the five gas fields in the order above and `keccak256(paymasterAndData)`.
+
+`callData` is the wallet's `executeBatch` with one call: ERC-20 `transfer(address, amountAtomic)` on the token contract, with no native value. A payout, a swap and a move have the same shape, with no fee transfer and no token approval. `initCode` is `0x`, or the factory call that deploys the wallet when the operation is its first.
+
+Check these before you sign:
+
+| Check | What must hold |
+| --- | --- |
+| Hash | The hash recomputed from `debit.operation` equals `body.params.hash` in the payload. |
+| Entry point | `operation.entryPoint` is the v0.6 entry point, `0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789`. |
+| Sender | `operation.sender` equals `debit.sourceAddress`, and it is the wallet you meant to pay from. |
+| Call | `callData` decodes to `executeBatch` with one call, with no native value. |
+| Token | The call targets the contract of `debit.token` on `debit.chainId`. |
+| Transfer | The call is `transfer(address,uint256)` to `debit.address` for `debit.amountAtomic`. |
+| `initCode` | It is `0x`, or a `createAccount` call on the Coinbase Smart Wallet factory, `0x0BA5ED0c6AA8c49038F819E587E2633c4A9F428a`. |
+
+The Node package [hevn-inc/dapi-sdk](https://github.com/hevn-inc/dapi-sdk) runs these checks and refuses a `debit` that has no `operation`. `nonce`, the gas fields and `paymasterAndData` are bound by the hash and have no check of their own.
+
+An escrow action returns `approval` with no `authorization`, `debit` or operation.
+
+## Signature format
+
+| Rule | Value | Common mistake |
+| --- | --- | --- |
+| Algorithm | ECDSA on P-256, digest SHA-256 | Pre-hashing. Most libraries hash the message. |
+| Encoding | ASN.1 DER `(r, s)` | Raw 64-byte `r‖s` (WebCrypto, Java's `SHA256withECDSAinP1363Format`). Convert it to DER. |
+| Transport | base64, standard alphabet, padded | base64url (`-` and `_`), or missing `=` padding. |
+| Content | One signature, with no `,`, `\n` or `\r` | Signing the base64 text and not the decoded bytes. Base64 wrapped at 64 columns. A newline appended by a shell pipeline. |
+
+A signature that breaks a rule returns `400 signature_invalid` and does not consume the approval. Sign on your server and not in a browser.
+
+import SignPayloadSnippet from "/snippets/sign-payload.mdx";
+
+<SignPayloadSnippet />
+
+## Approval lifetime
+
+An approval is single-use and ends at `approval.expiresAt`. The windows are in [Routes](#routes).
+
+- Run the steps in one pass. A payload queued for a person to approve later expires.
+- To re-open, call the prepare route again with the same `Idempotency-Key`. While the payment has not moved, it returns an approval on the same booked payment, at the same price. A replay while the approval is still open returns the same approval and the same operation. A payout that already moved comes back with no `approval`.
+- Re-opening has no attempt limit. Each new approval uses the same on-chain slot. See [Why a retry cannot pay twice](/developers/conventions#why-a-retry-cannot-pay-twice).
+
+## Retrying a confirm
+
+The first confirm with a valid signature uses the approval. A second confirm on the same approval is refused, so read the payout or swap instead of confirming again. A payout confirm returns `200` when the operation lands within the request, and `202` with `pollUrl` otherwise. A swap confirm, and a payout confirm with `authorization: intent`, always return `202`. An escrow confirm repeated with the same path key returns the first result.
+
+| Response | Meaning | Next |
+| --- | --- | --- |
+| `200` `status: "settled"` | Done | Store `transactionHash`. |
+| `200` `status: "failed"` | The operation reverted on chain. | Book a new payment with a new `Idempotency-Key`. A re-open of this one returns `payment_slot_consumed`. |
+| `202` `status: "submitted"` | Sent, no receipt yet | Read `pollUrl` until `status` is `settled` or `failed`. |
+| Timeout or network error | Unknown | Read the payout or swap. If `status` is `awaitingSignature`, re-open with the same `Idempotency-Key`. |
+| `503` `user_operation_rejected` or `user_operation_unavailable` | The operation was not accepted, or its state could not be read. | As for a timeout. |
+| `503` `bundler_rejected` or `bundler_unavailable` | An escrow action was rejected, or the chain was unreachable. | Confirm the escrow action again with backoff. |
+| `409` `funding_attempt_expired` (payout with `debit`), `410` `approval_expired` (payout with `intent`), `409` `swap_not_confirmable` (swap) | No open approval: it expired, or a confirm already used it. | As for a timeout. |
+| `409` `funding_in_progress` | An attempt is live. | Wait, then send the same call again. |
+| `409` `already_funded` | A swap re-open found that the money moved. | Success. Read `details.transactionHash`. |
+| `409` `payment_slot_consumed` | An operation for this payment already landed or reverted. | Stop re-opening. Read the payout and book a new one if it is `failed`. |
+| `400` `signature_invalid` | Wrong bytes, wrong encoding, or a key that is not on your account. The approval stays usable. | Fix the signing and confirm again. |
+
+Each approval for one payment uses the same on-chain slot. If an earlier operation lands after a re-open, the new one returns `payment_slot_consumed`. The loop as code is in [HTTP client](/developers/reference/client).
+
+<Card title="Next: Conventions" icon="arrow-right" href="/developers/conventions" />

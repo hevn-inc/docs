@@ -7,23 +7,27 @@ HEVN is payments software: an API and app over a Base smart wallet that only its
 
 A HEVN account is a profile plus a Base smart wallet that holds USDC. The app adds contacts, invoices, contracts, payouts to bank accounts, cards issued by a partner and transaction reports.
 
-## Self-serve and whitelabel
+## Self-serve and integrations
 
-| | Self-serve | Whitelabel |
-| --- | --- | --- |
-| Account creation | The holder signs up in the HEVN app with an email | Your customer creates a HEVN account in a sign-in window on your site and links it to your product |
-| Operator | None | Your backend, with a developer key. It verifies the account, opens its rails and books its payments |
-| Payment approval | The holder, with their key | The holder, with their key, in the sign-in window |
-| Docs | This tab | [Whitelabel tab](/whitelabel/overview) |
+| | Self-serve | HEVN Connect | External wallets |
+| --- | --- | --- | --- |
+| Account creation | The holder signs up in the HEVN app with an email | Your customer creates a HEVN account in a sign-in window on your site and links it to your product | Your backend creates a client with `POST /dapi/v1/clients` and registers a wallet address the customer holds |
+| Operator | None | Your backend, with a developer key. It verifies the account, requests its virtual accounts and books its payments | Your backend, with a developer key. It verifies the client, requests its virtual accounts and books its payments |
+| Payment approval | The holder, with their key | The holder, with their key, in the sign-in window | The customer, with a transfer from their own wallet |
+| Docs | This tab | [HEVN Connect tab](/connect/overview) | [External wallets tab](/external-wallets/overview) |
+
+[Build on HEVN](/general/build-on-hevn) compares the two integrations.
 
 ## Interfaces
 
 | Interface | What it is | Docs |
 | --- | --- | --- |
 | Web app | Product UI at [app.gethevn.com](https://app.gethevn.com) | n/a |
-| REST API | The HTTP API behind the whitelabel integration, at `/dapi/v1` | [REST API tab](/api-reference/overview) |
-| Whitelabel | Guides for linking your customers' accounts and operating them from your backend | [Whitelabel tab](/whitelabel/overview) |
-| Remote transfers | A capped key that lets your server or script send USDC from your account. Advanced use. Create one key per integration | [Remote Transfers tab](/remote-transfers/overview) |
+| REST API | The HTTP API behind both integrations, at `/dapi/v1` | [For developers tab](/developers/overview), [REST API tab](/api-reference/overview) |
+| HEVN Connect | A sign-in window on your site where your customers link their HEVN accounts and approve payouts | [HEVN Connect tab](/connect/overview) |
+| External wallets | Clients you create through the API, with virtual accounts that deliver to wallets your customers hold | [External wallets tab](/external-wallets/overview) |
+| Sub accounts | Further wallets of your own account, each with its own address and virtual accounts | [Sub Accounts tab](/sub-accounts/overview) |
+| Remote transfers | A capped key that lets your server or script send USDC from your account. Advanced use. Create one key per integration | [Remote transfers](/general/remote-transfers) |
 
 ## Account structure
 

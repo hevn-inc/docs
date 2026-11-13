@@ -17,11 +17,11 @@ No route creates a key, in `/dapi/v1` or in the app's API (`/api/v1`).
 2. Enter [the IP allowlist](#the-ip-allowlist). It cannot be changed after creation.
 3. Save the private key. The browser generates the keypair and shows the private half once, and HEVN stores the public half. Write the private half to a file with mode `0600` on the machine that uses it.
 
-The app adds the public half to your account's signer in the same action. An account holds up to five keys. One key covers all clients linked to you.
+The app adds the public half to your account's signer in the same action. An account holds up to five keys. One key covers all your clients, linked or created.
 
 ### Key format
 
-The curve is P-256, also called `secp256r1` or `prime256v1`. The app shows the key's `dk_…` id and its fingerprint, `sha256:<hex of sha256(DER)>`. The public key is sent as base64 of the DER SubjectPublicKeyInfo, at most 4096 characters. The wire formats of the key and the signature are in [Signature format](/whitelabel/signing#signature-format) and on [Start a developer-key login](/api-reference/auth/start-a-developer-key-login-and-receive-the-payload-to-sign).
+The curve is P-256, also called `secp256r1` or `prime256v1`. The app shows the key's `dk_…` id and its fingerprint, `sha256:<hex of sha256(DER)>`. The public key is sent as base64 of the DER SubjectPublicKeyInfo, at most 4096 characters. The wire formats of the key and the signature are in [Signature format](/developers/signing#signature-format) and on [Start a developer-key login](/api-reference/auth/start-a-developer-key-login-and-receive-the-payload-to-sign).
 
 ### The IP allowlist
 
@@ -37,14 +37,16 @@ Include the addresses an autoscaler adds. Your edge must remove caller-supplied 
 
 ### Load the key
 
-Read the key from the file named in `HEVN_KEY_PEM`. The loader is in [HTTP client](/whitelabel/reference/client). A `200` from `POST /dapi/v1/auth/challenge` shows that the key exists and the allowlist covers the host.
+Read the key from the file named in `HEVN_KEY_PEM`. The loader is in [HTTP client](/developers/reference/client). A `200` from `POST /dapi/v1/auth/challenge` shows that the key exists and the allowlist covers the host.
 
 ### What a session from the key may do
 
-A session from any of your keys can call any `/dapi/v1` route. The key signs for your integrator wallet and for no client wallet. See [Who can spend](/whitelabel/overview#who-can-spend).
+A session from any of your keys can call any `/dapi/v1` route. A key has no scopes.
+
+The key signs for your integrator wallet and for your [sub accounts](/sub-accounts/overview). It does not sign for a client's wallet or for an external account. See [Who can spend](/developers/overview#who-can-spend).
 
 <Warning>
-  The key has no amount limit. It can spend the full balance of your integrator wallet. See [What this means for your product](/whitelabel/overview#what-this-means-for-your-product).
+  The key has no amount limit. It can spend the full balance of your integrator wallet and of each sub account. See [What this means for your product](/developers/overview#what-this-means-for-your-product).
 </Warning>
 
 ## Sessions
@@ -75,7 +77,7 @@ Send it to `POST /dapi/v1/auth/challenge`. The field rules are on [Start a devel
 { "challengeId": "9f2c1ab8-4d7e-4f1f-a3c6-5b0e7d9a2c41", "payload": "eyJib2R5Ijp…", "expiresAt": "2026-09-17T10:06:10Z" }
 ```
 
-Base64-decode `payload`, sign the bytes as in [Signing](/whitelabel/signing#signature-format), and call `POST /dapi/v1/auth/token`:
+Base64-decode `payload`, sign the bytes as in [Signing](/developers/signing#signature-format), and call `POST /dapi/v1/auth/token`:
 
 ```json
 { "challengeId": "9f2c1ab8-4d7e-4f1f-a3c6-5b0e7d9a2c41", "signature": "MEQCIF3q…" }
@@ -93,17 +95,17 @@ Base64-decode `payload`, sign the bytes as in [Signing](/whitelabel/signing#sign
 
 At login, `401 invalid_credentials` covers any problem with the email, the key, the allowlist, the signer or the signature. It does not name the check that failed.
 
-Refusals after login are in [Errors](/whitelabel/reference/errors):
+Refusals after login are in [Errors](/developers/reference/errors):
 
-- `403 forbidden` (key deleted, address outside the allowlist, or `details.reason = "developerSessionRequired"`) is under [Developer keys](/whitelabel/reference/errors#developer-keys).
-- `403 key_not_registered`, `409 signer_not_attached` and `400 signature_invalid` are under [Authentication and signing](/whitelabel/reference/errors#authentication-and-signing).
-- `403 account_not_controlled` is under [Acting as a client](/whitelabel/reference/errors#acting-as-a-client).
+- `403 forbidden` (key deleted, address outside the allowlist, or `details.reason = "developerSessionRequired"`) is under [Developer keys](/developers/reference/errors#developer-keys).
+- `403 key_not_registered`, `409 signer_not_attached` and `400 signature_invalid` are under [Authentication and signing](/developers/reference/errors#authentication-and-signing).
+- `403 account_not_controlled` is under [Acting as a client](/developers/reference/errors#acting-as-a-client).
 
 ### Tokens
 
 The access token audience is `platform`, and the refresh token audience is `platform-refresh`. Lifetimes and token fields are on [Exchange a signed login challenge](/api-reference/auth/exchange-a-signed-login-challenge-for-a-session).
 
-Both tokens have a `developer_key_id` claim that names the key behind the session. `/dapi/v1` refuses other bearers:
+Both tokens have a `developer_key_id` claim that names the key behind the session. `/dapi/v1` refuses other bearers.
 
 - No bearer returns `401 unauthenticated`.
 - An app token, a refresh token on another route, or a token with no key behind it returns `403 forbidden`. `details.reason` is `developerSessionRequired`.
@@ -150,15 +152,17 @@ accessToken := minted.AccessToken
 { "accessToken": "eyJ…", "expiresIn": 3600, "userId": "cl_9f2c…" }
 ```
 
-Log in once per process and store the refresh token as a secret. Refresh about a minute before the access token expires. `Session` in [HTTP client](/whitelabel/reference/client) does this.
+Log in once per process and store the refresh token as a secret. Refresh about a minute before the access token expires. `Session` in [HTTP client](/developers/reference/client) does this.
 
 ### Session scope
 
-Production refuses a sandbox token, and the reverse. Log in on each host with a key created in that environment's app. See [rate limits](/whitelabel/conventions#rate-limits).
+Production refuses a sandbox token, and the reverse. Log in on each host with a key created in that environment's app. See [rate limits](/developers/conventions#rate-limits).
 
 ## Acting as a client
 
-Send `X-Hevn-Account: cl_…` with your access token to act for a client. One token covers all clients linked to you.
+Send `X-Hevn-Account: cl_…` with your access token to act for a client. One token covers all your clients: those linked through [HEVN Connect](/connect/overview) and those created with `POST /dapi/v1/clients` for [external wallets](/external-wallets/overview).
+
+The header selects whose data a call reads and writes. It does not let the developer key sign for that client's wallet.
 
 <CodeGroup>
 
@@ -184,11 +188,13 @@ rows, err := api.ActingAs("cl_7YQ2Kf3mN8").Get("/transactions", hevn.Query{"limi
 
 No path has a `{clientId}` parameter.
 
+Your own `cl_…` id, the `userId` from `POST /dapi/v1/auth/token`, selects your integrator account. Send it on the routes that require the header, for example to open a sub account with `POST /dapi/v1/client/accounts`.
+
 | Routes | Header | Behaviour |
 | --- | --- | --- |
 | `/banks*`, `/payins*`, `/payouts*`, `/swaps*`, `/contacts*`, `/transactions*`, `/documents*`, `/sandbox/*` | Optional | Without it the call acts on your integrator account. |
-| `GET /client`, `PATCH /client`, `GET /client/balance`, `GET /client/kyb`, `PUT /client/kyb`, `POST /client/kyb/complete` | Required | For your integrator account, send your `cl_…`. |
-| `POST /clients/link`, `GET /clients`, `POST /connect/sessions` | Refused | These act on your integrator account. |
+| `GET /client`, `PATCH /client`, `GET /client/balance`, `GET /client/kyb`, `PUT /client/kyb`, `POST /client/kyb/complete`, `/client/accounts*` | Required | For your integrator account, send your `cl_…`. |
+| `POST /clients`, `POST /clients/link`, `GET /clients`, `POST /connect/sessions` | Refused | These act on your integrator account. |
 | `/escrow*` | Refused | A deal names `senderClientId` and `receiverClientId` in the body. You are the operator. |
 | `/auth/*`, `GET /chains`, `GET /rates` | Ignored | n/a |
 
@@ -198,8 +204,9 @@ No path has a `{clientId}` parameter.
 | 400 | `account_scope_conflict` | The header, or a token scoped to another account, reached a route that refuses it. `details.reason` is `selfScopedRoute`. |
 | 422 | `validation_failed` | The header is missing on a `/client*` route. `details.fields` names it. |
 | 404 | `account_not_found` | The id is unknown or is not one of your clients. |
-| 403 | `account_not_controlled` | A confirm on a client's payout or swap. The holder signs those in the [sign-in window](/whitelabel/sign-in-with-hevn#approve-a-payout). |
+| 403 | `account_not_controlled` | A call that needs your developer key to sign for a client: a payout confirm, a swap, a sub account. `details.clientId` names the client. See [Who can spend](/developers/overview#who-can-spend). |
 | 403 | `account_forbidden` | The client is yours, but your integrator standing or the link to the client is not current. |
+| 403 | `account_read_only` | The credential in `details.credential` may read this client and not write to it. |
 
 For an access token that acts for one client, send its `userId` to [`POST /dapi/v1/auth/refresh`](/api-reference/auth/exchange-a-refresh-token-for-a-session-optionally-acting-for-an-account).
 
@@ -221,4 +228,4 @@ Both keys work while both exist.
 
 Deleting a key ends its sessions. The next call with an access token from that key returns `403`, and so does `POST /dapi/v1/auth/refresh`. Delete the key when a token leaks, too. Test rotation in the sandbox.
 
-<Card title="Next: Signing" icon="pen-tool" href="/whitelabel/signing" />
+<Card title="Next: Signing" icon="pen-tool" href="/developers/signing" />

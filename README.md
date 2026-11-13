@@ -6,9 +6,11 @@ Source of the HEVN documentation site, built with [Mintlify](https://mintlify.co
 
 | Path | Contents |
 | --- | --- |
-| `general/` | How the platform is built |
-| `remote-transfers/` | API keys for automating your account |
-| `whitelabel/` | Integration guides and reference for the Platform API |
+| `general/` | How the platform is built, the routing page for developers, remote transfers |
+| `developers/` | What is common to both integrations: access, authentication, signing, verification, money movement, sandbox, reference |
+| `connect/` | HEVN Connect: the sign-in window and holder-approved payouts |
+| `external-wallets/` | External wallets: clients created through the API and wallets they hold |
+| `sub-accounts/` | Sub accounts of the integrator account |
 | `api-reference/` | Overview page of the REST API tab |
 | `snippets/` | Code shared between pages |
 | `openapi.json` | The Platform API contract, source of the REST API tab. Generated from the backend schemas: edit field descriptions there |

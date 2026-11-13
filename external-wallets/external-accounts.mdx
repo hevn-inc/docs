@@ -1,0 +1,189 @@
+---
+title: "External accounts"
+description: "Register, read and archive the wallet addresses a client holds."
+---
+
+An external account is a wallet address a client holds and signs for, recorded as an `acc_…` id with `kind: "external"`. Register one with `POST /dapi/v1/client/accounts`.
+
+The routes here require `X-Hevn-Account` with the client's id ([Acting as a client](/developers/authentication#acting-as-a-client)). The same routes return [sub accounts](/sub-accounts/overview) of your own account, told apart by `kind`.
+
+## Register an address
+
+Call `POST /dapi/v1/client/accounts` with the network and the address. Fields are on [Add an account](/api-reference/client-accounts/add-an-account).
+
+<CodeGroup>
+
+```bash cURL
+curl -s -X POST "$HEVN_API/client/accounts" \
+  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+  -H "X-Hevn-Account: $HEVN_CLIENT_ID" \
+  -H "Content-Type: application/json" \
+  -d '{"chain":"base","address":"0x8ba1f109551bD432803012645Ac136ddd64DBA72","label":"Treasury wallet"}'
+```
+
+```python Python
+client = hevn.acting_as(CLIENT_ID)
+
+account = client.post("/client/accounts", {
+    "chain": "base",
+    "address": "0x8ba1f109551bD432803012645Ac136ddd64DBA72",
+    "label": "Treasury wallet",
+})
+```
+
+```javascript Node
+const client = hevn.actingAs(clientId);
+
+const account = await client.post("/client/accounts", {
+  chain: "base",
+  address: "0x8ba1f109551bD432803012645Ac136ddd64DBA72",
+  label: "Treasury wallet",
+});
+```
+
+```go Go
+client := api.ActingAs(clientID)
+
+account, err := client.Post("/client/accounts", hevn.Body{
+	"chain":   "base",
+	"address": "0x8ba1f109551bD432803012645Ac136ddd64DBA72",
+	"label":   "Treasury wallet",
+})
+```
+
+</CodeGroup>
+
+```json Response 201, Location: /dapi/v1/client/accounts/acc_9f2c…
+{
+  "accountId": "acc_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41",
+  "kind": "external",
+  "asset": "USDC",
+  "chain": "base",
+  "address": "0x8ba1f109551bD432803012645Ac136ddd64DBA72",
+  "label": "Treasury wallet",
+  "balance": "0.0",
+  "syncedAt": "2026-11-12T09:14:02Z",
+  "createdAt": "2026-11-12T09:14:02Z"
+}
+```
+
+Store `accountId`. It names the account in `accountId`, `sourceAccount` and `destinationAccount` on the [money routes](/external-wallets/money-movement).
+
+## Address rules
+
+| Rule | Detail |
+| --- | --- |
+| Network | `chain` is `base`, `arb`, `eth`, `op`, `pol` or `sol`. One account is one address on one network. |
+| Format | A `0x` address on the EVM networks, a base58 address on `sol`. At most 64 characters. |
+| Label | Optional, at most 64 characters. It cannot be edited. |
+| Uniqueness | One active account per client, network and address. |
+| Refused addresses | `422 account_address_refused` for an address not valid on `chain`, a HEVN wallet, a sub account, the zero address, a precompile, and a protocol or token contract. |
+| Token | The account holds USDC. `asset` is `USDC`. |
+| Ownership | No proof is asked. Register an address your customer controls. |
+
+Payouts need an account on `base`. An account on another network receives payins and returns `409 source_account_unsupported` as a payout source.
+
+## Retries
+
+The address and the label identify the request. An `Idempotency-Key` is accepted and is not needed.
+
+| Request | Result |
+| --- | --- |
+| Same network, address and label | `200` with `Idempotency-Replayed: true` and the same account. |
+| Same network and address, another label | `409 account_address_taken` |
+| An address archived earlier | `201` with a new `acc_…` id. |
+
+## Read accounts
+
+Call `GET /dapi/v1/client/accounts` for a page of the client's active accounts, oldest first, or `GET /dapi/v1/client/accounts/{accountId}` for one. Paging follows [Pagination](/developers/conventions#pagination).
+
+<CodeGroup>
+
+```bash cURL
+curl -s "$HEVN_API/client/accounts?limit=50" \
+  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+  -H "X-Hevn-Account: $HEVN_CLIENT_ID"
+```
+
+```python Python
+page = client.get("/client/accounts", {"limit": 50})
+for row in page["items"]:
+    print(row["accountId"], row["chain"], row["address"], row["balance"])
+```
+
+```javascript Node
+const page = await client.get("/client/accounts", { limit: 50 });
+for (const row of page.items) console.log(row.accountId, row.chain, row.address, row.balance);
+```
+
+```go Go
+page, err := client.Get("/client/accounts", hevn.Query{"limit": "50"})
+for _, row := range page.List("items") {
+	fmt.Println(row.Str("accountId"), row.Str("chain"), row.Str("address"), row.Str("balance"))
+}
+```
+
+</CodeGroup>
+
+The fields are on [List accounts](/api-reference/client-accounts/list-accounts) and [Retrieve one account](/api-reference/client-accounts/retrieve-one-account).
+
+## Balance
+
+`balance` is the USDC at the address on `chain`. A read refreshes it from the network when the stored value is older than a minute.
+
+When the network does not respond, the route returns the last value read. `syncedAt` is the time of the last successful read, so compare it with the clock before you show the balance as current.
+
+External accounts have no row in `GET /dapi/v1/client/balance`.
+
+## Archive an account
+
+Call `DELETE /dapi/v1/client/accounts/{accountId}`. The route returns the archived account. See [Archive an external account](/api-reference/client-accounts/archive-an-external-account).
+
+<CodeGroup>
+
+```bash cURL
+curl -s -X DELETE "$HEVN_API/client/accounts/$HEVN_ACCOUNT_ID" \
+  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+  -H "X-Hevn-Account: $HEVN_CLIENT_ID"
+```
+
+```python Python
+archived = client.delete(f"/client/accounts/{account['accountId']}")
+```
+
+```javascript Node
+const archived = await client.delete(`/client/accounts/${account.accountId}`);
+```
+
+```go Go
+archived, err := client.Delete("/client/accounts/" + account.Str("accountId"))
+```
+
+</CodeGroup>
+
+| Effect | Detail |
+| --- | --- |
+| Reads | The account leaves the list, and its id returns `404 account_not_found`. |
+| Virtual accounts | Each virtual account opened on it is closed. |
+| Money routes | The id is refused as `accountId`, `sourceAccount` and `destinationAccount`. |
+| Ledger | Its rows stay readable with the `accountId` filter on `GET /dapi/v1/transactions`. |
+| Same address again | `POST /dapi/v1/client/accounts` creates a new `acc_…` id with no virtual accounts. |
+
+<Warning>
+  Archiving closes the virtual accounts opened on the account. Take their account details out of use with payers before you archive.
+</Warning>
+
+## Errors
+
+| Error | Cause |
+| --- | --- |
+| `404 account_not_found` | Unknown or archived `acc_…` id, or an id of another client. |
+| `409 account_address_taken` | The client has an active account with this address on this network under another label. |
+| `422 account_address_refused` | The address cannot be an external account. See [Address rules](#address-rules). |
+| `422 validation_failed` | Unknown `chain`, or a field over its length. |
+| `409 account_archive_unsupported` | `DELETE` on a sub account. |
+| `409 account_destination_unsupported` | A virtual account or payin that cannot deliver to this account. |
+| `409 source_account_unsupported` | A payout this account cannot fund. |
+| `422 refund_address_required` | A payin to this account without `refundAddress`. |
+
+The last three are returned by the routes in [Money movement](/external-wallets/money-movement). The envelope is in [Errors](/developers/reference/errors).

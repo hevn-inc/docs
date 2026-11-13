@@ -3,7 +3,7 @@ title: "REST API overview"
 description: "Where the OpenAPI document is served, which host to call, and the headers a request needs."
 ---
 
-The REST API tab is generated from the OpenAPI document of the HEVN Platform API. Log in with `POST /dapi/v1/auth/challenge` and `POST /dapi/v1/auth/token` ([Sessions](/whitelabel/authentication#sessions)).
+The REST API tab is generated from the OpenAPI document of the HEVN Platform API. Log in with `POST /dapi/v1/auth/challenge` and `POST /dapi/v1/auth/token` ([Sessions](/developers/authentication#sessions)).
 
 ## OpenAPI document
 
@@ -29,20 +29,20 @@ The environments have separate accounts, and a token issued by one host is refus
 
 | Header | Sent on | Defined in |
 | --- | --- | --- |
-| `Authorization: Bearer <accessToken>` | All operations outside the `auth` tag. `POST /auth/refresh` takes the refresh token as the bearer. | [Tokens](/whitelabel/authentication#tokens) |
-| `X-Hevn-Account: cl_…` | Operations that act for a client | [Acting as a client](/whitelabel/authentication#acting-as-a-client) |
+| `Authorization: Bearer <accessToken>` | All operations outside the `auth` tag. `POST /auth/refresh` takes the refresh token as the bearer. | [Tokens](/developers/authentication#tokens) |
+| `X-Hevn-Account: cl_…` | Operations that act for a client | [Acting as a client](/developers/authentication#acting-as-a-client) |
 
-`/dapi/v1` does not accept `X-Api-Key`. That header authenticates [Remote Transfers](/remote-transfers/overview).
+`/dapi/v1` does not accept `X-Api-Key`. That header authenticates [Remote Transfers](/general/remote-transfers).
 
 ## Errors
 
-An error response is a JSON envelope with `error.code`, `error.message` and `error.details`. The OpenAPI document lists the codes in one enum, `PlatformErrorCode`, with no per-operation list. [Errors](/whitelabel/reference/errors) gives the HTTP status and next step for each code.
+An error response is a JSON envelope with `error.code`, `error.message` and `error.details`. The OpenAPI document lists the codes in one enum, `PlatformErrorCode`, with no per-operation list. [Errors](/developers/reference/errors) gives the HTTP status and next step for each code.
 
 ## Related pages
 
 | Topic | Page |
 | --- | --- |
-| Money format, ids, idempotency, pagination, status codes | [Conventions](/whitelabel/conventions) |
-| Signing a payout, swap or escrow action with the developer key | [Signing](/whitelabel/signing) |
-| A holder authorising a client's payout in the sign-in window | [Sign in with HEVN](/whitelabel/sign-in-with-hevn) |
-| Rate limits and lifetimes | [Conventions](/whitelabel/conventions#rate-limits) |
+| Money format, ids, idempotency, pagination, status codes | [Conventions](/developers/conventions) |
+| Signing a payout, swap or escrow action with the developer key | [Signing](/developers/signing) |
+| A holder authorising a client's payout in the sign-in window | [Sign in with HEVN](/connect/sign-in-with-hevn) |
+| Rate limits and lifetimes | [Conventions](/developers/conventions#rate-limits) |

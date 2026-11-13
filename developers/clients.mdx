@@ -1,11 +1,16 @@
 ---
 title: "Clients and verification"
-description: "Read and update a linked client, then write, submit and track a business client's KYB document."
+description: "Read and update a client, then write, submit and track a business client's KYB document."
 ---
 
-A client is your customer's HEVN account, linked to your integrator account through [Sign in with HEVN](/whitelabel/sign-in-with-hevn). Read it with `GET /dapi/v1/client`, then verify a business client with `PUT /dapi/v1/client/kyb`.
+A client is a customer's account that your integrator account acts for, one per customer. Read it with `GET /dapi/v1/client`, then verify a business client with `PUT /dapi/v1/client/kyb`.
 
-`POST /dapi/v1/clients/link` returns the `cl_…` id. Send it as `X-Hevn-Account` to read the client with `GET /dapi/v1/client`.
+| Integration kind | How the client is created | Returns |
+| --- | --- | --- |
+| [HEVN Connect](/connect/overview) | The customer signs in, then you call `POST /dapi/v1/clients/link` with the code ([Sign in with HEVN](/connect/sign-in-with-hevn)) | `200` with the client, usually `ready` |
+| [External wallets](/external-wallets/overview) | You call `POST /dapi/v1/clients` with the company's `name` and `email` | `202` with the client in `provisioning` and a `pollUrl` |
+
+Both routes return the `cl_…` id. Send it as `X-Hevn-Account` to read the client with `GET /dapi/v1/client`.
 
 ```json POST /dapi/v1/clients/link 200
 {
@@ -19,21 +24,21 @@ A client is your customer's HEVN account, linked to your integrator account thro
 }
 ```
 
-The fields are described on [Connect an existing account](/api-reference/accounts/connect-an-existing-account). A field with no value is omitted.
+The fields are described on [Connect an existing account](/api-reference/accounts/connect-an-existing-account) and [Create a client](/api-reference/accounts/create-a-client). A field with no value is omitted. A client created with `POST /dapi/v1/clients` has no wallet at HEVN, so it has no `baseSmartWallet`.
 
-An individual has no KYB progress. Poll `verifiedAt` after they [verify their identity](/whitelabel/sign-in-with-hevn#verify-an-individual).
+A linked individual has no KYB progress. Poll `verifiedAt` after they [verify their identity](/connect/sign-in-with-hevn#verify-an-individual). `POST /dapi/v1/clients` creates companies.
 
-Which routes take `X-Hevn-Account` is covered in [Acting as a client](/whitelabel/authentication#acting-as-a-client). For who signs a client's payouts, see [Who can spend](/whitelabel/overview#who-can-spend).
+Which routes take `X-Hevn-Account` is covered in [Acting as a client](/developers/authentication#acting-as-a-client). For who signs a client's payouts, see [Who can spend](/developers/overview#who-can-spend).
 
 ## Statuses
 
 | `status` | Meaning | Next |
 | --- | --- | --- |
-| `provisioning` | The smart wallet is not deployed yet. | Poll `GET /dapi/v1/client` every 2 s. |
-| `ready` | The account, your seat on it, the KYB subject and the Base smart wallet exist. | [Write the KYB document](#write-the-document). |
-| `failed` | Provisioning was refused. | Contact support with the client id. |
+| `provisioning` | A creation request is open, or the client has no deployed Base smart wallet and no active external account yet. | Poll `GET /dapi/v1/client`. For a created client, register an [external account](/external-wallets/external-accounts). |
+| `ready` | The account and its KYB subject exist, and the client has a deployed Base smart wallet or an active external account. | [Write the KYB document](#write-the-document). |
+| `failed` | The client was not created. `failure` has `code`, `message` and `retriable: false`. | Read `failure.code`: `provisioning_failed`, `request_rejected` or `request_canceled`. |
 
-A client is usually `ready` when you exchange the code. `poll_until` is defined in [HTTP client](/whitelabel/reference/client).
+A linked client is usually `ready` when you exchange the code. HEVN reviews a `POST /dapi/v1/clients` request unless your integrator agreement waives the review, so a created client can stay `provisioning` for longer. Until its account exists, routes that take the new id, other than `GET /dapi/v1/client`, return `404 account_not_found`. `GET /dapi/v1/client` returns the client in each status, and an unknown id returns `404 client_not_found`. `poll_until` is defined in [HTTP client](/developers/reference/client).
 
 <CodeGroup>
 
@@ -70,7 +75,7 @@ ready, err := hevn.PollUntil(func() (hevn.Payload, error) {
 
 ## List clients
 
-`GET /dapi/v1/clients` lists the accounts linked to you. Use it to recover a lost id. Filters are on [List clients](/api-reference/accounts/list-clients), and paging follows [Pagination](/whitelabel/conventions#pagination).
+`GET /dapi/v1/clients` lists your clients: the accounts linked to you, the clients you created and the creation requests still open. Use it to recover a lost id. Filters are on [List clients](/api-reference/accounts/list-clients), and paging follows [Pagination](/developers/conventions#pagination).
 
 <CodeGroup>
 
@@ -132,7 +137,7 @@ A company's virtual account requires a phone number. Either phone satisfies the 
 
 A business client is verified from one KYB document that you write, submit for review and correct on request. Write it with `PUT /dapi/v1/client/kyb` until the response returns `ready: true`. Then call `POST /dapi/v1/client/kyb/complete`.
 
-The KYB and document routes are client-scoped, so send `X-Hevn-Account`. An individual client verifies in the [sign-in window](/whitelabel/sign-in-with-hevn#verify-an-individual).
+The KYB and document routes are client-scoped, so send `X-Hevn-Account`. The flow is the same for a linked business and for a created company. An individual client verifies in the [sign-in window](/connect/sign-in-with-hevn#verify-an-individual).
 
 The document has the sections `company`, `people[]` and `documents[]`. Field types, enum values and slot names are on [Provide applicant information](/api-reference/verification/provide-applicant-information).
 
@@ -395,7 +400,7 @@ A flat write leaves entities added through those routes in place. A write that w
 
 ## Track the application
 
-`GET /dapi/v1/client/kyb` returns readiness, the application if one is filed, and the stored document. Poll it as described in [polling](/whitelabel/conventions#status-codes).
+`GET /dapi/v1/client/kyb` returns readiness, the application if one is filed, and the stored document. Poll it as described in [polling](/developers/conventions#status-codes).
 
 ```json
 {
@@ -421,11 +426,11 @@ A flat write leaves entities added through those routes in place. A write that w
 | --- | --- | --- |
 | `notStarted` | No application is filed. | Complete the document, then the submission. |
 | `pending` | The application is filed and under review. | Poll. Timing is set by the reviewer. |
-| `approved` | The application was accepted. | [Request virtual accounts](/whitelabel/virtual-accounts). |
+| `approved` | The application was accepted. | [Request virtual accounts](/developers/virtual-accounts). |
 | `rfi` | The reviewer asked for something. | [Answer the RFI](#answer-an-rfi). |
 | `rejected` | The application was refused. | Read `application.comment`. Complete again only after you change the document. |
 
-In the sandbox, set the status with [`POST /dapi/v1/sandbox/kyb/status`](/whitelabel/sandbox#decide-a-kyb-application).
+In the sandbox, set the status with [`POST /dapi/v1/sandbox/kyb/status`](/developers/sandbox#decide-a-kyb-application).
 
 ## Answer an RFI
 
@@ -475,4 +480,4 @@ filled, err := client.Put("/documents/doc_1a7Kd2/content", hevn.Body{"fields": h
 
 Key format and refusals are on [Fill the typed fields read off a document](/api-reference/documents/fill-the-typed-fields-read-off-a-document).
 
-<Card title="Next: Virtual accounts" icon="arrow-right" href="/whitelabel/virtual-accounts" />
+<Card title="Next: Virtual accounts" icon="arrow-right" href="/developers/virtual-accounts" />

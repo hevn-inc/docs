@@ -1,0 +1,165 @@
+---
+title: "Money movement"
+description: "Take payins and book payouts for a linked client, and what the developer key cannot sign."
+---
+
+A linked client's money is held on its Base smart wallet, and the holder signs each payout from it. Book a payout with `POST /dapi/v1/payouts` and the client's id in `X-Hevn-Account`, then open a `sign` session for the holder.
+
+Send the client's `cl_…` id in `X-Hevn-Account` on the routes below ([Acting as a client](/developers/authentication#acting-as-a-client)).
+
+## What differs
+
+| Operation | For a linked client | Common page |
+| --- | --- | --- |
+| Virtual account | `POST /dapi/v1/banks`. The rail delivers the settlement token to the client's wallet. | [Virtual accounts](/developers/virtual-accounts) |
+| Quoted payin | `POST /dapi/v1/payins`. It settles on the client's wallet. | [Payins](/developers/payins) |
+| Transfer on Base | USDC or EURC sent to `baseSmartWallet` is in the balance once it confirms. | [Payins](/developers/payins) |
+| Payout from `USDC` or `EURC` | `POST /dapi/v1/payouts` returns `authorization: "client"` and no `approval`. The holder approves it. | [Payouts](/developers/payouts) |
+| Balance and ledger | `GET /dapi/v1/client/balance` and `GET /dapi/v1/transactions` read the client's wallet. | [Balances and transactions](/developers/balances-and-transactions) |
+| Swap | `POST /dapi/v1/swaps/preview` prices one. `POST /dapi/v1/swaps` is [refused](#refusals). | [Swaps](/developers/swaps) |
+| Escrow, sub account | [Refused](#refusals). | n/a |
+
+Verification comes first for bank rails. A virtual account lists `kyb_required` or `verification_required` in `blockers[]` until the client is verified ([Integration steps](/connect/overview#integration-steps)).
+
+## Book the payout
+
+Save a contact with `POST /dapi/v1/contacts` ([Payouts](/developers/payouts)), then call `POST /dapi/v1/payouts` with the contact and one amount. Do not send `publicKey`.
+
+<CodeGroup>
+```bash cURL
+curl -s -X POST "$HEVN_API/payouts" \
+  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+  -H "X-Hevn-Account: $HEVN_CLIENT_ID" \
+  -H "Idempotency-Key: order-A-1187" \
+  -H "Content-Type: application/json" \
+  -d '{"contactId":"ct_3K9…","amount":"500.00","paymentReference":"INV-2026-114"}'
+```
+
+```python Python
+payout = client.post("/payouts", {
+    "contactId": contact["id"],
+    "amount": "500.00",
+    "paymentReference": "INV-2026-114",
+}, idempotency_key="order-A-1187")
+```
+
+```javascript Node
+const payout = await client.post("/payouts", {
+  contactId: contact.id,
+  amount: "500.00",
+  paymentReference: "INV-2026-114",
+}, { idempotencyKey: "order-A-1187" });
+```
+
+```go Go
+payout, err := client.Post("/payouts", hevn.Body{
+	"contactId":        contact.Str("id"),
+	"amount":           "500.00",
+	"paymentReference": "INV-2026-114",
+}, hevn.IdempotencyKey("order-A-1187"))
+```
+</CodeGroup>
+
+```json Response 201, Location: /dapi/v1/payouts/po_4c8a…
+{
+  "id": "po_4c8a…",
+  "kind": "fiat",
+  "status": "awaitingSignature",
+  "quote": { "fromAmount": "500.00", "fromCurrency": "USD", "sourceAccount": "USDC",
+             "toAmount": "459.31", "toCurrency": "EUR", …,
+             "expiresAt": "2026-09-17T10:06:11Z" },
+  "authorization": "client",
+  "contact": { "contactId": "ct_3K9…", "name": "Ardenne Fabrication SARL" }
+}
+```
+
+Show the holder `quote` and `contact` in your product before you open the window. Fields are on [Create an outgoing transfer](/api-reference/transfers/create-an-outgoing-transfer).
+
+<Warning>
+  Reuse the `Idempotency-Key` when you retry. A new key books a second payout ([Idempotency-Key](/developers/conventions#idempotency-key)).
+</Warning>
+
+## Approve the payout
+
+Call `POST /dapi/v1/connect/sessions` with `action: "sign"` and the payout id, without `X-Hevn-Account`. Open the returned `url` in the popup ([Approve a payout](/connect/sign-in-with-hevn#approve-a-payout)).
+
+<CodeGroup>
+```bash cURL
+curl -s -X POST "$HEVN_API/connect/sessions" \
+  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"action":"sign","payoutId":"po_4c8a…","redirectUri":"https://app.example.com/hevn/callback"}'
+```
+
+```python Python
+session = hevn.post("/connect/sessions", {
+    "action": "sign",
+    "payoutId": payout["id"],
+    "redirectUri": "https://app.example.com/hevn/callback",
+})
+```
+
+```javascript Node
+const session = await hevn.post("/connect/sessions", {
+  action: "sign",
+  payoutId: payout.id,
+  redirectUri: "https://app.example.com/hevn/callback",
+});
+```
+
+```go Go
+session, err := api.Post("/connect/sessions", hevn.Body{
+	"action":      "sign",
+	"payoutId":    payout.Str("id"),
+	"redirectUri": "https://app.example.com/hevn/callback",
+})
+```
+</CodeGroup>
+
+```json Response 201
+{ "url": "https://sandbox.gethevn.com/connect?session=eyJ…", "state": "pQ8v2Zr0…", "expiresAt": "2026-09-17T10:14:11Z" }
+```
+
+The session lasts 10 minutes. Field rules are on [Create a sign-in window session](/api-reference/accounts/create-a-sign-in-window-session).
+
+| Case | Behaviour | Next |
+| --- | --- | --- |
+| The holder approves | The callback receives `status=submitted` and `payout=po_…`. | Poll the payout. |
+| The holder declines or closes the window | The payout stays `awaitingSignature`. | Create a new `sign` session for the same `po_…`. |
+| The quote expired | A routed payout's quote expires at `quote.expiresAt`, and the window then returns `unsupported`. | Open the window right after booking. |
+| The holder uses another account | The window returns `not_found`. | Ask the holder to sign in to the linked account. |
+| You repeat the booking with the same key | The route returns the same `po_…` with `authorization: "client"`. | Create a new `sign` session. |
+| The payout is no longer waiting | `409 payout_not_awaiting_signature` on the session. | Read the payout. |
+
+## Track the payout
+
+Do not act on the redirect. Poll `GET /dapi/v1/payouts/{payoutId}` with the client in `X-Hevn-Account` until `status` leaves `awaitingSignature` and `submitted`.
+
+The window returns `submitted` once the holder's wallet has sent the debit, before the on-chain receipt. The statuses and `failure.code` are in [Payouts](/developers/payouts), and the polling interval in [Status codes](/developers/conventions#status-codes).
+
+## Refusals
+
+Your developer key signs for your integrator account and its sub accounts. These calls, made with a linked client in `X-Hevn-Account` or named in the body, are refused.
+
+| Call | Refusal | Instead |
+| --- | --- | --- |
+| `POST /dapi/v1/payouts/{payoutId}/confirm` | `403 account_not_controlled` | A `sign` session. |
+| `POST /dapi/v1/payouts` with `sourceAccount: "FDIC_USD"` | `409 payout_not_fundable`, `details.reason` is `holder_signature_unsupported` | Pay from `USDC` or `EURC`. |
+| `POST /dapi/v1/swaps`, `POST /dapi/v1/swaps/{swapId}/confirm` | `403 account_not_controlled` | n/a. The window does not approve swaps. |
+| `POST /dapi/v1/escrow` with the client as the buyer | `403 account_not_controlled` | n/a. The window does not approve escrow deals. |
+| `POST /dapi/v1/client/accounts` with `kind: "sub"` | `403 account_not_controlled` | [Sub accounts](/sub-accounts/overview) are opened on your integrator account. |
+
+`account_not_controlled` returns the client's id in `details.clientId`. The other payout refusals are in [Errors](/developers/reference/errors).
+
+## Sandbox
+
+| Area | Sandbox behaviour |
+| --- | --- |
+| Sign-in | A real sign-in. Each test client needs a Google account or email address with no HEVN sandbox account. |
+| Allowed sites | Add `http://localhost:<port>` in the sandbox app. |
+| Funding | `POST /dapi/v1/sandbox/deposits` with the client in `X-Hevn-Account` ([Mint money](/developers/sandbox#mint-money)). |
+| Verification | `POST /dapi/v1/sandbox/kyb/status` approves a business application or verifies an individual ([Decide a KYB application](/developers/sandbox#decide-a-kyb-application)). |
+| Approval | The holder approves in the window as in production. No sandbox route signs for the holder. |
+| Amounts | A payout is capped ([Limits](/developers/sandbox#limits)). |
+
+<Card title="Next: Balances and transactions" icon="arrow-right" href="/developers/balances-and-transactions" />

@@ -33,10 +33,11 @@ An id is a prefixed, opaque string. Store it as text. Do not parse it, derive it
 | `txn_` | Transaction |
 | `ct_` | Contact |
 | `bnk_` | Virtual account |
+| `acc_` | External account or sub account ([Accounts](/developers/accounts)) |
 | `doc_` | Document |
 | `kyb_` | KYB application |
 | `esc_` | Escrow deal |
-| `dk_` | [Developer key](/whitelabel/authentication#developer-key). Not sent to this API. |
+| `dk_` | [Developer key](/developers/authentication#developer-key). Not sent to this API. |
 
 An id of the wrong kind in a body or query field returns `400 invalid_id`, with the expected prefix in `details`. In a path it returns the `404` of that resource.
 
@@ -53,7 +54,7 @@ An id of the wrong kind in a body or query field returns `400 invalid_id`, with 
 
 A contact's `address`, and the `fields` and `holder` of a `bank` or `payer` requisite, ignore unknown keys. A misspelt `streetAddress` counts as missing: on a bank contact that needs an address, `POST /dapi/v1/contacts` returns `422 validation_failed`, and the message names the missing keys in `snake_case`.
 
-The `fields` keys on `PUT /dapi/v1/documents/{documentId}/content` are document field names such as `registration_number` and `address.street_address`. A refusal that requires one of these fields returns its name. See [Fill a document's fields by hand](/whitelabel/clients#fill-a-documents-fields-by-hand).
+The `fields` keys on `PUT /dapi/v1/documents/{documentId}/content` are document field names such as `registration_number` and `address.street_address`. A refusal that requires one of these fields returns its name. See [Fill a document's fields by hand](/developers/clients#fill-a-documents-fields-by-hand).
 
 ## Idempotency-Key
 
@@ -98,18 +99,20 @@ To book two identical payouts within 2 hours, send a different key with each.
 | Route under `/dapi/v1` | What the key identifies |
 | --- | --- |
 | `POST /payouts` | The payment. For a bank contact, the booking and its price. For a wallet contact, the key is part of the `po_` id. |
-| `POST /swaps` | The swap |
+| `POST /swaps` | The swap or move |
 | `POST /escrow` | The deal, its resolved windows and its `approve` action. The raw key is returned as `action.idempotencyKey`. |
 | `POST /escrow/{escrowId}/actions` | The action. The raw key is the `{idempotencyKey}` segment of the confirm URL. |
 | `POST /sandbox/deposits`, `/sandbox/payins/{payinId}/complete`, `/sandbox/payouts/{payoutId}/status` | The emulated credit or status change |
 | `POST /contacts`, `PATCH` and `DELETE /contacts/{contactId}` | None. Account details deduplicate a contact. |
+| `POST /clients` | The creation request. The same key returns the same client. |
+| `POST /client/accounts` | None. The address and label identify an external account ([External accounts](/external-wallets/external-accounts)). The label and `asset` identify a sub account ([Sub accounts](/sub-accounts/overview)). |
 | `POST /clients/link`, `POST /banks`, `PUT /client/kyb`, `POST /client/kyb/complete`, `POST /payins`, `POST /payins/{payinId}/instructions` | None. The linked account, product, client or payin identifies the request. A key sent to these routes is accepted and has no effect. |
 
 ## Why a retry cannot pay twice
 
-Each payout has one slot in the paying Base smart wallet: an ERC-4337 nonce derived from the payout. The network accepts one operation per slot.
+Each payout has one slot in the paying wallet, the main wallet or a sub account: an ERC-4337 nonce derived from the payout. The network accepts one operation per slot.
 
-When the slot is used or an operation is in flight, the call returns `409 already_funded`, `409 payment_slot_consumed` or `409 funding_in_progress`. After `payment_slot_consumed` an operation has landed, possibly reverted, and signing again has no effect. [Retrying a confirm](/whitelabel/signing#retrying-a-confirm) lists the next step for each.
+When the slot is used or an operation is in flight, the call returns `409 already_funded`, `409 payment_slot_consumed` or `409 funding_in_progress`. After `payment_slot_consumed` an operation has landed, possibly reverted, and signing again has no effect. [Retrying a confirm](/developers/signing#retrying-a-confirm) lists the next step for each.
 
 Escrow actions and payments sent from the HEVN app use the same slots.
 
@@ -136,13 +139,15 @@ A cursor sent to a different query returns `400 invalid_cursor`. Lists have no `
 
 No route returns `204`. `Location` and `pollUrl` are paths from the host root, including `/dapi/v1`.
 
-The API sends no webhooks. After a `202`, read `pollUrl` with backoff until `status` is final. See [HTTP client](/whitelabel/reference/client) for the helper and [Rate limits](#rate-limits) for read limits.
+The API sends no webhooks. After a `202`, read `pollUrl` with backoff until `status` is final. See [HTTP client](/developers/reference/client) for the helper and [Rate limits](#rate-limits) for read limits.
 
 A client's `pollUrl` is `/dapi/v1/client`. Poll it with the new `cl_…` in `X-Hevn-Account`.
 
+A payout with `authorization: "wallet"` has no confirm call. Poll `GET /dapi/v1/payouts/{payoutId}` after the customer's wallet sends the transfer.
+
 ## Errors
 
-A refusal returns `{ "error": { "code", "message", "details" } }`. Branch on `code`. The fields, the `details` keys and the full list of codes are in [Errors](/whitelabel/reference/errors).
+A refusal returns `{ "error": { "code", "message", "details" } }`. Branch on `code`. The fields, the `details` keys and the full list of codes are in [Errors](/developers/reference/errors).
 
 <Warning>
   Funding refusals report `details.available` and `details.required` in atomic units: `"3000000"` is 3 USDC. Do not mix them with major-unit amounts.
@@ -167,7 +172,7 @@ Requests with different `X-Hevn-Account` values share the write and read counter
 
 Booking and confirming a signed payout counts as two writes. Poll with backoff ([Status codes](#status-codes)), and read `GET /dapi/v1/transactions` once for the account where you can, not once per client.
 
-A sandbox host may run with the credential and account limits off. Test the `Retry-After` path before you go live. Sandbox amount caps and faucet rules are listed in [Sandbox](/whitelabel/sandbox#limits).
+A sandbox host may run with the credential and account limits off. Test the `Retry-After` path before you go live. Sandbox amount caps and faucet rules are listed in [Sandbox](/developers/sandbox#limits).
 
 ## Lifetimes
 
@@ -176,8 +181,9 @@ A sandbox host may run with the credential and account limits off. Test the `Ret
 | Login challenge | Up to 5 minutes, set with `requestExpiry` | `410 challenge_expired` |
 | Access token | 1 hour | `401 token_expired`. Call `POST /dapi/v1/auth/refresh`. |
 | Payout quote | Until `quote.expiresAt` | `410 quote_expired` |
-| Payout approval, on your account | 120 seconds | `409 funding_attempt_expired`, or `410 approval_expired` with `authorization: intent`. Book again with the same `Idempotency-Key` for a new approval. |
-| Swap approval, on your account | 120 seconds | `409 swap_not_confirmable` |
+| Payout approval, on your main wallet or a sub account | 120 seconds | `409 funding_attempt_expired`, or `410 approval_expired` with `authorization: intent`. Book again with the same `Idempotency-Key` for a new approval. |
+| Swap or move approval | 120 seconds | `409 swap_not_confirmable` |
+| Transfer that funds a payout from an external account | Until `transfer.expiresAt` | A transfer mined later does not fund the payout ([External wallets](/external-wallets/money-movement)). |
 | Link code from the sign-in window | 5 minutes | `410 link_code_expired` on `POST /dapi/v1/clients/link`. Start a new sign-in. |
 | Escrow action approval | 60 seconds | `410 approval_expired` on confirm. Prepare the action again with the same `Idempotency-Key`. |
 
@@ -193,4 +199,4 @@ Field sizes on API requests are on the REST API page of each operation. These li
 | `publicKey` on a developer key | 4,096 characters, DER-encoded |
 | IP allowlist on a developer key | 1 to 64 addresses or CIDR networks, fixed when the key is created |
 
-<Card title="Next: Sign in with HEVN" icon="log-in" href="/whitelabel/sign-in-with-hevn" />
+<Card title="Next: Accounts" icon="arrow-right" href="/developers/accounts" />

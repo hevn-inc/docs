@@ -1,0 +1,234 @@
+---
+title: "Money movement"
+description: "Payouts, moves, payins, virtual accounts and the ledger of a sub account."
+---
+
+A sub account is named by its `acc_…` id in the fields that take an account key of your main wallet. Send the id as `sourceAccount` on `POST /dapi/v1/payouts` to pay a contact from it.
+
+The examples bind `me` to your own `cl_…` id, as in the [Quickstart](/sub-accounts/quickstart). For a session that acts for a client, the signed routes return `403 account_not_controlled`.
+
+## Payouts
+
+Call `POST /dapi/v1/payouts` with the contact, the amount, the sub account as `sourceAccount` and your `publicKey`.
+
+<CodeGroup>
+
+```bash cURL
+curl -s -X POST "$HEVN_API/payouts" \
+  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+  -H "Idempotency-Key: redemption-1188" \
+  -H "Content-Type: application/json" \
+  -d '{"contactId":"ct_3K9…","amount":"250.00","sourceAccount":"acc_9f2c…",
+       "publicKey":"'"$HEVN_PUBLIC_KEY"'"}'
+```
+
+```python Python
+payout = me.post("/payouts", {
+    "contactId": "ct_3K9…",
+    "amount": "250.00",
+    "sourceAccount": "acc_9f2c…",
+    "publicKey": key.public_key,
+}, idempotency_key="redemption-1188")
+```
+
+```javascript Node
+const payout = await me.post("/payouts", {
+  contactId: "ct_3K9…",
+  amount: "250.00",
+  sourceAccount: "acc_9f2c…",
+  publicKey: key.publicKey,
+}, { idempotencyKey: "redemption-1188" });
+```
+
+```go Go
+payout, err := me.Post("/payouts", hevn.Body{
+	"contactId":     "ct_3K9…",
+	"amount":        "250.00",
+	"sourceAccount": "acc_9f2c…",
+	"publicKey":     key.PublicKey,
+}, hevn.IdempotencyKey("redemption-1188"))
+```
+
+</CodeGroup>
+
+```json Response 201, Location: /dapi/v1/payouts/po_7e1b…
+{ "id": "po_7e1b…", "kind": "fiat", "status": "awaitingSignature", "quote": { … },
+  "authorization": "debit",
+  "approval": { "id": "…", "payload": "eyJ…", "expiresAt": "2026-11-13T09:21:10Z" },
+  "debit": { "address": "0x8f3b…", "sourceAddress": "0x51c7…",
+             "amount": "250.00", "amountAtomic": "250000000", "token": "USDC", "chainId": 8453,
+             "operation": { "sender": "0x51c7…", "nonce": "0x…", "initCode": "0x",
+                            "callData": "0x34fc…", …, "entryPoint": "0x5FF1…" } } }
+```
+
+Check `debit`, sign `approval.payload` and call `POST /dapi/v1/payouts/{payoutId}/confirm`, as for a payout from your main wallet ([Signing](/developers/signing)). Fields: [Create an outgoing transfer](/api-reference/transfers/create-an-outgoing-transfer).
+
+`debit.sourceAddress` is the `address` of the sub account, and the amount is in the token it holds. The other `debit` fields and the checks to run before you sign are in [Debit contents](/developers/signing#debit-contents).
+
+| Case | Result |
+| --- | --- |
+| No `publicKey` | `422 validation_failed`, with `details.field` set to `publicKey` |
+| A route that is not one token transfer to a funding address | `409 source_account_unsupported` |
+| A replay of the key with another `sourceAccount` | `409 idempotency_key_reused` |
+| A replay while the approval is open | The same `approval` and `operation` |
+
+Statuses and the other refusals are in [Payouts](/developers/payouts#track-it-to-completion).
+
+## Moves
+
+A move is a swap with a sub account on either side: one token, one for one, no fee. Call `POST /dapi/v1/swaps` with an account key or an `acc_…` id on each side. `POST /dapi/v1/swaps/preview` takes the same accounts and has no side effects.
+
+<CodeGroup>
+
+```bash cURL
+curl -s -X POST "$HEVN_API/swaps" \
+  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+  -H "Idempotency-Key: fund-customer-1042" \
+  -H "Content-Type: application/json" \
+  -d '{"sourceAccount":"USDC","destinationAccount":"acc_9f2c…","amount":"40.00",
+       "publicKey":"'"$HEVN_PUBLIC_KEY"'"}'
+```
+
+```python Python
+move = me.post("/swaps", {
+    "sourceAccount": "USDC",
+    "destinationAccount": "acc_9f2c…",
+    "amount": "40.00",
+    "publicKey": key.public_key,
+}, idempotency_key="fund-customer-1042")
+```
+
+```javascript Node
+const move = await me.post("/swaps", {
+  sourceAccount: "USDC",
+  destinationAccount: "acc_9f2c…",
+  amount: "40.00",
+  publicKey: key.publicKey,
+}, { idempotencyKey: "fund-customer-1042" });
+```
+
+```go Go
+move, err := me.Post("/swaps", hevn.Body{
+	"sourceAccount":      "USDC",
+	"destinationAccount": "acc_9f2c…",
+	"amount":             "40.00",
+	"publicKey":          key.PublicKey,
+}, hevn.IdempotencyKey("fund-customer-1042"))
+```
+
+</CodeGroup>
+
+The response has `authorization: "debit"` for the account the money leaves. `debit.sourceAddress` is that account's address and `debit.address` is the address of the receiving account. Sign and confirm with `POST /dapi/v1/swaps/{swapId}/confirm`, then read `GET /dapi/v1/swaps/{swapId}`, which returns both account ids ([Swaps](/developers/swaps#create-and-confirm)).
+
+| `sourceAccount` | `destinationAccount` | Result |
+| --- | --- | --- |
+| `USDC` | A USDC sub account | Move |
+| A USDC sub account | `USDC`, or another USDC sub account | Move |
+| `RD` | An RD sub account | Move |
+| An RD sub account | `RD`, or another RD sub account | Move |
+| An account key or a sub account of another token | A sub account | `409 account_destination_unsupported` |
+| A sub account | The account key of another token: `USDC`, `EURC` or `RD` | [Other tokens](#other-tokens) |
+| A sub account | An `FDIC_*` account | `409 source_account_unsupported` |
+| An external account on either side | n/a | `404 account_not_found` |
+
+### Other tokens
+
+A token the sub account does not hold, for example EURC, can still be sent to its address. That token is not in `balance`, and it cannot pay a payout or move to another sub account.
+
+To move it out, call `POST /dapi/v1/swaps` with the sub account as `sourceAccount` and the account key of that token as `destinationAccount`. The token goes to your main wallet one for one, with no fee and no conversion, under `authorization: "debit"`.
+
+```json
+{ "sourceAccount": "acc_9f2c…", "destinationAccount": "EURC", "amount": "12.50", "publicKey": "MFkwEwYH…" }
+```
+
+No balance route reports the amount of such a token. Read it from the ledger row of the incoming transfer.
+
+## Payins
+
+Call `POST /dapi/v1/payins` with the sub account as `destinationAccount` and `originChainId`. The payer sends an on-chain transfer, and the sub account receives the token it holds at its address on Base.
+
+<CodeGroup>
+
+```bash cURL
+curl -s -X POST "$HEVN_API/payins" \
+  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"amount":"500.00","currency":"USDC","originChainId":"arb","destinationAccount":"acc_9f2c…"}'
+```
+
+```python Python
+payin = me.post("/payins", {
+    "amount": "500.00",
+    "currency": "USDC",
+    "originChainId": "arb",
+    "destinationAccount": "acc_9f2c…",
+})
+```
+
+```javascript Node
+const payin = await me.post("/payins", {
+  amount: "500.00",
+  currency: "USDC",
+  originChainId: "arb",
+  destinationAccount: "acc_9f2c…",
+});
+```
+
+```go Go
+payin, err := me.Post("/payins", hevn.Body{
+	"amount":             "500.00",
+	"currency":           "USDC",
+	"originChainId":      "arb",
+	"destinationAccount": "acc_9f2c…",
+})
+```
+
+</CodeGroup>
+
+The payin has `accountId` set to the sub account. Open it with `POST /dapi/v1/payins/{payinId}/instructions` as for your main wallet ([Payins](/developers/payins#quote-an-on-chain-transfer)). Fields: [Create an incoming transfer quote](/api-reference/transfers/create-an-incoming-transfer-quote).
+
+| Request | Result |
+| --- | --- |
+| `rail` with a sub account as `destinationAccount` | `409 account_destination_unsupported`. A bank transfer reaches a sub account through its [virtual account](#virtual-accounts). |
+| `refundAddress` | Ignored. A sub account is refunded as your main wallet is. |
+
+## Virtual accounts
+
+Call `POST /dapi/v1/banks` with `product` and `accountId` to request a virtual account that delivers to the sub account ([Quickstart](/sub-accounts/quickstart)). Each sub account has its own record per product, with its own account details, returned as `requisites`.
+
+| Call | Result |
+| --- | --- |
+| First `POST /dapi/v1/banks` for a product and `accountId` | `201` with `Location: /dapi/v1/banks/{product}?accountId=acc_…` |
+| The same request again | `200` with `Idempotency-Replayed: true` |
+| `GET /dapi/v1/banks/{product}?accountId=acc_…` | The virtual account of that sub account. Without `accountId` the route returns the one of your main wallet. |
+| A product that cannot deliver the token to the address | `409 account_destination_unsupported` on `POST`, `403 rail_not_available` on `GET` |
+
+A product is accepted when its rail delivers the token of the sub account on chain to an address ([Deliver to an account](/developers/virtual-accounts#deliver-to-an-account)). Statuses, blockers and account details are in [Virtual accounts](/developers/virtual-accounts).
+
+## Balance and ledger
+
+| Read | Sub account data |
+| --- | --- |
+| `GET /dapi/v1/client/balance` | One `accounts[]` entry per sub account, with `account` set to `USDC` or `RD` and `accountId` set. `totalUsd` includes them. |
+| `GET /dapi/v1/client/accounts`, `GET /dapi/v1/client/accounts/{accountId}` | `balance` in `asset`, read from the network when the last read is older than a minute, with `syncedAt` |
+| `GET /dapi/v1/transactions`, `/transactions/summary`, `/transactions/export` | Rows have `accountId`. The `accountId` query parameter keeps the rows of one sub account. |
+
+Income of a sub account counts in the unfiltered summary of your account. A move writes two rows of `type: "move"`, one per account, and both are left out of unfiltered totals. A transfer that arrives from outside HEVN appears after a ledger refresh, which `POST /dapi/v1/transactions/sync` runs ([Refresh the ledger](/developers/balances-and-transactions#refresh-the-ledger)).
+
+## RD sub accounts
+
+A sub account opened with `asset: "RD"` follows the rules above with RD in place of USDC.
+
+| Operation | RD sub account |
+| --- | --- |
+| Payout | Booked in RD. It reaches the contacts that `sourceAccount: "RD"` of your main wallet reaches. Others return `409 source_account_unsupported`. |
+| Move | RD to RD. To change token, swap `USDC` and `RD` on your main wallet, then move. |
+| Virtual account | `POST /dapi/v1/banks` requests the RD virtual account of the product. It needs the `RD` account key switched on for your account ([Account keys](/developers/overview#account-keys)), otherwise `409 account_destination_unsupported`. |
+| Payin | On-chain, with `quote.destinationAccount` set to `RD`. The payer sends USDC from `arb`, `base`, `eth`, `op`, `pol` or `sol`, or USDT from `eth`. It needs what a payin into `RD` on your main wallet needs: your US account and the `RD` account key switched on. Without them no route is quoted and the call returns `503 provider_unavailable`. |
+| Ledger | RD sent to the address from outside HEVN is not listed. |
+
+## Sandbox
+
+In the sandbox a sub account holds USDC, and you fund it through a virtual account or the faucet. The differences from production, with the products, limits and refusals, are in [Accounts](/developers/sandbox#accounts).
+
+<Card title="Next: Signing" icon="arrow-right" href="/developers/signing" />

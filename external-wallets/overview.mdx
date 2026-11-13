@@ -1,0 +1,69 @@
+---
+title: "External wallets"
+description: "Create clients through the API and deliver their money to wallets they hold, with no HEVN window."
+---
+
+External wallets is the integration kind in which your backend creates each client and the client's money settles on a wallet address your customer holds. Create a client with `POST /dapi/v1/clients`, then register its address with `POST /dapi/v1/client/accounts`.
+
+Your customer sees no HEVN screen. [For developers](/developers/overview) compares this kind with HEVN Connect.
+
+## Model
+
+| Object | What it is | Created with |
+| --- | --- | --- |
+| client | A company account that HEVN opens for your customer, named by a `cl_…` id. HEVN keeps no wallet for it. | `POST /dapi/v1/clients` |
+| external account | A wallet address the customer holds and signs for: an `acc_…` id with `kind: "external"`. It holds USDC on one network. | `POST /dapi/v1/client/accounts` |
+| virtual account | The `bnk_…` record a partner bank opens for the client. Incoming payments are delivered as USDC to the address of the external account. | `POST /dapi/v1/banks` with `accountId` |
+
+A client can register several external accounts. How `acc_…` ids are used is in [Accounts](/developers/accounts).
+
+## Who signs
+
+HEVN holds no key to the wallet behind an external account, and your developer key cannot sign for it.
+
+| Operation | Who acts |
+| --- | --- |
+| Create the client, verify it, register addresses, request virtual accounts, save contacts, book payouts | Your backend, with the developer key |
+| Payin | No signature. The partner bank or the route delivers USDC to the address. |
+| Payout | The customer's wallet. `POST /dapi/v1/payouts` returns `authorization: "wallet"` and the `transfer` that wallet sends. |
+
+Your product asks the customer's wallet to sign that transfer, and the payout proceeds once the transfer is seen on chain. The other `authorization` values are in [Authorization values](/developers/signing#authorization-values).
+
+## Access
+
+HEVN enables client creation per integrator, in the sandbox and in production. Until then `POST /dapi/v1/clients` returns `403 client_creation_not_enabled`.
+
+To request access, show HEVN that your wallet infrastructure is non-custodial for your customers. Each customer holds the key to the address you register, and your backend cannot sign for that address.
+
+HEVN also reviews each `POST /dapi/v1/clients` request, unless your integrator agreement waives the review. The other grants are in [What HEVN must enable](/developers/sandbox#what-hevn-must-enable).
+
+<Warning>
+  `POST /dapi/v1/client/accounts` asks for no proof that the customer controls the address. Each incoming payment of a virtual account is delivered to that address, and the delivery address of a virtual account does not change.
+</Warning>
+
+`POST /dapi/v1/clients` returns `202` with the client in `provisioning`. It becomes `ready` once it holds an active external account ([Statuses](/developers/clients#statuses)).
+
+## Limits
+
+| Area | For a client created through the API |
+| --- | --- |
+| Who can be a client | A company. `name` is its legal name. An individual links a HEVN account through [HEVN Connect](/connect/overview). |
+| Wallet | No Base smart wallet. `baseSmartWallet` is absent, and the account keys `USDC` and `EURC` have no balance. An external account holds USDC. |
+| Virtual accounts | Products whose rail can deliver USDC to an address ([Money movement](/external-wallets/money-movement#virtual-accounts)). |
+| Payout source | An external account on Base. |
+| Swaps and moves | Not available. An external `acc_…` id on `POST /dapi/v1/swaps` returns `404 account_not_found`. |
+| Escrow | Not available. The client has no Base smart wallet. |
+| Sub accounts | `POST /dapi/v1/client/accounts` with `kind: "sub"` for a client returns `403 account_not_controlled` ([Sub accounts](/sub-accounts/overview)). |
+
+## Integration steps
+
+| Step | Calls | Page |
+| --- | --- | --- |
+| Create the client | `POST /dapi/v1/clients`, then `GET /dapi/v1/client` | [Quickstart](/external-wallets/quickstart) |
+| Register the address | `POST /dapi/v1/client/accounts` | [External accounts](/external-wallets/external-accounts) |
+| Verify the client | `PUT /dapi/v1/client/kyb`, then `POST /dapi/v1/client/kyb/complete` | [Clients and verification](/developers/clients#write-the-document) |
+| Take money in | `POST /dapi/v1/banks` with `accountId`, `POST /dapi/v1/payins` with `destinationAccount` and `refundAddress` | [Money movement](/external-wallets/money-movement) |
+| Pay money out | `POST /dapi/v1/contacts`, `POST /dapi/v1/payouts` with `sourceAccount`, then the wallet's transfer | [Money movement](/external-wallets/money-movement#payouts) |
+| Read balance and ledger | `GET /dapi/v1/client/accounts`, `GET /dapi/v1/transactions` with `accountId` | [Balance and ledger](/external-wallets/money-movement#balance-and-ledger) |
+
+<Card title="Next: Quickstart" icon="rocket" href="/external-wallets/quickstart" />

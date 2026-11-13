@@ -5,7 +5,7 @@ description: "Products, payment methods with their currencies and identifiers, c
 
 A payment method is the bank network a payin or payout uses, named by a value such as `sepa` or `ach`. Read what one client can use with `GET /dapi/v1/banks`, and what one contact can receive with `GET /dapi/v1/contacts/{contactId}/capabilities`.
 
-[Virtual accounts](/whitelabel/virtual-accounts) defines product, rail, virtual account and account details.
+[Virtual accounts](/developers/virtual-accounts) defines product, rail, virtual account and account details.
 
 ## Products
 
@@ -101,14 +101,15 @@ Each `requisites` object and each contact has a `holder`. Its `type` is `individ
 
 | Narrowed by | Effect | Returned as |
 | --- | --- | --- |
-| Your integrator agreement ([Going live](/whitelabel/sandbox#what-hevn-must-enable)) | Which products HEVN enables for you | `403 rail_not_available` on `POST /dapi/v1/banks` |
+| Your integrator agreement ([Going live](/developers/sandbox#what-hevn-must-enable)) | Which products HEVN enables for you | `403 rail_not_available` on `POST /dapi/v1/banks` |
 | The client's residency and legal form | Which of those products the client can request | The product is absent from `GET /dapi/v1/banks` |
+| The account named in `accountId` | Which products can deliver to an external account or a sub account ([Virtual accounts](/developers/virtual-accounts#deliver-to-an-account)) | `409 account_destination_unsupported` on `POST /dapi/v1/banks`, `403 rail_not_available` on `GET /dapi/v1/banks/{product}` |
 | The client's verification state | Whether a requested virtual account can become `active` | `blockers[]` on the record: `kyb_required`, `verification_required`, `terms_required` |
 | Rail status | Whether the rail accepts payments now | `503 provider_unavailable`, or `channel_unavailable` in a contact's `blockers[]` |
 
 ## Chain codes
 
-A chain code names the chain in `crypto.chain` of a wallet [contact](/whitelabel/payouts#save-an-address-as-a-contact) and in `originChainId` of a quoted on-chain [payin](/whitelabel/payins#quote-an-on-chain-transfer).
+A chain code names the chain in `crypto.chain` of a wallet [contact](/developers/payouts#save-an-address-as-a-contact) and in `originChainId` of a quoted on-chain [payin](/developers/payins#quote-an-on-chain-transfer).
 
 A transfer to `baseSmartWallet` and a quoted on-chain payin need no virtual account and no verification. The client must be `ready`.
 
@@ -116,7 +117,7 @@ Read [`GET /dapi/v1/chains`](/api-reference/catalog/list-supported-chains-and-to
 
 Chain codes: `eth`, `bsc`, `avax`, `op`, `arb`, `pol`, `sol`, `base`, `gnosis`, `tron`, `xrp`, `zec`, `doge`, `ltc`, `btc`, `cardano`, `bera`, `sui`, `near`, `near_intents`, `xlayer`, `plasma`, `ton`, `stellar`, `monad`, `starknet`, `aptos`, `adi`, `bch`.
 
-A payout to a chain other than Base is [routed](/whitelabel/payouts#a-routed-payout-is-priced).
+A payout to a chain other than Base is [routed](/developers/payouts#a-routed-payout-is-priced).
 
 ## Fees
 
@@ -138,13 +139,13 @@ Do not bill from a stored declared rate.
 | Field | Returned by | Meaning |
 | --- | --- | --- |
 | `feeBps`, `minimumDeposit` | `GET /dapi/v1/banks` | The payin fee is taken from the converted amount. A payment below `minimumDeposit` is returned to the payer. |
-| `feeBps`, `fixedFee`, `minAmount`, `maxAmount` | `options[]` on `GET /dapi/v1/contacts/{contactId}/capabilities` | Indicative price and amount range for one contact. See [Payouts](/whitelabel/payouts#save-a-contact). |
-| `feeAmount`, `feeCurrency`, `rate` | `quote` on a payin or a payout | The binding terms. See [Payins](/whitelabel/payins) and [Payouts](/whitelabel/payouts). |
+| `feeBps`, `fixedFee`, `minAmount`, `maxAmount` | `options[]` on `GET /dapi/v1/contacts/{contactId}/capabilities` | Indicative price and amount range for one contact. See [Payouts](/developers/payouts#save-a-contact). |
+| `feeAmount`, `feeCurrency`, `rate` | `quote` on a payin or a payout | The binding terms. See [Payins](/developers/payins) and [Payouts](/developers/payouts). |
 | `expiresAt` | `quote` on a payout, top level of a payin | When the quoted terms stop applying. |
 
 [`POST /dapi/v1/payouts/preview`](/api-reference/transfers/create-an-outgoing-transfer-quote) prices a rail without a contact. A price from capabilities or preview is indicative. `POST /dapi/v1/payouts` repeats the checks and returns the binding quote.
 
-To choose which side of a payment absorbs the fee, send `amount` or `amountTo` ([Conventions](/whitelabel/conventions#money)).
+To choose which side of a payment absorbs the fee, send `amount` or `amountTo` ([Conventions](/developers/conventions#money)).
 
 ### Product rate
 
@@ -168,7 +169,8 @@ A currency HEVN does not price returns `404 not_found`.
 
 | Item | Why |
 | --- | --- |
-| Gas | Gas on Base is paid by an ERC-4337 paymaster. A quote has no network fee line, and the client's wallet needs no ETH. |
-| Escrow `feeBps` | Your take rate on `capture` and `charge`, deducted from the captured amount before the seller is paid. The ceiling is fixed when the deal is created. See [Escrow](/whitelabel/escrow#the-matrix). |
+| Gas | Gas on Base is paid by an ERC-4337 paymaster. A quote has no network fee line, and the client's wallet needs no ETH. A transfer an external account sends is paid for by the customer's wallet. |
+| A move with a sub account | One for one, with no fee ([Swaps](/developers/swaps#sub-account-moves)). |
+| Escrow `feeBps` | Your take rate on `capture` and `charge`, deducted from the captured amount before the seller is paid. The ceiling is fixed when the deal is created. See [Escrow](/developers/escrow#the-matrix). |
 
-<Card title="Next: Errors" icon="arrow-right" href="/whitelabel/reference/errors" />
+<Card title="Next: Errors" icon="arrow-right" href="/developers/reference/errors" />

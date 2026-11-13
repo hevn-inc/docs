@@ -9,11 +9,12 @@ The sandbox is the production API running against one emulated partner bank on B
 
 <EnvSnippet />
 
-`X-Hevn-Account` selects the client ([Acting as a client](/whitelabel/authentication#acting-as-a-client)).
+`X-Hevn-Account` selects the client ([Acting as a client](/developers/authentication#acting-as-a-client)).
 
-Clients link through [Sign in with HEVN](/whitelabel/sign-in-with-hevn) with a real sign-in. Each test client needs a Google account or email address with no HEVN sandbox account.
-
-Add your test origin, for example `http://localhost:<port>`, under **Allowed sites** in the sandbox app.
+| Integration kind | Test clients |
+| --- | --- |
+| [HEVN Connect](/connect/overview) | Clients link through [Sign in with HEVN](/connect/sign-in-with-hevn) with a real sign-in. Each needs a Google account or email address with no HEVN sandbox account. Add your test origin, for example `http://localhost:<port>`, under **Allowed sites** in the sandbox app. |
+| [External wallets](/external-wallets/overview) | Create clients with `POST /dapi/v1/clients` and register testnet addresses you hold. |
 
 ## What HEVN must enable
 
@@ -22,6 +23,7 @@ HEVN grants these in both environments. No API call sets them.
 | Grant | Without it | When to ask |
 | --- | --- | --- |
 | An active integrator profile that may link clients | `403 client_creation_not_enabled` on `POST /dapi/v1/connect/sessions` and `POST /dapi/v1/clients/link`. `403 account_forbidden` on calls that act for an existing client. | Before you write production code. |
+| Client creation for external wallets | `403 client_creation_not_enabled` on `POST /dapi/v1/clients` | After you show HEVN that your wallet infrastructure is non-custodial ([External wallets](/external-wallets/overview)). |
 | Escrow operation | Escrow actions are refused. | When funds must be locked on chain between your customers. |
 | The rails you need | `403 rail_not_available` on `POST /dapi/v1/banks` | Name the currencies and countries you sell into. Availability is set per integrator and per client. |
 
@@ -33,10 +35,10 @@ HEVN grants these in both environments. No API call sets them.
 | Partner bank | One emulator for all rails. Account details are checksum-valid: `SBOX…` BICs, DE, AE and GB IBANs, ABA routing numbers, a PIX key, an 18-digit SPEI number. |
 | FX | Fixed rates, for example USD 1, EUR 1.08, GBP 1.27 and AED 0.2723. USDC is pegged to USD, EURC to EUR. |
 | Verification | No registry or document check. Made-up companies, people and documents pass once the KYB document is `ready: true` and you [approve the application](#decide-a-kyb-application). |
-| Background work | Off. Each call writes its rows before it returns. |
-| Swaps | `POST /dapi/v1/swaps` and `POST /dapi/v1/swaps/preview` return `422 swap_route_unavailable`. The sandbox issues no dollar balance held at the partner bank. |
-| Partner-issued cards, cross-chain routing | Disabled. Not part of the whitelabel API. |
-| Source IP | Checked against the key's [allowlist](/whitelabel/authentication#the-ip-allowlist). An unlisted address gets `403` on all routes. |
+| Background work | Each emulated credit and status change writes its rows before the call returns. The exception is the matching of an external account's payout transfer, which runs about every 30 seconds ([Accounts](#accounts)). |
+| Swaps | `POST /dapi/v1/swaps` and `POST /dapi/v1/swaps/preview` between two account keys return `422 swap_route_unavailable`. A [move](/developers/swaps#sub-account-moves) that names a sub account is served. The sandbox issues no dollar balance held at the partner bank. |
+| Partner-issued cards, cross-chain routing | Disabled. Not part of `/dapi/v1`. |
+| Source IP | Checked against the key's [allowlist](/developers/authentication#the-ip-allowlist). An unlisted address gets `403` on all routes. |
 
 ## Read the faucet account
 
@@ -72,7 +74,7 @@ When the faucet account is out of tokens or gas, credits return `503 provider_un
 
 ## Mint money
 
-`POST /dapi/v1/sandbox/deposits` credits a client. With `bankId` it books an unquoted payin to that virtual account at the fixed rate. Without it, the faucet sends `token` to the client's wallet, within the faucet [limits](#limits). Fields: [Emulate an incoming deposit](/api-reference/sandbox/emulate-an-incoming-deposit:-an-account-transfer-with-bankid-a-token-transfer-without).
+`POST /dapi/v1/sandbox/deposits` credits a client. With `bankId` it books an unquoted payin to that virtual account at the fixed rate. Without it, the faucet sends `token` to the client's wallet, or to the sub account named in `accountId`, within the faucet [limits](#limits). Fields: [Emulate an incoming deposit](/api-reference/sandbox/emulate-an-incoming-deposit:-an-account-transfer-with-bankid-a-token-transfer-without).
 
 <CodeGroup>
 ```bash cURL
@@ -113,7 +115,25 @@ credit, err := client.Post("/sandbox/deposits", hevn.Body{"amount": "5.00", "tok
 
 `202` means the faucet transfer is unconfirmed. Repeat the same request until `status` is `settled`. The amount is credited once.
 
-Identical requests without an [`Idempotency-Key`](/whitelabel/conventions#idempotency-key) replay the first credit at any interval. Send a new key to credit the same amount again.
+Identical requests without an [`Idempotency-Key`](/developers/conventions#idempotency-key) replay the first credit at any interval. Send a new key to credit the same amount again.
+
+## Accounts
+
+Sub accounts and external accounts run in the sandbox as in production, with these differences.
+
+| Flow | Sub account | External account |
+| --- | --- | --- |
+| Create | `asset: "RD"` returns `409 account_destination_unsupported`. | `balance` is read on the Base and Arbitrum testnets and on no other network. |
+| Virtual account with `accountId` | Products `us` and `swift`. Others return `409 account_destination_unsupported`. | The same products, for an account on Base. |
+| Credit with `bankId` | Delivered to the sub account's address | Delivered to the external address |
+| Faucet credit with `accountId` | Sends the token the account holds to its address, within the faucet [limits](#limits) | `409 account_destination_unsupported`. Fund the address from a public testnet faucet. |
+| Quoted payin with `destinationAccount` | No on-chain route exists in the sandbox. | No on-chain route exists in the sandbox. |
+| Payout | `authorization: "debit"`, at most `1` of the account's token | `authorization: "wallet"`. `transfer.toAddress` is the faucet account of `GET /dapi/v1/sandbox/treasury`, and the transfer is matched within about 30 seconds. |
+| Move | Served, with no amount cap | `404 account_not_found`, as in production |
+
+`accountId` together with `bankId` returns `422 validation_failed`: a credit with `bankId` lands on the account its virtual account was opened for. The same `Idempotency-Key` with another `accountId` returns `409 idempotency_key_reused`.
+
+The responses of `POST /dapi/v1/sandbox/deposits` and `POST /dapi/v1/sandbox/payouts/{payoutId}/status` have `accountId` when the credit or the payout belongs to an `acc_…` account. After a payout from an external account, wait for the transfer to be matched before you [move the payout](#move-a-payout). Until then `POST /dapi/v1/sandbox/payouts/{payoutId}/status` returns `409 payout_not_fundable` for `submitted`, `settled` and `refunded`.
 
 ## Decide a KYB application
 
@@ -143,7 +163,7 @@ kyb, err := client.Post("/sandbox/kyb/status", hevn.Body{"status": "approved"})
 
 </CodeGroup>
 
-The statuses, what each needs and the refusals are on [Decide the client's latest KYB application](/api-reference/sandbox/decide-the-clients-latest-kyb-application-as-the-compliance-reviewer-would). After `rfi`, [answer the RFI](/whitelabel/clients#answer-an-rfi) and complete the submission again, then decide the new application. After `rejected`, a new attempt needs a new submission. For an individual client, `approved` sets `verifiedAt`.
+The statuses, what each needs and the refusals are on [Decide the client's latest KYB application](/api-reference/sandbox/decide-the-clients-latest-kyb-application-as-the-compliance-reviewer-would). After `rfi`, [answer the RFI](/developers/clients#answer-an-rfi) and complete the submission again, then decide the new application. After `rejected`, a new attempt needs a new submission. For an individual client, `approved` sets `verifiedAt`.
 
 ## Settle a payin
 
@@ -230,9 +250,10 @@ Production has the same routes, bodies and error codes as the sandbox, with part
 
 | Object | In production |
 | --- | --- |
-| Developer key | Create one in the production app (`https://app.gethevn.com`) with your production egress addresses. The [allowlist](/whitelabel/authentication#the-ip-allowlist) cannot be edited, so list all calling hosts first. |
-| Sign-in window | Add your production callback origins under **Allowed sites**. An unlisted `redirectUri` returns `403 redirect_uri_not_allowed`. Ask HEVN to brand the production window. Check that you [bind `state` to the browser](/whitelabel/sign-in-with-hevn#3-bind-the-session-to-this-browser). |
-| Clients | A sandbox `cl_…` does not exist in production, and neither do its KYB, virtual accounts, contacts or escrow deals. Your customers link again. |
+| Developer key | Create one in the production app (`https://app.gethevn.com`) with your production egress addresses. The [allowlist](/developers/authentication#the-ip-allowlist) cannot be edited, so list all calling hosts first. |
+| Sign-in window | Add your production callback origins under **Allowed sites**. An unlisted `redirectUri` returns `403 redirect_uri_not_allowed`. Ask HEVN to brand the production window. Check that you [bind `state` to the browser](/connect/sign-in-with-hevn#3-bind-the-session-to-this-browser). |
+| Clients | A sandbox `cl_…` does not exist in production, and neither do its KYB, virtual accounts, contacts or escrow deals. Your customers link again, or you create the clients again. |
+| External accounts and sub accounts | An `acc_…` id exists in one environment. Register the addresses and open the sub accounts again. |
 | Tokens | Access and refresh tokens are valid in one environment. |
 | Virtual accounts | Product codes are the same. The products a client can request and the rail behind each differ. Read `GET /dapi/v1/banks` per client and do not store `rail`. |
 | Idempotency keys | Scoped to your account and the environment. |
@@ -241,7 +262,7 @@ A key used against the other environment's host fails at login with `401 invalid
 
 ### Timing
 
-In production, the steps you trigger yourself in the sandbox wait on a reviewer or the partner bank. Poll as described in [Status codes](/whitelabel/conventions#status-codes).
+In production, the steps you trigger yourself in the sandbox wait on a reviewer or the partner bank. Poll as described in [Status codes](/developers/conventions#status-codes).
 
 | Step | Sandbox | Production |
 | --- | --- | --- |
@@ -260,9 +281,9 @@ Production returns these for causes the emulator does not have.
 | `422 amount_below_minimum`, `422 amount_above_maximum` | Rail limits replace the sandbox minimum of `0.10`. | Change the amount. |
 | `attention: {"kind": "rfi"}` on a payout | The partner bank holds the payout until a question is answered. | Answer the question. Signing again does not release the payout. |
 | `503 provider_unavailable` | The partner bank is unavailable. | Retry with backoff. Do not book again. |
-| `429 rate_limited` | A [rate limit](/whitelabel/conventions#rate-limits) was reached. The counters are enforced in production. | Wait for `Retry-After`. |
+| `429 rate_limited` | A [rate limit](/developers/conventions#rate-limits) was reached. The counters are enforced in production. | Wait for `Retry-After`. |
 
-Also handle the sign-in window results `access_denied`, `already_registered`, `already_linked` and `expired`, and the [funding codes](/whitelabel/reference/errors#funding-a-payment) for payouts from your integrator account.
+With HEVN Connect, also handle the sign-in window results `access_denied`, `already_registered`, `already_linked` and `expired`. Handle the [funding codes](/developers/reference/errors#funding-a-payment) for payouts from your integrator account.
 
 ### Checklist
 
@@ -274,14 +295,14 @@ Also handle the sign-in window results `access_denied`, `already_registered`, `a
     `/dapi/v1/sandbox/*` returns `404` in production. Poll for each state in [Timing](#timing).
   </Step>
   <Step title="Handle 429, 401 and 5xx">
-    Handle `429`, `401` and `5xx` as in [Errors](/whitelabel/reference/errors). Log `X-Request-ID` and include it in support requests.
+    Handle `429`, `401` and `5xx` as in [Errors](/developers/reference/errors). Log `X-Request-ID` and include it in support requests.
   </Step>
   <Step title="Rehearse key rotation">
-    Create a second key whose allowlist covers your hosts. Log in with it and book a payout from your integrator account with its `publicKey`, then delete the old key ([Rotate a key](/whitelabel/authentication#rotate-a-key)).
+    Create a second key whose allowlist covers your hosts. Log in with it and book a payout from your integrator account with its `publicKey`, then delete the old key ([Rotate a key](/developers/authentication#rotate-a-key)).
   </Step>
   <Step title="Run one production payment">
-    A payout debits the client's wallet and an escrow refund debits yours, so fund both. Link one client, pay a small amount to an account you control and reconcile it from `GET /dapi/v1/transactions`.
+    A payout debits the paying account and an escrow refund debits your wallet, so fund both. Link or create one client, pay a small amount to an account you control and reconcile it from `GET /dapi/v1/transactions`.
   </Step>
 </Steps>
 
-<Card title="Next: Rails and fees" icon="arrow-right" href="/whitelabel/reference/rails" />
+<Card title="Next: Rails and fees" icon="arrow-right" href="/developers/reference/rails" />

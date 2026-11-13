@@ -1,0 +1,97 @@
+---
+title: "Changelog"
+description: "Dated changes to /dapi/v1, newest first, with the migration for each breaking change."
+---
+
+Changes to `/dapi/v1`, newest first. An entry marked Breaking requires a code change and lists the migration.
+
+<Update label="2026-11-13" description="Client creation, accounts, sub accounts · documentation tabs">
+  - `POST /dapi/v1/clients` creates a company client with no wallet at HEVN and returns `202` with the client in `provisioning`. HEVN enables it per integrator ([External wallets](/external-wallets/overview), [Clients](/developers/clients#statuses)).
+  - New resource `/dapi/v1/client/accounts`: `POST`, `GET`, `GET /{accountId}` and `DELETE /{accountId}`. It holds external accounts and sub accounts, both named by an `acc_…` id ([Accounts](/developers/accounts)).
+  - New `authorization` value `wallet`: a payout from an external account returns `transfer`, and the customer's wallet funds it ([Authorization values](/developers/signing#authorization-values)).
+  - Sub accounts: `POST /dapi/v1/client/accounts` with `kind: "sub"` opens a further wallet of your own account, in `USDC` or `RD` ([Sub accounts](/sub-accounts/overview)).
+  - `sourceAccount` on `POST /dapi/v1/payouts`, `sourceAccount` and `destinationAccount` on `POST /dapi/v1/swaps`, and `destinationAccount` on `POST /dapi/v1/payins` take an `acc_…` id. `POST /dapi/v1/payins` takes `refundAddress`.
+  - `POST /dapi/v1/banks` and `GET /dapi/v1/banks/{product}` take `accountId` ([Virtual accounts](/developers/virtual-accounts#deliver-to-an-account)).
+  - `accountId` is returned on virtual accounts, payins, balance rows and transactions. `GET /dapi/v1/transactions`, `/summary` and `/export` take an `accountId` filter. A move is two rows of `type: "move"` ([Balances and transactions](/developers/balances-and-transactions)).
+  - `debit` has `sourceAddress` and `operation`, the user operation the approval signs ([Debit contents](/developers/signing#debit-contents)).
+  - Sandbox: `POST /dapi/v1/sandbox/deposits` takes `accountId`, and the credit and payout responses return it ([Sandbox](/developers/sandbox#accounts)).
+  - New [error codes](/developers/reference/errors#accounts): `account_address_taken`, `account_address_refused`, `account_not_spendable`, `account_destination_unsupported`, `source_account_unsupported`, `account_funding_invalid`, `account_spend_forbidden`, `refund_address_required`, `safe_mode_required` and `account_archive_unsupported`.
+  - The documentation is split into tabs: For developers, [HEVN Connect](/connect/overview), [External wallets](/external-wallets/overview) and [Sub Accounts](/sub-accounts/overview). Pages under `/whitelabel/` redirect to `/developers/` or `/connect/`.
+</Update>
+
+<Update label="2026-11-12" description="Error codes and enums">
+  - New [error codes](/developers/reference/errors): `verification_not_applicable` (409), `kyb_documents_processing` (409, complete again in a few seconds) and `transfer_policy_denied` (403, refused by the holder's transfer policy).
+  - `rail_requirements_unmet` and `phone_required` are no longer returned.
+  - The `slot` enum on documents no longer includes `directors_registry` or `list_of_authorized_signatories`.
+  - A contact's `address` is returned with all of its fields.
+  - The [sandbox](/developers/sandbox) runs no registry or document check on KYB.
+</Update>
+
+<Update label="2026-11-10" description="Fees from the client's plan">
+  - `feeBps` on a virtual account comes from the client's plan and can differ between clients ([Fees](/developers/reference/rails#fees)).
+</Update>
+
+<Update label="2026-11-06" description="Regulated companies">
+  - The KYB document takes `company.regulatoryLicenseType`, `company.regulatorCountry`, `company.verifiesCustomerIdentity` and `company.hasTransactionMonitoring`. They can be required when `isRegulated` is `true` ([KYB fields](/developers/clients#write-the-document)).
+</Update>
+
+<Update label="2026-11-04" description="FDIC_EUR account">
+  - New account `FDIC_EUR`, a euro balance held at the partner bank ([Balances and transactions](/developers/balances-and-transactions)). A payin cannot settle into it.
+  - `railCurrency` can be `EUR`.
+</Update>
+
+<Update label="2026-10-30" description="Virtual accounts by product · identity verification">
+  Breaking: virtual accounts are requested by product.
+
+  - `POST /dapi/v1/banks` takes `{"product": "eu"}` instead of `{"rail": "…"}`. Products: `eu`, `us`, `uk`, `swift`, `uae`, `br`, `mx`, `co`, `au`, `ng`. HEVN picks the rail ([Rails](/developers/reference/rails#products)).
+  - `GET /dapi/v1/banks/{rail}` and `GET /dapi/v1/banks/{rail}/rate` are now `GET /dapi/v1/banks/{product}` and `GET /dapi/v1/banks/{product}/rate`.
+  - `GET /dapi/v1/banks/{rail}/requirements` is removed. A request with something missing creates the record as `preparing` with `blockers[]`: `kyb_required`, `verification_required` or `terms_required` ([Virtual accounts](/developers/virtual-accounts#what-still-blocks-it)).
+  - Each record has `product`. `rail` is still returned, is informational and can change while the record is `preparing`. Do not store it or send it.
+  - A phone number on the account no longer blocks a virtual account.
+
+  To migrate: send `product` instead of `rail`, key stored records by `product`, read `blockers[]` in place of the requirements route, and drop handling for `422 rail_requirements_unmet` and `422 phone_required`.
+
+  Identity verification for linked individuals:
+
+  - `POST /dapi/v1/connect/sessions` takes `action: "verify"` with a `clientId`. The holder verifies their identity in the sign-in window ([Sign in with HEVN](/connect/sign-in-with-hevn#verify-an-individual)).
+  - The client record has `verifiedAt`, the time a business passed KYB or an individual verified their identity ([Clients](/developers/clients)).
+  - In the sandbox, `POST /dapi/v1/sandbox/kyb/status` with `approved` also verifies an individual client.
+</Update>
+
+<Update label="2026-10-26" description="Sign-in window">
+  - Linking issues the code right after sign-in. The consent screen is removed, and `access_denied` now means the holder cancelled.
+  - `login_hint` on the session URL signs the holder in with a one-time code sent to that email. Without it the window offers Google and email sign-in.
+  - HEVN sets the window's title, logo, colours and theme on request. The **Sign-in window** card keeps **Allowed sites**.
+</Update>
+
+<Update label="2026-10-23" description="Clients linked through Sign in with HEVN">
+  Breaking: your customers create their clients through Sign in with HEVN.
+
+  - `POST /dapi/v1/clients` is removed. Link a client through [Sign in with HEVN](/connect/sign-in-with-hevn): `POST /dapi/v1/connect/sessions` with `action: "link"`, the HEVN-hosted window, then `POST /dapi/v1/clients/link` with the returned code.
+  - The holder's key signs for the client's wallet. Your developer key signs only for your integrator account.
+  - A payout booked for a linked client returns `authorization: "client"`, and the holder approves it in a `sign` session.
+  - Developer key scopes are removed.
+
+  To migrate: replace client creation with the sign-in flow, store the `cl_…` from `POST /dapi/v1/clients/link` on your server, and route each client payout through a `sign` session ([HEVN Connect](/connect/money-movement#approve-the-payout)).
+</Update>
+
+<Update label="2026-10-20" description="Payout quotes name their source">
+  - `quote.sourceAccount` names the account a payout is paid from. Read it instead of `fromCurrency` ([Payouts](/developers/payouts)).
+  - A SEPA contact requires `bank.bankName`.
+</Update>
+
+<Update label="2026-10-19" description="Sandbox limits and KYB decisions">
+  - Sandbox limits: 5 clients per integrator, at most `1` per payout, escrow and payin credit, and a faucet that sends at most `5` to a wallet holding less than `1`. New refusals `sandbox_client_limit_reached`, `sandbox_amount_limit_exceeded` and `sandbox_faucet_balance_too_high` ([Limits](/developers/sandbox#limits)).
+  - In the sandbox you decide a completed KYB submission with `POST /dapi/v1/sandbox/kyb/status`: `approved`, `rfi` or `rejected` ([Sandbox](/developers/sandbox#decide-a-kyb-application)).
+  - Chain errors `bundler_*` and `user_operation_*` return `503` instead of `502`. `simulation_failed`, `bundler_unavailable` and `user_operation_unavailable` include `details.reason`.
+  - Unreadable values in a KYB document are reported in an RFI comment. Answer with `PUT /dapi/v1/documents/{documentId}/content`. `document_fields_missing` is removed, and completion returns only `kyb_incomplete`.
+  - Two clients may share a phone number.
+</Update>
+
+<Update label="2026-09-20" description="Swaps">
+  - New [swaps](/developers/swaps) between two accounts of the same client, with `POST /dapi/v1/swaps/preview`, `POST /dapi/v1/swaps` and a signed confirmation.
+</Update>
+
+<Update label="2026-09-18" description="First release">
+  - First release of `/dapi/v1`: developer keys, clients, KYB, virtual accounts, payins, payouts, contacts, the ledger, escrow and the sandbox.
+</Update>

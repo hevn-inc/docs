@@ -18,7 +18,7 @@ In the HEVN app, open **Settings → Partner program → Developer**. In the **S
 
 Serve one static [callback page](#the-callback-page) from an allowed origin.
 
-Until HEVN [activates your integrator account](/whitelabel/sandbox#what-hevn-must-enable), `POST /dapi/v1/connect/sessions` and `POST /dapi/v1/clients/link` return `403 client_creation_not_enabled`.
+Until HEVN [activates your integrator account](/developers/sandbox#what-hevn-must-enable), `POST /dapi/v1/connect/sessions` and `POST /dapi/v1/clients/link` return `403 client_creation_not_enabled`.
 
 ## Link an account
 
@@ -146,7 +146,7 @@ client, err := api.Post("/clients/link", hevn.Body{"code": code})
 { "id": "cl_7YQ2Kf3mN8", "status": "ready", … }
 ```
 
-The response is the [client record](/whitelabel/clients). Store `id` on your server and send it in `X-Hevn-Account`. Do not accept it from the browser.
+The response is the [client record](/developers/clients). Store `id` on your server and send it in `X-Hevn-Account`. Do not accept it from the browser.
 
 On `400 link_code_invalid` or `410 link_code_expired`, start a new sign-in. Do not retry `409 client_already_linked`.
 
@@ -248,13 +248,13 @@ The holder signs in, or reuses a HEVN session open in that browser. The window s
 
 The callback receives `status=submitted`, `payout=po_…` and, when the debit was sent, `reference`. If the payout was no longer waiting when the window opened, nothing is signed. The callback receives its current `status`.
 
-Do not act on the redirect. Read `GET /dapi/v1/payouts/{payoutId}` with the client in `X-Hevn-Account` and follow it to `settled` ([Payouts](/whitelabel/payouts#approve-it-in-the-sign-in-window)).
+Do not act on the redirect. Read `GET /dapi/v1/payouts/{payoutId}` with the client in `X-Hevn-Account` and follow it to `settled` ([Money movement](/connect/money-movement#track-the-payout)).
 
 ## Verify an individual
 
-A linked individual verifies their identity in a `verify` session. HEVN does not issue a verification link to you. A business client verifies through [KYB](/whitelabel/clients#write-the-document).
+A linked individual verifies their identity in a `verify` session. HEVN does not issue a verification link to you. A business client verifies through [KYB](/developers/clients#write-the-document).
 
-Create a `verify` session when a virtual account has the [`verification_required` blocker](/whitelabel/virtual-accounts#what-still-blocks-it), and open the popup as for a link.
+Create a `verify` session when a virtual account has the [`verification_required` blocker](/developers/virtual-accounts#what-still-blocks-it), and open the popup as for a link.
 
 <CodeGroup>
 
@@ -303,13 +303,13 @@ The identity check runs in the window. When the holder finishes or closes it, th
 | `rejected` | Refused. | n/a |
 | `notStarted` | The holder left before submitting. | Open a new `verify` session. |
 
-A review can finish after the window closes. Poll [`verifiedAt`](/whitelabel/clients) on `GET /dapi/v1/client`, or poll `GET /dapi/v1/banks/{product}`.
+A review can finish after the window closes. Poll [`verifiedAt`](/developers/clients) on `GET /dapi/v1/client`, or poll `GET /dapi/v1/banks/{product}`.
 
-In the sandbox the window accepts test documents. In automated tests, verify an individual with [`POST /dapi/v1/sandbox/kyb/status`](/whitelabel/sandbox#decide-a-kyb-application).
+In the sandbox the window accepts test documents. In automated tests, verify an individual with [`POST /dapi/v1/sandbox/kyb/status`](/developers/sandbox#decide-a-kyb-application).
 
 ## Errors
 
-The window returns a refusal as `error` on the redirect. API errors are in the [error reference](/whitelabel/reference/errors).
+The window returns a refusal as `error` on the redirect. API errors are in the [error reference](/developers/reference/errors).
 
 A session that is invalid or expired when it opens sends no result. The window shows "This link has expired or is invalid". Stop waiting at `expiresAt` and close the popup.
 
@@ -320,8 +320,8 @@ A session that is invalid or expired when it opens sends no result. The window s
 | `already_linked` | The account is linked to another integrator. | Do not retry. |
 | `account_mismatch` | `verify`: the holder signed in to an account other than the session's client. | Ask the holder to use the linked account. |
 | `not_found` | `sign`: the holder does not hold the payout, or it is not linked to you. Usually the wrong Google account. | Ask the holder to use the linked account. |
-| `unsupported` | The payout cannot be approved in the window. | See [Payouts](/whitelabel/payouts#approve-it-in-the-sign-in-window). |
+| `unsupported` | The payout cannot be approved in the window. | See [Approve the payout](/connect/money-movement#approve-the-payout). |
 | `expired` | The session expired while the holder was in the window. | Create a new session. |
 | `failed` | Any other failure. | Create a new session. |
 
-<Card title="Next: Clients" icon="building-2" href="/whitelabel/clients" />
+<Card title="Next: Money movement" icon="arrow-right" href="/connect/money-movement" />

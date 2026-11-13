@@ -21,7 +21,7 @@ An error from `/dapi/v1` is a JSON envelope with a stable `code`. Branch on `err
 | `message` | One sentence to log or show an operator. The wording can change. |
 | `details` | camelCase data for the slug. Includes `requestId` on a `5xx`. Omitted when empty. |
 
-Each response has an `X-Request-ID` header. Log it and quote it to support. The [HTTP client](/whitelabel/reference/client) maps the envelope to a typed error.
+Each response has an `X-Request-ID` header. Log it and quote it to support. The [HTTP client](/developers/reference/client) maps the envelope to a typed error.
 
 ## Field errors
 
@@ -64,7 +64,7 @@ A status with no narrower slug returns the generic slug.
 | `410` | `gone` | The object expired or is no longer available. | Create a new one. |
 | `413` | `payload_too_large` | The upload is too large. | Send a smaller file. |
 | `422` | `validation_failed` | Wrong value, or an unmet data precondition. | Fix the fields in `details.fields`. |
-| `429` | `rate_limited` | Too many requests. | Wait `Retry-After` seconds. See [Rate limits](/whitelabel/conventions#rate-limits). |
+| `429` | `rate_limited` | Too many requests. | Wait `Retry-After` seconds. See [Rate limits](/developers/conventions#rate-limits). |
 | `500` | `internal_error` | Server error. | Log `details.requestId` and contact support. |
 | `501` | `login_mode_unavailable` | The login mode is not enabled in this environment. | Use the mode in `details.use`. |
 | `503` | `provider_unavailable` | The partner bank or chain infrastructure is unavailable. | Retry with backoff. A confirm is safe to repeat. |
@@ -79,8 +79,8 @@ A slug marked "Reserved" is in the published enum, but the API does not return i
 | --- | --- | --- |
 | `invalid_cursor` | 400 | The cursor is from another query or sort. Restart without `cursor`. |
 | `invalid_id` | 400 | The id has the wrong prefix. See `details.expectedPrefix`. |
-| `idempotency_key_invalid` | 400 | The header breaks the [key format](/whitelabel/conventions#idempotency-key). |
-| `idempotency_key_reused` | 409 | The key was used with different terms. `details` has the `payoutId` or `escrowId`. |
+| `idempotency_key_invalid` | 400 | The header breaks the [key format](/developers/conventions#idempotency-key). |
+| `idempotency_key_reused` | 409 | The key was used with different terms, for example another `sourceAccount` or `accountId`. `details` has the `payoutId` or `escrowId`. |
 | `unauthenticated` | 401 | The bearer token is missing, invalid or expired. |
 | `token_expired` | 401 | Reserved. An expired token returns `unauthenticated`. |
 | `provider_unavailable` | 503 | The partner bank or sandbox faucet is unavailable. |
@@ -90,13 +90,13 @@ A slug marked "Reserved" is in the published enum, but the API does not return i
 
 | Slug | Status | Cause |
 | --- | --- | --- |
-| `invalid_credentials` | 401 | The email, key or login proof did not verify. See [refused keys](/whitelabel/authentication#when-a-key-is-refused). |
+| `invalid_credentials` | 401 | The email, key or login proof did not verify. See [refused keys](/developers/authentication#when-a-key-is-refused). |
 | `request_expired` | 400 | `requestExpiry` is past or over five minutes ahead. |
 | `challenge_not_found` | 404 | No login challenge has this `challengeId`. |
 | `challenge_consumed` | 409 | The login challenge was already used. |
 | `challenge_expired` | 410 | The login challenge expired. Start a new one. |
 | `signature_invalid` | 400 | The signature does not match the stored payload. The approval stays usable. Sign the decoded payload bytes. |
-| `key_not_registered` | 403 | The public key is not a [developer key](/whitelabel/authentication#developer-key) here. |
+| `key_not_registered` | 403 | The public key is not a [developer key](/developers/authentication#developer-key) here. |
 | `signer_not_attached` | 409 | The developer signer is not on the wallet. |
 | `wallet_not_linked` | 409 | The account has no wallet yet. Wait for `status: "ready"`. |
 | `approval_consumed` | 409 | The approval was already used. Prepare again. |
@@ -110,8 +110,8 @@ A slug marked "Reserved" is in the published enum, but the API does not return i
 
 | Slug | Status | Cause |
 | --- | --- | --- |
-| `forbidden` | 403 | `details.reason` is `developerSessionRequired`. The bearer is not a developer-key session. [Log in](/whitelabel/authentication#log-in) with the key. |
-| `forbidden` | 403 | No `details`. The key was deleted, or the IP is outside its [allowlist](/whitelabel/authentication#the-ip-allowlist). |
+| `forbidden` | 403 | `details.reason` is `developerSessionRequired`. The bearer is not a developer-key session. [Log in](/developers/authentication#log-in) with the key. |
+| `forbidden` | 403 | No `details`. The key was deleted, or the IP is outside its [allowlist](/developers/authentication#the-ip-allowlist). |
 | `developer_key_not_found` | 404 | Reserved. No developer key of yours has this `dk_…` id. |
 | `developer_key_already_exists` | 409 | Reserved. The public key is already registered. |
 
@@ -122,34 +122,35 @@ A slug marked "Reserved" is in the published enum, but the API does not return i
 | Slug | Status | Cause |
 | --- | --- | --- |
 | `account_header_invalid` | 400 | `X-Hevn-Account` is not a `cl_…` id. |
-| `account_scope_conflict` | 400 | The route [refuses the header](/whitelabel/authentication#acting-as-a-client), or the token is delegated to one client. `details.reason` is `selfScopedRoute`. |
-| `account_not_found` | 404 | Unknown client, or not linked to you. |
+| `account_scope_conflict` | 400 | The route [refuses the header](/developers/authentication#acting-as-a-client), or the token is delegated to one client. `details.reason` is `selfScopedRoute`. |
+| `account_not_found` | 404 | Unknown client, or not one of yours. The same slug is returned for an unknown [`acc_…` id](#accounts). |
 | `account_forbidden` | 403 | The client cannot be acted for right now. |
 | `account_read_only` | 403 | `details.credential` may read this client but not write. |
-| `account_not_controlled` | 403 | The session cannot sign for this client: a payout confirm, a swap, or an escrow deal where it is the buyer. The holder signs in the [sign-in window](/whitelabel/sign-in-with-hevn#approve-a-payout). |
+| `account_not_controlled` | 403 | The developer key cannot sign for this client: a payout confirm, a payout from the main wallet of a client not linked through HEVN Connect, a swap, a sub account, or an escrow deal where it is the buyer. `details.clientId` names the client. See [Who can spend](/developers/overview#who-can-spend). |
 
 ## Clients and sign-in window
 
 | Slug | Status | Cause |
 | --- | --- | --- |
-| `client_creation_not_enabled` | 403 | Your integrator account is inactive or may not create clients. HEVN enables it. |
+| `client_creation_not_enabled` | 403 | Your integrator account is inactive or may not create clients. Returned by `POST /dapi/v1/clients`, `POST /dapi/v1/clients/link` and `POST /dapi/v1/connect/sessions`. HEVN enables it ([What HEVN must enable](/developers/sandbox#what-hevn-must-enable)). |
 | `redirect_uri_not_allowed` | 403 | The `redirectUri` origin is not in Allowed sites. Add it in the Sign-in window card. |
 | `payout_not_awaiting_signature` | 409 | The payout no longer awaits the holder's signature. |
 | `link_code_invalid` | 400 | The code is malformed, foreign or its account is gone. |
 | `link_code_expired` | 410 | The code is older than five minutes. |
 | `client_already_linked` | 409 | The account is linked to another integrator, or can no longer be linked to you. |
 | `client_not_found` | 404 | Unknown client id, or not yours. |
+| `provisioning_failed`, `request_rejected`, `request_canceled` | n/a | Not error slugs. They are the `failure.code` of a client with `status: "failed"` ([Statuses](/developers/clients#statuses)). |
 | `verification_not_applicable` | 409 | A `verify` session was requested for a business. Use `PUT /dapi/v1/client/kyb`. |
 | `profile_locked` | 409 | `details.fields` are locked after verification. |
 
-The window's callback codes are not error slugs. See [Sign in with HEVN](/whitelabel/sign-in-with-hevn#errors).
+The window's callback codes are not error slugs. See [Sign in with HEVN](/connect/sign-in-with-hevn#errors).
 
 ## Rails and payins
 
 | Slug | Status | Cause |
 | --- | --- | --- |
 | `rail_not_found` | 404 | Unknown `bnk_…` id, or another client's. |
-| `rail_not_available` | 403 | `details.product` is not offered to this client. Pending requirements are [`blockers[]`](/whitelabel/virtual-accounts#what-still-blocks-it). |
+| `rail_not_available` | 403 | `details.product` is not offered to this client. Pending requirements are [`blockers[]`](/developers/virtual-accounts#what-still-blocks-it). |
 | `payin_not_available` | 422 | No payin for this currency and method. See `details.options` when present. |
 | `payin_expired` | 410 | The payin price expired. Quote again. |
 | `payin_not_found` | 404 | Unknown payin id, or another client's. |
@@ -165,8 +166,8 @@ Contact, payout booking and swap routes return these slugs. Confirm errors are u
 | `transfer_policy_denied` | 403 | The account's transfer policy refuses this payout. `message` names the rule. The holder changes it. |
 | `contact_not_payable` | 409 | Reserved. The contact cannot be paid on this rail. |
 | `contact_payment_details_invalid` | 422 | Reserved. The partner bank refused the payment details. |
-| `contact_chain_unsupported` | 422 | Reserved. A contact on another chain is [routed](/whitelabel/payouts#a-routed-payout-is-priced). |
-| `contact_token_unsupported` | 422 | Reserved. A contact on another token is [routed](/whitelabel/payouts#a-routed-payout-is-priced). |
+| `contact_chain_unsupported` | 422 | Reserved. A contact on another chain is [routed](/developers/payouts#a-routed-payout-is-priced). |
+| `contact_token_unsupported` | 422 | Reserved. A contact on another token is [routed](/developers/payouts#a-routed-payout-is-priced). |
 | `amount_below_minimum` | 422 | The amount is below the route minimum. Preview returns `minAmount`. |
 | `amount_above_maximum` | 422 | The amount is above the route maximum. |
 | `amount_precision_unsupported` | 422 | The amount has more than 15 significant digits. More decimals than the token allows return `422 validation_failed` with `amount_precision`. |
@@ -176,13 +177,35 @@ Contact, payout booking and swap routes return these slugs. Confirm errors are u
 | `payout_not_fundable` | 409 | The payout can no longer be funded. Book a new one. |
 | `quote_expired` | 410 | The price expired. Book again with the same `Idempotency-Key`. |
 | `swap_not_found` | 404 | Unknown swap id for this client. |
-| `swap_route_unavailable` | 422 | Swaps are not served in the sandbox. |
+| `swap_route_unavailable` | 422 | The sandbox does not serve a swap between two account keys. |
 | `swap_not_confirmable` | 409 | The swap awaits no signature. Read the swap. |
 | `intent_not_signable` | 409 | Reserved. The quote is not signed by intent. |
 
 `payout_not_fundable` with `details.reason` `holder_signature_unsupported` means the holder cannot approve an `FDIC_USD` payout in the sign-in window. A contact on another chain or token without routing returns `409 payout_not_fundable`.
 
 `account_unavailable` on `FDIC_USD` means the client has no balance held at the partner bank. `account_not_supported` means a payin cannot settle into `FDIC_USD`, or a payout from it does not use the rail that holds it.
+
+## Accounts
+
+`/dapi/v1/client/accounts`, and each route that takes an `acc_…` id, returns these slugs. [Accounts](/developers/accounts) compares the two kinds.
+
+| Slug | Status | Cause |
+| --- | --- | --- |
+| `account_not_found` | 404 | Unknown or archived `acc_…` id, or another account's. On a swap, the id of an external account. |
+| `account_address_taken` | 409 | The address is already an active external account of this client on this network, under another label. Also returned when no address could be allocated for a new sub account. Retry. |
+| `account_address_refused` | 422 | The address cannot be an external account: a HEVN wallet, a sub account, the zero address, a precompile, or a protocol or token contract. |
+| `account_not_spendable` | 409 | The account cannot be used for this operation. |
+| `account_destination_unsupported` | 409 | The product, payin or move cannot deliver to this account. In the sandbox, also a sub account with `asset: "RD"` and a faucet credit to an external account. |
+| `source_account_unsupported` | 409 | The account cannot pay this payout or leave by this move. |
+| `account_funding_invalid` | 422 | The payment can no longer be funded from this account. Book a new one. |
+| `account_spend_forbidden` | 403 | The session's seat on the client may not manage or pay from its external accounts. |
+| `refund_address_required` | 422 | A payin to an external account was sent without `refundAddress`. |
+| `safe_mode_required` | 409 | A sub account was requested on an account whose wallet is not protected by co-signing. |
+| `account_archive_unsupported` | 409 | `DELETE` was called on a sub account. A sub account cannot be archived. |
+
+A sub account requested for a client returns `403 account_not_controlled` ([Acting as a client](#acting-as-a-client)). `POST /dapi/v1/payouts/{payoutId}/confirm` on a payout with `authorization: "wallet"` returns `400 invalid_request` with `details.reason = "funded_by_wallet_transfer"`.
+
+An `accountId` with another prefix returns `400 invalid_id`. A `sourceAccount` or `destinationAccount` that is neither an account key nor an `acc_…` id returns `422 validation_failed`.
 
 ## Contact blockers
 
@@ -211,7 +234,7 @@ Contact, payout booking and swap routes return these slugs. Confirm errors are u
 
 ## Funding a payment
 
-`POST /dapi/v1/payouts/{payoutId}/confirm` returns these slugs. The sandbox settlement routes also return `quote_not_submitted` and `payout_not_fundable`. See [Retrying a confirm](/whitelabel/signing#retrying-a-confirm).
+`POST /dapi/v1/payouts/{payoutId}/confirm` returns these slugs. The sandbox settlement routes also return `quote_not_submitted` and `payout_not_fundable`. See [Retrying a confirm](/developers/signing#retrying-a-confirm).
 
 | Slug | Status | Cause |
 | --- | --- | --- |
@@ -237,7 +260,7 @@ Contact, payout booking and swap routes return these slugs. Confirm errors are u
 | --- | --- | --- |
 | `kyb_incomplete` | 422 | Completion requested with gaps. `GET /dapi/v1/client/kyb` lists `missing[]`. |
 | `kyb_documents_processing` | 409 | `details.documents` are still being read. Retry in seconds. |
-| `kyb_roster_conflict` | 409 | The write conflicts with the people on file, usually a removed shareholder. See [Complex ownership](/whitelabel/clients#complex-ownership). |
+| `kyb_roster_conflict` | 409 | The write conflicts with the people on file, usually a removed shareholder. See [Complex ownership](/developers/clients#complex-ownership). |
 | `kyb_subject_conflict` | 409 | The subject conflicts with verification data on file. |
 | `document_not_found` | 404 | Unknown `doc_…` id for this client. |
 | `document_type_unsupported` | 422 | The slot does not accept this document type. |
@@ -256,7 +279,7 @@ A closed window, or an over-large `capture` or `authorize`, returns `400 invalid
 | `escrow_action_not_found` | 404 | No action on this deal has that key. Use the raw key sent to `POST /actions`. |
 | `escrow_not_operated_by_you` | 403 | You are a party but not the operator. |
 | `escrow_state_changed` | 409 | The deal changed after prepare. Read `availableActions`. |
-| `action_in_flight` | 409 | Another action of yours is on chain. See [Action in flight](/whitelabel/escrow#action-in-flight). |
+| `action_in_flight` | 409 | Another action of yours is on chain. See [Action in flight](/developers/escrow#action-in-flight). |
 | `simulation_failed` | 409 | The action would revert or lacks gas sponsorship. See `details.reason`. |
 | `stale_nonce` | 409 | The wallet nonce changed after prepare. Prepare again with the same key. |
 | `insufficient_funds` | 409 | The payer or operator balance is too low. See `details.party`. |
@@ -272,11 +295,11 @@ Escrow `insufficient_funds` sets `details.party` to `payer` (`authorize`, `charg
 
 ## Sandbox
 
-Values are in [Sandbox limits](/whitelabel/sandbox#limits).
+Values are in [Sandbox limits](/developers/sandbox#limits).
 
 | Slug | Status | Cause |
 | --- | --- | --- |
 | `sandbox_amount_limit_exceeded` | 422 | `details.operation` is above `details.maximum`. |
 | `sandbox_faucet_balance_too_high` | 409 | The wallet holds `details.threshold` or more. Spend first. |
 
-<Card title="Next: HTTP client" icon="arrow-right" href="/whitelabel/reference/client" />
+<Card title="Next: HTTP client" icon="arrow-right" href="/developers/reference/client" />

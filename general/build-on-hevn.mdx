@@ -1,0 +1,57 @@
+---
+title: "Build on HEVN"
+description: "Choose between HEVN Connect and external wallets, and see where sub accounts and remote transfers fit."
+---
+
+The HEVN API at `/dapi/v1` lets your backend onboard customers, give them virtual accounts and move their money. Read [For developers](/developers/overview) first, then pick one of the two integrations below.
+
+Both integrations use the same API, the same developer key and the same sandbox. They differ in who holds the customer's wallet and how a payout is approved.
+
+## Integrations
+
+| | HEVN Connect | External wallets |
+| --- | --- | --- |
+| Status | Recommended | For integrators with their own wallet infrastructure. HEVN enables it per integrator |
+| Customer's wallet | A Base smart wallet inside the customer's HEVN account | A wallet address the customer holds outside HEVN, on Base or another supported network |
+| HEVN in your UI | The sign-in window. HEVN can set your title, logo and colours on it | None |
+| Payout approval | The customer signs in the sign-in window | The customer's wallet sends one USDC transfer that your product asks it to sign |
+
+The full comparison is in [Integration kinds](/developers/overview#integration-kinds).
+
+## HEVN Connect
+
+Your customer creates or links a HEVN account in a HEVN window that opens from your site. The account holds a non-custodial Base smart wallet, and the customer's key signs each payout in that window.
+
+Choose it when you have no wallet infrastructure of your own. HEVN provides the wallet and the signing screen.
+
+<Card title="HEVN Connect" icon="log-in" href="/connect/overview" />
+
+## External wallets
+
+Your backend creates each client through the API and registers a wallet address the customer holds as an external account. Virtual accounts requested on it deliver USDC to that address. A payout from it is funded by a transfer the customer's wallet sends.
+
+Choose it when your product already gives each customer a wallet and you want no HEVN screen in the flow. Before HEVN enables it, you show that your customers hold the keys to those wallets.
+
+<Card title="External wallets" icon="wallet" href="/external-wallets/overview" />
+
+## Sub accounts
+
+A sub account is a further wallet of your own HEVN account on Base, with its own address, balance, ledger and virtual accounts. Your developer key signs for it, as it does for your main wallet.
+
+Use sub accounts to run many balances inside your own account, for example one per customer or per project. They are a feature of your integrator account and work with either integration. You cannot open or spend a sub account on an account you operate for a customer.
+
+<Card title="Sub accounts" icon="layers" href="/sub-accounts/overview" />
+
+## Remote transfers
+
+A remote transfer key sends USDC from your own HEVN account within an onchain allowance you grant. It is a separate credential on a separate API and needs no developer key. See [Remote transfers](/general/remote-transfers).
+
+## Where to read
+
+| Question | Section |
+| --- | --- |
+| How do I get API access, log in and sign a payment? | [For developers](/developers/overview) |
+| How do I link a customer's HEVN account and get a payout approved? | [HEVN Connect](/connect/overview) |
+| How do I onboard a customer who keeps their own wallet? | [External wallets](/external-wallets/overview) |
+| How do I hold separate balances inside my own account? | [Sub accounts](/sub-accounts/overview) |
+| What are the fields of one operation? | [REST API](/api-reference/overview) |

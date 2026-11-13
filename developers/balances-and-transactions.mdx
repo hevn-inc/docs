@@ -1,11 +1,11 @@
 ---
 title: "Balances and transactions"
-description: "Read a client's balance, page its ledger, export files, and reconcile."
+description: "Read a balance, page the ledger, export files, and reconcile."
 ---
 
-The balance is what each of a client's accounts holds, and the ledger lists the movements in and out. Start with `GET /dapi/v1/client/balance`.
+The balance is what each account of a client, or of your integrator account, holds. The ledger lists the movements in and out. Start with `GET /dapi/v1/client/balance`.
 
-Send `X-Hevn-Account` to act for a client ([Acting as a client](/whitelabel/authentication#acting-as-a-client)).
+Send `X-Hevn-Account` to act for a client ([Acting as a client](/developers/authentication#acting-as-a-client)).
 
 ## Balance
 
@@ -32,17 +32,25 @@ balance, err := client.Get("/client/balance")
 ```json Response: 200
 { "clientId": "cl_7YQ2Kf3mN8",
   "baseSmartWallet": "0x2f1c…",
-  "accounts": [ { "account": "USDC", "balance": "1204.500000", "usdValue": "1204.50" }, … ],
+  "accounts": [ { "account": "USDC", "balance": "1204.500000", "usdValue": "1204.50" },
+                { "account": "USDC", "accountId": "acc_5Jd8Qw2LmX",
+                  "balance": "250.000000", "usdValue": "250.00" }, … ],
   "totalUsd": "1701.05" }
 ```
 
-Fields: [Read a client's balances](/api-reference/accounts/read-a-clients-balances). The account names are in [Accounts](/whitelabel/overview#accounts). The balance has no `FDIC_EUR` row.
+Fields: [Read a client's balances](/api-reference/accounts/read-a-clients-balances). The account keys are in [Account keys](/developers/overview#account-keys). The balance has no `FDIC_EUR` row.
+
+| Balance | Where it is returned |
+| --- | --- |
+| Main wallet and partner bank | One row per account key, with no `accountId` |
+| Sub account | One row with `account` set to its token, `USDC` or `RD`, and its `accountId`. `totalUsd` includes it. |
+| External account | Not in this response. Read `balance` on `GET /dapi/v1/client/accounts` ([Accounts](/developers/accounts)). |
 
 If `POST /dapi/v1/payouts` returns `insufficient_funds` while the balance looks sufficient, a debit is in flight.
 
 ## Walk the ledger
 
-`GET /dapi/v1/transactions` returns rows newest first, in cursor pages ([Pagination](/whitelabel/conventions#pagination)).
+`GET /dapi/v1/transactions` returns rows newest first, in cursor pages ([Pagination](/developers/conventions#pagination)).
 
 <CodeGroup>
 ```bash cURL
@@ -87,6 +95,14 @@ for page.Str("nextCursor") != "" {
 
 Fields and filters: [List transactions, newest first](/api-reference/transactions/list-transactions-newest-first).
 
+A row has `accountId` when an external account or a sub account moved the money. It is absent on a main wallet row.
+
+| Account | Rows on the ledger |
+| --- | --- |
+| Main wallet | Each tracked transfer in or out |
+| Sub account | Each transfer its address sends or receives. A [move](/developers/swaps#sub-account-moves) is two rows of `type: "move"`, one per account. `RD` sent from outside HEVN to an `RD` sub account is not listed. |
+| External account | The transfers HEVN arranged: payins and virtual-account payments delivered to it, and payouts it funded |
+
 ### Filters
 
 | Parameter | Takes |
@@ -94,6 +110,7 @@ Fields and filters: [List transactions, newest first](/api-reference/transaction
 | `incomeOnly` | `true` keeps only money in |
 | `contactId` | `ct_…` ids of the contacts you paid |
 | `bankId` | `bnk_…` ids of the virtual accounts money arrived on |
+| `accountId` | The `acc_…` id of one external account or sub account. An archived account's rows stay readable. Another account's id returns `404 account_not_found`. |
 | `tag` | `UNTAGGED` keeps rows with no tag |
 | `q` | Free text, at least two characters |
 | `from`, `to` | ISO-8601 timestamps bounding `createdAt` |
@@ -101,6 +118,12 @@ Fields and filters: [List transactions, newest first](/api-reference/transaction
 ### Summary
 
 `GET /dapi/v1/transactions/summary` takes the same filters and returns settled and pending totals in USD ([Inflow and outflow totals](/api-reference/transactions/inflow-and-outflow-totals-for-the-same-filters)).
+
+| Rows | Without `accountId` | With `accountId` |
+| --- | --- | --- |
+| Sub account income and outflow | Counted | Counted for that account |
+| `move` rows | Left out | Counted for that account |
+| External account income | Left out | Counted for that account |
 
 ```json Response: 200
 { "inflowUsd": "12040.50", "inflowCount": 9,
@@ -149,11 +172,11 @@ _, err := client.Download("/transactions/export", hevn.Query{
 
 </CodeGroup>
 
-The `download` helper is in the [reference client](/whitelabel/reference/client#download-an-export).
+The `download` helper is in the [reference client](/developers/reference/client#download-an-export).
 
 ## Reconcile
 
-1. Store the newest `createdAt` you have processed, per client.
+1. Store the newest `createdAt` you have processed, per client, and per `accountId` when you reconcile accounts apart.
 2. Request `from=<watermark>` and walk the cursor to the end.
 3. Match your records on `id`, and a payout on the `transactionId` its read returns.
 4. Move the watermark after the walk completes. Ids are stable, so an overlapping replay is safe.
@@ -170,4 +193,4 @@ A row appears once the partner bank reports the payment or the chain confirms th
 
 Reads do not refresh the ledger. When a transfer made outside your integration must be visible, call sync once before a walk. The route is rate-limited.
 
-<Card title="Next: Escrow" icon="arrow-right" href="/whitelabel/escrow" />
+<Card title="Next: Escrow" icon="arrow-right" href="/developers/escrow" />

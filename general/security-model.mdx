@@ -35,7 +35,7 @@ The wallet is an unmodified [Coinbase Smart Wallet](https://github.com/coinbase/
 
 Transfers, owner changes and upgrades each need an owner signature. HEVN holds no upgrade key or pause switch. HEVN sponsors gas through the [Coinbase Developer Platform Paymaster](https://docs.cdp.coinbase.com/paymaster/docs/welcome), so holders pay in USDC and hold no ETH. The paymaster cannot initiate or alter an operation.
 
-Each operation has a unique nonce, so a retried submission executes at most once. For a fiat payout or a cross-chain transfer, the app derives the nonce from the one-time address, so a second transfer to that address is rejected. API [idempotency keys](/whitelabel/conventions#idempotency-key) are a separate check.
+Each operation has a unique nonce, so a retried submission executes at most once. For a fiat payout or a cross-chain transfer, the app derives the nonce from the one-time address, so a second transfer to that address is rejected. API [idempotency keys](/developers/conventions#idempotency-key) are a separate check.
 
 ## Contract addresses
 

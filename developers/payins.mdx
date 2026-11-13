@@ -1,9 +1,9 @@
 ---
 title: "Payins"
-description: "Quote an incoming payment, give the payer instructions, and follow it to settlement on the client's wallet."
+description: "Quote an incoming payment, give the payer instructions, and follow it to settlement."
 ---
 
-A payin is an arrival of money on a client's wallet, recorded as an income row on the ledger. To fix the rate and fee before the payer pays, quote it with `POST /dapi/v1/payins`.
+A payin is an arrival of money on a Base smart wallet, a sub account or an external account, recorded as an income row on the ledger. To fix the rate and fee before the payer pays, quote it with `POST /dapi/v1/payins`.
 
 | Shape | Call | Payer needs |
 | --- | --- | --- |
@@ -12,11 +12,11 @@ A payin is an arrival of money on a client's wallet, recorded as an income row o
 | Unsolicited wire | None | `requisites` of an active virtual account |
 | Direct crypto | None | `baseSmartWallet` |
 
-Send `X-Hevn-Account` on each route ([Acting as a client](/whitelabel/authentication#acting-as-a-client)).
+Send `X-Hevn-Account` to act for a client ([Acting as a client](/developers/authentication#acting-as-a-client)).
 
 ## Quote a bank payin
 
-The client needs an active [virtual account](/whitelabel/virtual-accounts) in the payer's currency.
+The client needs an active [virtual account](/developers/virtual-accounts) in the payer's currency.
 
 <Steps>
   <Step title="Create the quote">
@@ -66,7 +66,7 @@ The client needs an active [virtual account](/whitelabel/virtual-accounts) in th
       "expiresAt": "2026-09-17T10:06:11Z", … }
     ```
 
-    Field rules are in [Create an incoming transfer quote](/api-reference/transfers/create-an-incoming-transfer-quote). Payment methods are listed in [Rails](/whitelabel/reference/rails#what-each-method-needs).
+    Field rules are in [Create an incoming transfer quote](/api-reference/transfers/create-an-incoming-transfer-quote). Payment methods are listed in [Rails](/developers/reference/rails#what-each-method-needs).
   </Step>
 
   <Step title="Request the instructions">
@@ -106,7 +106,7 @@ The client needs an active [virtual account](/whitelabel/virtual-accounts) in th
 
 ## Statuses
 
-Poll `GET /dapi/v1/payins/{payinId}` until the status is final ([Status codes](/whitelabel/conventions#status-codes)).
+Poll `GET /dapi/v1/payins/{payinId}` until the status is final ([Status codes](/developers/conventions#status-codes)).
 
 | `status` | Meaning | Next |
 | --- | --- | --- |
@@ -114,13 +114,13 @@ Poll `GET /dapi/v1/payins/{payinId}` until the status is final ([Status codes](/
 | `awaitingFunds` | Instructions issued. The partner bank sets `expiresAt`. | Wait for the payer. Money that arrives after `expiresAt` can be returned to the payer. |
 | `processing` | The partner bank has the money and is converting it. | Keep polling. |
 | `inReview` | Held for an information request about the payment. | Keep polling. |
-| `completed` | The tokens are on the client's wallet. | n/a |
+| `completed` | The tokens are on the destination. | n/a |
 | `failed`, `canceled` | The money will not arrive. | Quote again. |
 | `refunded` | Returned to the payer. | n/a |
 
 An unpaid payin expires without a charge and has no ledger row. No route lists payins, so store `payinId` when you quote.
 
-Once money arrives, a `pending` income row appears on the [ledger](/whitelabel/balances-and-transactions). It shows `rfi` while the partner bank asks about the payment and ends as `success` or `refunded`.
+Once money arrives, a `pending` income row appears on the [ledger](/developers/balances-and-transactions). It shows `rfi` while the partner bank asks about the payment and ends as `success` or `refunded`.
 
 ## Payer mistakes
 
@@ -147,7 +147,25 @@ The instructions call returns:
 { "kind": "onchain", "address": "0x9b41…", "chainId": "arb", "memo": null, … }
 ```
 
-Give the payer `memo` when it is set. Chain values are in [Chain codes](/whitelabel/reference/rails#chain-codes).
+Give the payer `memo` when it is set. Chain values are in [Chain codes](/developers/reference/rails#chain-codes).
+
+## Deliver to an account
+
+`destinationAccount` also takes the `acc_…` id of an [external account or a sub account](/developers/accounts). The payin is then an on-chain transfer, so send `originChainId`.
+
+```json
+{ "amount": "2000.00", "currency": "USDC", "originChainId": "arb",
+  "destinationAccount": "acc_5Jd8Qw2LmX", "refundAddress": "0x51a7…" }
+```
+
+| Rule | External account | Sub account |
+| --- | --- | --- |
+| `rail` | `409 account_destination_unsupported` | `409 account_destination_unsupported` |
+| `refundAddress` | Required. The address on the origin chain that receives the funds back when the transfer cannot be completed. Without it the call returns `422 refund_address_required`. | Ignored. A sub account is refunded as the main wallet is. |
+| Delivered | USDC on the account's network, to its address | The token the account holds, on Base, to its address |
+| Response | `accountId` names the account | `accountId` names the account |
+
+`refundAddress` with an account key as `destinationAccount` returns `422 validation_failed`. See [External wallets](/external-wallets/money-movement) and [Sub accounts](/sub-accounts/money-movement).
 
 ## Payer details
 
@@ -170,11 +188,11 @@ Some rails require the payer's account. Send it as `payer` on the instructions c
 | `400 invalid_request` | Send `payer` with the identifiers in `details.fields`. |
 | `410 payin_expired` | Quote again. |
 
-Other codes are in [Errors](/whitelabel/reference/errors#rails-and-payins). Indicative rates are in [Fees](/whitelabel/reference/rails#fees).
+Other codes are in [Errors](/developers/reference/errors#rails-and-payins). Indicative rates are in [Fees](/developers/reference/rails#fees).
 
 ## Unsolicited wires to the client's account details
 
-A payer can send to an active virtual account at any time. Give the payer its [account details](/whitelabel/virtual-accounts#account-details) from `GET /dapi/v1/banks`, with `paymentReference` when one is set.
+A payer can send to an active virtual account at any time. Give the payer its [account details](/developers/virtual-accounts#account-details) from `GET /dapi/v1/banks`, with `paymentReference` when one is set.
 
 The income row from `GET /dapi/v1/transactions` has `paymentReference`, the receiving account details and `remitter`.
 
@@ -184,7 +202,7 @@ The income row from `GET /dapi/v1/transactions` has `paymentReference`, the rece
 
 ## Direct crypto
 
-Read `baseSmartWallet` from `GET /dapi/v1/client/balance` and give the address to the payer.
+Read `baseSmartWallet` from `GET /dapi/v1/client/balance` and give the address to the payer. A sub account takes a transfer of its token at its `address` in the same way ([Sub accounts](/sub-accounts/money-movement)).
 
 <Warning>
   HEVN tracks USDC and EURC on Base. Other tokens, and these tokens on other chains, do not become a balance or a transaction.
@@ -192,6 +210,6 @@ Read `baseSmartWallet` from `GET /dapi/v1/client/balance` and give the address t
 
 ## Sandbox
 
-A quoted payin does not settle until you call the route in [Settle a payin](/whitelabel/sandbox#settle-a-payin). For the unquoted shapes, see [Mint money](/whitelabel/sandbox#mint-money).
+A quoted payin does not settle until you call the route in [Settle a payin](/developers/sandbox#settle-a-payin). For the unquoted shapes, see [Mint money](/developers/sandbox#mint-money).
 
-<Card title="Next: Payouts" icon="arrow-right" href="/whitelabel/payouts" />
+<Card title="Next: Payouts" icon="arrow-right" href="/developers/payouts" />

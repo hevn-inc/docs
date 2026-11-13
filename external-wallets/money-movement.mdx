@@ -1,0 +1,251 @@
+---
+title: "Money movement"
+description: "Virtual accounts, payins, payouts and the ledger of an external account."
+---
+
+Money reaches an external account as USDC on its network and leaves it by a transfer the customer's wallet sends. Name the account by its `acc_…` id: `accountId` on `POST /dapi/v1/banks`, `destinationAccount` on `POST /dapi/v1/payins`, `sourceAccount` on `POST /dapi/v1/payouts`.
+
+The routes take the client's id in `X-Hevn-Account`. The common flows are in [Virtual accounts](/developers/virtual-accounts), [Payins](/developers/payins) and [Payouts](/developers/payouts).
+
+## Virtual accounts
+
+Call `POST /dapi/v1/banks` with a product and the `accountId`. Each incoming payment is delivered as USDC to the account's address.
+
+<CodeGroup>
+
+```bash cURL
+curl -s -X POST "$HEVN_API/banks" \
+  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+  -H "X-Hevn-Account: $HEVN_CLIENT_ID" \
+  -H "Content-Type: application/json" \
+  -d "{\"product\":\"us\",\"accountId\":\"$HEVN_ACCOUNT_ID\"}"
+```
+
+```python Python
+bank = client.post("/banks", {"product": "us", "accountId": account["accountId"]})
+bound = client.get("/banks/us", {"accountId": account["accountId"]})
+```
+
+```javascript Node
+const bank = await client.post("/banks", { product: "us", accountId: account.accountId });
+const bound = await client.get("/banks/us", { accountId: account.accountId });
+```
+
+```go Go
+bank, err := client.Post("/banks", hevn.Body{"product": "us", "accountId": account.Str("accountId")})
+bound, err := client.Get("/banks/us", hevn.Query{"accountId": account.Str("accountId")})
+```
+
+</CodeGroup>
+
+```json Response 201, Location: /dapi/v1/banks/us?accountId=acc_9f2c…
+{ "product": "us", "status": "preparing", "id": "bnk_5Hq2…", "accountId": "acc_9f2c…",
+  "blockers": [ { "code": "kyb_required", … } ], … }
+```
+
+Statuses, `blockers[]` and the account details are in [Virtual accounts](/developers/virtual-accounts#statuses). Fields: [Request a receiving account](/api-reference/virtual-accounts/request-a-receiving-account-for-a-product).
+
+| Rule | Detail |
+| --- | --- |
+| Key | One virtual account per client, product and `accountId`. A repeat returns `200` with `Idempotency-Replayed: true`. |
+| Products | A product is accepted when its rail delivers USDC on chain to the address ([Deliver to an account](/developers/virtual-accounts#deliver-to-an-account)). Another product returns `409 account_destination_unsupported`. |
+| Read | `GET /dapi/v1/banks/{product}?accountId=acc_…`. A product that cannot deliver to the account returns `403 rail_not_available`. `GET /dapi/v1/banks` lists the record with `accountId` set. |
+| Delivery | The address does not change. To deliver elsewhere, register another address and request a virtual account on it. |
+| Close | [Archiving](/external-wallets/external-accounts#archive-an-account) the account closes its virtual accounts. |
+
+## On-chain payins
+
+Call `POST /dapi/v1/payins` with `originChainId`, the account as `destinationAccount`, and `refundAddress`. The payin is delivered as USDC on the account's network.
+
+<CodeGroup>
+
+```bash cURL
+curl -s -X POST "$HEVN_API/payins" \
+  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+  -H "X-Hevn-Account: $HEVN_CLIENT_ID" \
+  -H "Content-Type: application/json" \
+  -d "{\"amount\":\"2000.00\",\"currency\":\"USDC\",\"originChainId\":\"arb\",
+       \"destinationAccount\":\"$HEVN_ACCOUNT_ID\",
+       \"refundAddress\":\"0x51c7a2e9b0d34f6a8e1c5b7d9f02a4c6e8b1d3f5\"}"
+```
+
+```python Python
+payin = client.post("/payins", {
+    "amount": "2000.00", "currency": "USDC", "originChainId": "arb",
+    "destinationAccount": account["accountId"],
+    "refundAddress": "0x51c7a2e9b0d34f6a8e1c5b7d9f02a4c6e8b1d3f5",
+})
+instructions = client.post(f"/payins/{payin['id']}/instructions", {})
+```
+
+```javascript Node
+const payin = await client.post("/payins", {
+  amount: "2000.00", currency: "USDC", originChainId: "arb",
+  destinationAccount: account.accountId,
+  refundAddress: "0x51c7a2e9b0d34f6a8e1c5b7d9f02a4c6e8b1d3f5",
+});
+const instructions = await client.post(`/payins/${payin.id}/instructions`, {});
+```
+
+```go Go
+payin, err := client.Post("/payins", hevn.Body{
+	"amount": "2000.00", "currency": "USDC", "originChainId": "arb",
+	"destinationAccount": account.Str("accountId"),
+	"refundAddress":      "0x51c7a2e9b0d34f6a8e1c5b7d9f02a4c6e8b1d3f5",
+})
+instructions, err := client.Post("/payins/"+payin.Str("id")+"/instructions", hevn.Body{})
+```
+
+</CodeGroup>
+
+Give the payer `address`, `chainId`, `amount` and `memo` from the instructions call, then poll `GET /dapi/v1/payins/{payinId}`. Statuses and payer mistakes are in [Payins](/developers/payins#statuses). Fields: [Create an incoming transfer quote](/api-reference/transfers/create-an-incoming-transfer-quote).
+
+| Rule | Detail |
+| --- | --- |
+| `refundAddress` | Required: an address on `originChainId` that receives the money back when the route cannot complete. Without it the call returns `422 refund_address_required`. |
+| `refundAddress` on another destination | `422 validation_failed` when `destinationAccount` is an account key. |
+| `rail` | `409 account_destination_unsupported`. Bank money reaches the account through its virtual account. |
+| Response | `accountId` names the account. `destinationChainId` is the account's network. |
+
+<Warning>
+  A refund goes to `refundAddress` on the origin chain. Use an address the payer controls on that chain.
+</Warning>
+
+## Payouts
+
+Save a [contact](/developers/payouts#save-a-contact), then call `POST /dapi/v1/payouts` with the account as `sourceAccount`. `publicKey` is not used.
+
+<CodeGroup>
+
+```bash cURL
+curl -s -X POST "$HEVN_API/payouts" \
+  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+  -H "X-Hevn-Account: $HEVN_CLIENT_ID" \
+  -H "Idempotency-Key: order-1188" \
+  -H "Content-Type: application/json" \
+  -d "{\"contactId\":\"ct_3K9…\",\"amount\":\"250.00\",\"sourceAccount\":\"$HEVN_ACCOUNT_ID\"}"
+```
+
+```python Python
+payout = client.post("/payouts", {
+    "contactId": contact["id"],
+    "amount": "250.00",
+    "sourceAccount": account["accountId"],
+}, idempotency_key="order-1188")
+transfer = payout.get("transfer")
+```
+
+```javascript Node
+const payout = await client.post("/payouts", {
+  contactId: contact.id,
+  amount: "250.00",
+  sourceAccount: account.accountId,
+}, { idempotencyKey: "order-1188" });
+const transfer = payout.transfer;
+```
+
+```go Go
+payout, err := client.Post("/payouts", hevn.Body{
+	"contactId":     contact.Str("id"),
+	"amount":        "250.00",
+	"sourceAccount": account.Str("accountId"),
+}, hevn.IdempotencyKey("order-1188"))
+```
+
+</CodeGroup>
+
+```json Response 201, Location: /dapi/v1/payouts/po_4c8a…
+{
+  "id": "po_4c8a…",
+  "kind": "fiat",
+  "status": "awaitingSignature",
+  "idempotencyKey": "order-1188",
+  "quote": { … },
+  "authorization": "wallet",
+  "transfer": {
+    "chain": "base",
+    "chainId": 8453,
+    "token": "USDC",
+    "tokenAddress": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "fromAddress": "0x8ba1f109551bD432803012645Ac136ddd64DBA72",
+    "toAddress": "0x3e5b…",
+    "amount": "250.00",
+    "amountAtomic": "250000000",
+    "expiresAt": "2026-11-12T10:19:11Z"
+  },
+  "contact": { "contactId": "ct_3K9…", "name": "Ardenne Fabrication SARL" }
+}
+```
+
+`approval`, `debit` and `intent` are absent. Fields: [Create an outgoing transfer](/api-reference/transfers/create-an-outgoing-transfer).
+
+### Send the transfer
+
+Have the customer's wallet call the ERC-20 `transfer(toAddress, amountAtomic)` on `tokenAddress`, from `fromAddress`, on `chainId`. Read `authorization` before `status`. With `wallet`, `awaitingSignature` means the transfer is outstanding.
+
+| Transfer | Result |
+| --- | --- |
+| `amountAtomic` from `fromAddress` to `toAddress`, mined before `expiresAt` | Funds the payout. The status leaves `awaitingSignature`. |
+| From another address, of another amount, or mined after `expiresAt` | Does not fund the payout. |
+| A second transfer of the same amount | Does not fund a payout. |
+| None before `expiresAt` | The payout ends as `failed`, with `failure.code` `payout_canceled` or `quote_expired`. Book a new one. |
+
+<Warning>
+  A transfer that does not match `transfer` leaves the wallet and does not fund the payout. Send one transfer per payout, with the amount, sender and deadline of `transfer`.
+</Warning>
+
+`POST /dapi/v1/payouts/{payoutId}/confirm` returns `400 invalid_request` with `details.reason` `funded_by_wallet_transfer`.
+
+### Check the instruction
+
+Check `transfer` on your server before your product asks the wallet to sign.
+
+| Field | Check |
+| --- | --- |
+| `chainId` | `8453` in production, `84532` in the sandbox. |
+| `tokenAddress` | The USDC contract you hold in your own configuration for that chain. |
+| `fromAddress` | The address of the account you named as `sourceAccount`. |
+| `toAddress` | Differs from `fromAddress` and from `tokenAddress`. |
+| `amount`, `amountAtomic` | Equal to each other at 6 decimals, and to the amount you booked. |
+| `expiresAt` | In the future, with time for the wallet to sign and the transfer to be mined. |
+
+`toAddress` is the address the payout is collected at. Your server cannot derive it, so pass it to the wallet as returned.
+
+### Track the payout
+
+Poll `GET /dapi/v1/payouts/{payoutId}`. The statuses are in [Track it to completion](/developers/payouts#track-it-to-completion).
+
+| Case | Behaviour |
+| --- | --- |
+| Replay with the same `Idempotency-Key` before funding | The same payout and the same `transfer`. |
+| Replay after funding | The payout as it stands, with no `transfer`. |
+| Same key, another `sourceAccount` | `409 idempotency_key_reused` |
+
+### Refusals
+
+| Error | Cause |
+| --- | --- |
+| `409 source_account_unsupported` | The account is not on `base`, or the payout is not a USDC payout funded from the account's balance. |
+| `404 account_not_found` | Unknown or archived `acc_…` id. |
+| `403 transfer_policy_denied` | The client's transfer policy refuses the payout. `transferPolicy` is on `GET /dapi/v1/client`. |
+| `403 account_spend_forbidden` | Your seat on the client cannot pay from its external accounts. |
+| `422 account_funding_invalid` | The booking can no longer be funded from the account. Book a new payout. |
+
+Other payout codes are in [Errors](/developers/reference/errors#payouts).
+
+## Balance and ledger
+
+| Read | Behaviour |
+| --- | --- |
+| Balance | `balance` on `GET /dapi/v1/client/accounts` ([Balance](/external-wallets/external-accounts#balance)). `GET /dapi/v1/client/balance` has no row for an external account. |
+| Ledger rows | HEVN writes a row for each transfer it arranged: an incoming payment of a virtual account, a delivered payin, a payout. Each has `accountId`. Other transfers of the address have no row. |
+| Filter | `GET /dapi/v1/transactions`, `/transactions/summary` and `/transactions/export` take `accountId`. An archived account's rows stay readable. An id of another client returns `404 account_not_found`. |
+| Summary | Income of an external account is left out of `/transactions/summary` unless `accountId` names the account. |
+
+Paging, filters and exports are in [Balances and transactions](/developers/balances-and-transactions).
+
+## Sandbox
+
+In the sandbox, fund the address through a virtual account or a public testnet faucet, and send the payout `transfer` to the faucet account. The products, limits and refusals are in [Accounts](/developers/sandbox#accounts).
+
+<Card title="Next: Sandbox and going live" icon="flask-conical" href="/developers/sandbox" />

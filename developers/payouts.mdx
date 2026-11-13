@@ -5,7 +5,7 @@ description: "Save a contact, book a payout to a bank account or a wallet, and t
 
 A payout sends money from an account to a saved contact, which is a bank account or a wallet address. Save the contact with `POST /dapi/v1/contacts`, then book the payout with `POST /dapi/v1/payouts`.
 
-The holder approves a client's payout. Your developer key signs a payout from your account ([Who can spend](/whitelabel/overview#who-can-spend)). These routes are client-scoped and take `X-Hevn-Account` ([Acting as a client](/whitelabel/authentication#acting-as-a-client)).
+Who funds a payout depends on the paying account, and the response names it in `authorization` ([Authorization](#authorization)). These routes take `X-Hevn-Account` to act for a client ([Acting as a client](/developers/authentication#acting-as-a-client)).
 
 ## Save a contact
 
@@ -71,13 +71,13 @@ contact, err := client.Post("/contacts", hevn.Body{
   "bank": { "method": "sepa", "state": "active", … }, … }
 ```
 
-The identifiers each method needs in `bank.fields` are in [Rails](/whitelabel/reference/rails#what-each-method-needs). Field rules are on [Create a contact](/api-reference/contacts/create-a-contact). To edit, delete or list contacts, see [Update a contact](/api-reference/contacts/update-a-contact), [Delete a contact](/api-reference/contacts/delete-a-contact) and [List saved contacts](/api-reference/contacts/list-saved-contacts).
+The identifiers each method needs in `bank.fields` are in [Rails](/developers/reference/rails#what-each-method-needs). Field rules are on [Create a contact](/api-reference/contacts/create-a-contact). To edit, delete or list contacts, see [Update a contact](/api-reference/contacts/update-a-contact), [Delete a contact](/api-reference/contacts/delete-a-contact) and [List saved contacts](/api-reference/contacts/list-saved-contacts).
 
 ### Check capabilities
 
 Both calls are optional. `POST /dapi/v1/payouts` applies the same checks.
 
-- [Retrieve contact channels](/api-reference/contacts/retrieve-contact-channels) lists the options that can pay the contact, with limits, fees, the payout fields each one requires and blockers ([Contact blockers](/whitelabel/reference/errors#contact-blockers), [Fees](/whitelabel/reference/rails#fees)).
+- [Retrieve contact channels](/api-reference/contacts/retrieve-contact-channels) lists the options that can pay the contact, with limits, fees, the payout fields each one requires and blockers ([Contact blockers](/developers/reference/errors#contact-blockers), [Fees](/developers/reference/rails#fees)).
 - [Create an outgoing transfer quote](/api-reference/transfers/create-an-outgoing-transfer-quote) prices a payment method and amount without a contact.
 
 ## Book the payout
@@ -136,13 +136,13 @@ payout, err := client.Post("/payouts", hevn.Body{
 
 The body fields and the response are on [Create an outgoing transfer](/api-reference/transfers/create-an-outgoing-transfer). To pay from the fiat balance, see [Bank-held balance](#bank-held-balance).
 
-With `authorization: "client"`, show the holder `quote` and `contact`, then open the sign-in window.
+The example is a payout for a client linked through HEVN Connect. Other paying accounts return another `authorization` and the fields that go with it.
 
 ### Retries
 
-Send an `Idempotency-Key` with each booking. Key format, replay windows and bookings without a key are in [Idempotency-Key](/whitelabel/conventions#idempotency-key).
+Send an `Idempotency-Key` with each booking. Key format, replay windows and bookings without a key are in [Idempotency-Key](/developers/conventions#idempotency-key).
 
-A retry with the same key and terms returns the same `po_…` and quote. Until the payout is funded, a replay on your account returns a new `approval`, and a replay for a client returns `authorization: "client"` again, so create a new `sign` session. The rules for a changed request are on [Create an outgoing transfer](/api-reference/transfers/create-an-outgoing-transfer).
+A retry with the same key and terms returns the same `po_…` and quote. Until the payout is funded, a replay returns what the booking returned: an `approval` with `debit` or `intent`, `authorization: "client"` again (create a new `sign` session), or the same `transfer` with `wallet`. Once the payout is funded, a replay returns it with none of these. The rules for a changed request are on [Create an outgoing transfer](/api-reference/transfers/create-an-outgoing-transfer).
 
 A retry under the same key with another `sourceAccount` returns `409 idempotency_key_reused`. Without a key, a request with another `sourceAccount` books a new payout.
 
@@ -150,18 +150,27 @@ A retry under the same key with another `sourceAccount` returns `409 idempotency
   Reuse the key when you retry. A new key books a second payout.
 </Warning>
 
-## Approve it in the sign-in window
+## Authorization
 
-Create a session with `POST /dapi/v1/connect/sessions`, passing `action: "sign"` and the `payoutId`, without `X-Hevn-Account`. Then open the window. Session rules and the callback are in [Approve a payout](/whitelabel/sign-in-with-hevn#approve-a-payout).
+`authorization` on the response names who funds the payout. Read it before `status`: each value returns `awaitingSignature` after booking. The values are defined in [Authorization values](/developers/signing#authorization-values).
 
-| Case | Behaviour |
-| --- | --- |
-| Quote expired | A routed payout's quote expires at `quote.expiresAt`, and the window then returns `unsupported`. Open it right after booking. |
-| Declined or closed | The payout stays `awaitingSignature`. Create a new `sign` session for the same `po_…`. |
+| Paying account | `sourceAccount` | `authorization` | Next |
+| --- | --- | --- | --- |
+| Your main wallet | An account key such as `USDC` or `EURC` | `debit` | Sign and confirm ([Pay from your own account](#pay-from-your-own-account)). |
+| One of your sub accounts | Its `acc_…` id | `debit` | Sign and confirm. `debit.sourceAddress` is the sub account ([Sub accounts](/sub-accounts/money-movement)). |
+| Your balance at the partner bank | `FDIC_USD` | `intent` | Sign and confirm ([Bank-held balance](#bank-held-balance)). |
+| The wallet of a client linked through HEVN Connect | An account key | `client` | The holder approves in the sign-in window ([HEVN Connect](/connect/money-movement)). |
+| A client's external account on Base | Its `acc_…` id | `wallet` | The customer's wallet sends `transfer` ([External wallets](/external-wallets/money-movement)). |
+
+`publicKey` is required when your developer key signs. Without it the call returns `422 validation_failed` with `details.field = "publicKey"`. It is not used with `client` or `wallet`.
+
+A payout from the main wallet of a client that is not linked through HEVN Connect returns `403 account_not_controlled`. A client created with `POST /dapi/v1/clients` pays from an external account.
+
+With `authorization: "client"`, the holder approves the payout in a `sign` session of the sign-in window ([Approve the payout](/connect/money-movement#approve-the-payout)).
 
 ## Track it to completion
 
-Read `GET /dapi/v1/payouts/{payoutId}`. A `pollUrl` points to this route ([polling](/whitelabel/conventions#status-codes)).
+Read `GET /dapi/v1/payouts/{payoutId}`. A `pollUrl` points to this route ([polling](/developers/conventions#status-codes)).
 
 ```json Response 200
 { "id": "po_4c8a…", "kind": "fiat", "status": "settled",
@@ -172,17 +181,17 @@ Read `GET /dapi/v1/payouts/{payoutId}`. A `pollUrl` points to this route ([polli
 
 | `status` | Meaning | Next |
 | --- | --- | --- |
-| `awaitingSignature` | Booked and quoted. It is not signed and no money has moved. | Get the signature. |
+| `awaitingSignature` | Booked and quoted. No money has moved. | Follow `authorization`: sign and confirm, open a `sign` session, or have the wallet send `transfer`. |
 | `submitted` | The funding operation was sent, or the partner bank holds the payout (`attention`). | Poll. |
 | `settled` | The debit landed and the partner bank accepted the payout. Delivery timing is set by the partner bank. | Read the ledger row. |
-| `failed` | The payout did not complete. `failure.code` names the cause, listed on [Retrieve an outgoing transfer](/api-reference/transfers/retrieve-an-outgoing-transfer). | Book again with the same `Idempotency-Key`. After `409 payment_slot_consumed`, use a new key ([Retrying a confirm](/whitelabel/signing#retrying-a-confirm)). |
-| `refunded` | The partner bank returned the money to the wallet. | Reconcile. |
+| `failed` | The payout did not complete. `failure.code` names the cause, listed on [Retrieve an outgoing transfer](/api-reference/transfers/retrieve-an-outgoing-transfer). | Book again with the same `Idempotency-Key`. After `409 payment_slot_consumed`, use a new key ([Retrying a confirm](/developers/signing#retrying-a-confirm)). |
+| `refunded` | The partner bank returned the money to the paying account. | Reconcile. |
 
 The fields of the read, `attention` and `transactionId` among them, are on [Retrieve an outgoing transfer](/api-reference/transfers/retrieve-an-outgoing-transfer).
 
 ## Pay from your own account
 
-Book without `X-Hevn-Account`, or with your `cl_…` in it, and add `publicKey`.
+Book without `X-Hevn-Account`, or with your `cl_…` in it, and add `publicKey`. To pay from a sub account, also send its `acc_…` id as `sourceAccount`.
 
 <CodeGroup>
 ```bash cURL
@@ -230,16 +239,17 @@ payout, err := api.Post("/payouts", hevn.Body{
   "quote": { … },
   "authorization": "debit",
   "approval": { "id": "…", "payload": "eyJ…", "expiresAt": "2026-09-17T10:06:10Z" },
-  "debit": { "address": "0x8f3b…", "amount": "500.00", "amountAtomic": "500000000",
-             "token": "USDC", "chainId": 8453 }
+  "debit": { "address": "0x8f3b…", "sourceAddress": "0x2f1c…",
+             "amount": "500.00", "amountAtomic": "500000000",
+             "token": "USDC", "chainId": 8453, "operation": { … } }
 }
 ```
 
-Check `debit`, sign `approval.payload` and post the signature to `POST /dapi/v1/payouts/{payoutId}/confirm` ([Signing](/whitelabel/signing), [Authorize an outgoing transfer](/api-reference/transfers/authorize-an-outgoing-transfer)). Confirm outcomes are in [Retrying a confirm](/whitelabel/signing#retrying-a-confirm).
+Check `debit` and its `operation` ([Debit contents](/developers/signing#debit-contents)), sign `approval.payload` and post the signature to `POST /dapi/v1/payouts/{payoutId}/confirm` ([Signing](/developers/signing), [Authorize an outgoing transfer](/api-reference/transfers/authorize-an-outgoing-transfer)). Confirm outcomes are in [Retrying a confirm](/developers/signing#retrying-a-confirm).
 
 ## Pay a wallet
 
-A wallet contact uses the same payout body, `sign` session and read. The payout has `kind: "onchain"`.
+A wallet contact uses the same payout body, authorization and read. The payout has `kind: "onchain"`.
 
 ### Save an address as a contact
 
@@ -274,9 +284,9 @@ contact, err := client.Post("/contacts", hevn.Body{
 ```
 </CodeGroup>
 
-`chain` takes a [chain code](/whitelabel/reference/rails#chain-codes).
+`chain` takes a [chain code](/developers/reference/rails#chain-codes).
 
-| Contact | Payout | `quote` | `debit.address` on your account |
+| Contact | Payout | `quote` | `debit.address` with `debit` |
 | --- | --- | --- | --- |
 | USDC or EURC on Base | Direct, no conversion | `fromAmount` equals `toAmount`. `fromChainId` and `toChainId` are `base`. `expiresAt` is 15 minutes after booking. No `rate` or `feeAmount`. | `contact.address` |
 | Another chain or token | Routed across chains | `fromChainId`, `toChainId`, `feeAmount` in `USD`, `expiresAt`. No `rate`. | A one-time address for the route |
@@ -299,9 +309,9 @@ On a direct payout and on a payout to a HEVN account, `amountTo` equals `amount`
 | --- | --- |
 | `409 payout_not_fundable` | The account has no routing. Use a USDC or EURC contact on Base. |
 | `400` | The address is the paying account's wallet. |
-| `409 insufficient_funds` | The balance does not cover the amount. Fund the wallet. On your account, confirm again. |
+| `409 insufficient_funds` | The balance does not cover the amount. Fund the paying account. With `debit`, confirm again. |
 
-The ledger row of a settled wallet payout has `isIncome: false` and `type: "crypto"`, or `internal` when the address belongs to another HEVN account ([Walk the ledger](/whitelabel/balances-and-transactions#walk-the-ledger)).
+The ledger row of a settled wallet payout has `isIncome: false` and `type: "crypto"`, or `internal` when the address belongs to another HEVN account ([Walk the ledger](/developers/balances-and-transactions#walk-the-ledger)).
 
 ## Bank-held balance
 
@@ -352,9 +362,9 @@ payout, err := api.Post("/payouts", hevn.Body{
   "intent": { "digest": "0x9c1f…", "settles": "message_signature" } }
 ```
 
-Check `quote` and `intent`, then sign, confirm and poll as for any payout from your account. A client cannot pay from `FDIC_USD`. The refusals are under `sourceAccount` on [Create an outgoing transfer](/api-reference/transfers/create-an-outgoing-transfer).
+Check `quote` and `intent`, then sign, confirm and poll as for any payout from your account. A client whose holder signs cannot pay from `FDIC_USD`: the call returns `409 payout_not_fundable` with `details.reason = "holder_signature_unsupported"`. The refusals are under `sourceAccount` on [Create an outgoing transfer](/api-reference/transfers/create-an-outgoing-transfer).
 
-To move the balance to your wallet, use [Swaps](/whitelabel/swaps).
+To move the balance to your wallet, use [Swaps](/developers/swaps).
 
 ## When a payout is refused
 
@@ -365,7 +375,10 @@ To move the balance to your wallet, use [Swaps](/whitelabel/swaps).
 | `invalid_request` | 400 | The terms are not accepted, for example an amount below the minimum, a direction that cannot be priced, or account details the method does not accept. The reason is in `message`. |
 | `payout_not_fundable` | 409 | With `details.reason = "holder_signature_unsupported"`, pay from `USDC` or `EURC`. Otherwise book again with a new key on a rail that can be funded. |
 | `provider_unavailable` | 503 | The partner bank is unavailable. Retry with the same key. |
+| `account_not_controlled` | 403 | The paying wallet belongs to a client and its holder does not sign through HEVN Connect. See [Authorization](#authorization). |
+| `source_account_unsupported` | 409 | The `acc_…` account cannot pay this payout. An external account pays USDC from Base. A sub account pays its token on a route that is one transfer to a funding address. |
+| `transfer_policy_denied` | 403 | The account's transfer policy refuses this payout. It applies to each paying account, `acc_…` ids included. |
 
-The other codes, among them `404 contact_not_found`, `409 contact_not_payable` and `422 contact_payment_details_invalid`, are in [Errors](/whitelabel/reference/errors#payouts). To move a booked payout in the sandbox, see [Move a payout](/whitelabel/sandbox#move-a-payout).
+The other codes, among them `404 contact_not_found`, `409 contact_not_payable` and `422 contact_payment_details_invalid`, are in [Errors](/developers/reference/errors#payouts). To move a booked payout in the sandbox, see [Move a payout](/developers/sandbox#move-a-payout).
 
-<Card title="Next: Swaps" icon="arrow-right" href="/whitelabel/swaps" />
+<Card title="Next: Swaps" icon="arrow-right" href="/developers/swaps" />

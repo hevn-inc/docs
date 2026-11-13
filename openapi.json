@@ -651,10 +651,10 @@
     "/client/accounts": {
       "get": {
         "tags": [
-          "external accounts"
+          "client accounts"
         ],
-        "summary": "List external accounts",
-        "description": "Every active external account of the client selected by `X-Hevn-Account`, oldest first. An external account is an address the client holds on one of the supported networks; it holds USDC only, and HEVN keeps no transaction history for it beyond the transfers HEVN itself arranges.",
+        "summary": "List accounts",
+        "description": "Every active external account and sub account of the client selected by `X-Hevn-Account`, oldest first; `kind` tells them apart. An external account is an address the client holds on one of the supported networks; it holds USDC only, and HEVN keeps no transaction history for it beyond the transfers HEVN itself arranges. A sub account is a further wallet of the client on Base that HEVN opened: it holds one token (`asset`: USDC or RD), has its own ledger, and is spent with your developer key like the client's wallet.",
         "operationId": "list_accounts_client_accounts_get",
         "security": [
           {
@@ -712,7 +712,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Page_ExternalAccountView_"
+                  "$ref": "#/components/schemas/Page_ClientAccountView_"
                 }
               }
             }
@@ -731,10 +731,10 @@
       },
       "post": {
         "tags": [
-          "external accounts"
+          "client accounts"
         ],
-        "summary": "Add an external account",
-        "description": "Register an address for the client on `chain` (base, arb, eth, op, pol or sol). A receiving account opened on it delivers USDC on that network, an on-chain pay-in can be delivered to it, and a Base address can fund payouts it sends itself. Answers 201 the first time and 200 with `Idempotency-Replayed: true` when the same address was already added with the same label; another label is `account_address_taken`.",
+        "summary": "Add an account",
+        "description": "Without `kind`, or with `kind: external`: register an address for the client on `chain` (base, arb, eth, op, pol or sol). A receiving account opened on it delivers USDC on that network, an on-chain pay-in can be delivered to it, and a Base address can fund payouts it sends itself. Answers 201 the first time and 200 with `Idempotency-Replayed: true` when the same address was already added with the same label; another label is `account_address_taken`.\n\nWith `kind: sub`: open a sub account, a further wallet of your own account on Base that holds one token, `asset`: `USDC` (the default) or `RD`. The token is chosen once; receiving accounts, payouts and moves of the account run in it, and money moves only between accounts of the same token. Its address takes deposits at once; another token sent to it is not in `balance` and can only be moved out to the account's wallet with a swap. Name it as `sourceAccount` or `destinationAccount` on payouts, pay-ins and swaps, and as `accountId` on a receiving account; a payout or swap that leaves it is signed with your developer key, exactly like one that leaves the account's wallet. A create whose `label` and `asset` a sub account already carries answers 200 with that account; the same `label` with another `asset`, or a create without `label`, opens a new one. A sub account is opened on your own account only: a request that acts for a client returns `403 account_not_controlled`. An account whose wallet is not protected by co-signing returns `409 safe_mode_required`. A sub account cannot be archived.",
         "operationId": "create_account_client_accounts_post",
         "security": [
           {
@@ -783,7 +783,15 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ClientAccountCreateRequest"
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/ClientExternalAccountRequest"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ClientSubAccountRequest"
+                  }
+                ],
+                "title": "Data"
               }
             }
           }
@@ -794,7 +802,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ExternalAccountView"
+                  "$ref": "#/components/schemas/ClientAccountView"
                 }
               }
             }
@@ -815,10 +823,10 @@
     "/client/accounts/{accountId}": {
       "get": {
         "tags": [
-          "external accounts"
+          "client accounts"
         ],
-        "summary": "Retrieve one external account",
-        "description": "Retrieve one active external account of the client. Unknown and archived ids share the not-found.",
+        "summary": "Retrieve one account",
+        "description": "Retrieve one active external account or sub account of the client. Unknown and archived ids share the not-found.",
         "operationId": "read_account_client_accounts__accountId__get",
         "security": [
           {
@@ -832,13 +840,13 @@
             "required": true,
             "schema": {
               "type": "string",
-              "description": "External account identifier, as an `acc_` id.",
+              "description": "Account identifier, as an `acc_` id.",
               "examples": [
                 "acc_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
               ],
               "title": "Accountid"
             },
-            "description": "External account identifier, as an `acc_` id."
+            "description": "Account identifier, as an `acc_` id."
           },
           {
             "name": "X-Hevn-Account",
@@ -861,7 +869,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ExternalAccountView"
+                  "$ref": "#/components/schemas/ClientAccountView"
                 }
               }
             }
@@ -880,10 +888,10 @@
       },
       "delete": {
         "tags": [
-          "external accounts"
+          "client accounts"
         ],
         "summary": "Archive an external account",
-        "description": "Archive an external account and close every receiving account opened on it. An archived account is no longer listed and cannot be used; adding the address again creates a new account.",
+        "description": "Archive an external account and close every receiving account opened on it. An archived account is no longer listed and cannot be used; adding the address again creates a new account. A sub account returns `409 account_archive_unsupported`.",
         "operationId": "archive_account_client_accounts__accountId__delete",
         "security": [
           {
@@ -897,13 +905,13 @@
             "required": true,
             "schema": {
               "type": "string",
-              "description": "External account identifier, as an `acc_` id.",
+              "description": "Account identifier, as an `acc_` id.",
               "examples": [
                 "acc_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
               ],
               "title": "Accountid"
             },
-            "description": "External account identifier, as an `acc_` id."
+            "description": "Account identifier, as an `acc_` id."
           },
           {
             "name": "Idempotency-Key",
@@ -947,7 +955,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ExternalAccountView"
+                  "$ref": "#/components/schemas/ClientAccountView"
                 }
               }
             }
@@ -2024,7 +2032,7 @@
           "transfers"
         ],
         "summary": "Create an outgoing transfer",
-        "description": "Validate the contact, fix the payout terms and return how to authorize them. Returns `201` with `Location`. A retry with the same `Idempotency-Key` and terms returns `200`, `Idempotency-Replayed: true` and the same payout. The same key with another contact, `bankId`, pinned amount or `acc_` source returns `409 idempotency_key_reused` with `details.payoutId`. A `400` or `422` comes before booking, so the key stays usable for the corrected request. An `acc_` `sourceAccount` returns `authorization: wallet` with `transfer`, the USDC transfer that account sends itself, and has no confirm call.",
+        "description": "Validate the contact, fix the payout terms and return how to authorize them. Returns `201` with `Location`. A retry with the same `Idempotency-Key` and terms returns `200`, `Idempotency-Replayed: true` and the same payout. The same key with another contact, `bankId`, pinned amount or `acc_` source returns `409 idempotency_key_reused` with `details.payoutId`. A `400` or `422` comes before booking, so the key stays usable for the corrected request. The `acc_` id of an external account as `sourceAccount` returns `authorization: wallet` with `transfer`, the USDC transfer that account sends itself, and has no confirm call. The `acc_` id of a sub account pays from that sub account and is authorized like a payout from the client's wallet: `authorization: debit`, with `debit` to sign and confirm with your developer key.",
         "operationId": "create_payout_payouts_post",
         "security": [
           {
@@ -2343,7 +2351,7 @@
           "transfers"
         ],
         "summary": "Create a transfer between the client's own accounts",
-        "description": "Price the swap, reserve it and return `201` with a `Location` header and the approval to sign. `authorization` says what the approval covers: a `debit` of the wallet that funds the swap, or an `intent` that settles against the signature. The same `Idempotency-Key` and body return the same swap with `200` and `Idempotency-Replayed: true`. The same key with a different body returns `409 idempotency_key_reused`. A session acting for a client through `X-Hevn-Account` gets `403 account_not_controlled`. The sandbox returns `422 swap_route_unavailable`.",
+        "description": "Price the swap, reserve it and return `201` with a `Location` header and the approval to sign. `authorization` says what the approval covers: a `debit` of the wallet that funds the swap, or an `intent` that settles against the signature. The same `Idempotency-Key` and body return the same swap with `200` and `Idempotency-Replayed: true`. The same key with a different body returns `409 idempotency_key_reused`. A session acting for a client through `X-Hevn-Account` gets `403 account_not_controlled`. The sandbox returns `422 swap_route_unavailable` for a swap between two wallet accounts and serves a move that names a sub account. The `acc_` id of a sub account on either side moves the token that sub account holds (USDC or RD) between the client's wallet and that sub account, or between two sub accounts of the same token, one for one, with `authorization: debit` of the account the money leaves. A sub account as `sourceAccount` with a wallet account of another token (`USDC`, `EURC` or `RD`) as `destinationAccount` moves that other token, sent to the sub account address by mistake, out to the wallet, one for one.",
         "operationId": "create_swap_swaps_post",
         "security": [
           {
@@ -2434,7 +2442,7 @@
           "transfers"
         ],
         "summary": "Price a transfer between the client's own accounts",
-        "description": "Compare the routes that serve this pair of accounts and return the best price. Preview has no side effects and accepts a client in `X-Hevn-Account`. No route for the pair returns `400 invalid_request`. The sandbox returns `422 swap_route_unavailable` for every preview.",
+        "description": "Compare the routes that serve this pair of accounts and return the best price. Preview has no side effects and accepts a client in `X-Hevn-Account`. No route for the pair returns `400 invalid_request`. The sandbox returns `422 swap_route_unavailable` for a preview between two wallet accounts and prices a move that names a sub account.",
         "operationId": "preview_swap_swaps_preview_post",
         "security": [
           {
@@ -3250,7 +3258,7 @@
           "virtual accounts"
         ],
         "summary": "Request a receiving account for a product",
-        "description": "Send one product per call. The first request returns 201 with `Location`. Missing requirements do not refuse it. The record stays `preparing` and `blockers` lists what is pending. A product already requested returns 200 with `Idempotency-Replayed: true` and the same record, so no `Idempotency-Key` is needed. There is one virtual account per client, product and `accountId`. `accountId` names an external account it delivers to. Omit it for the client's wallet. A product that cannot deliver to that external account returns `409 account_destination_unsupported`. A product no rail serves for this client returns `403 rail_not_available` with `details.product`. An unknown product code returns `422 validation_failed`.",
+        "description": "Send one product per call. The first request returns 201 with `Location`. Missing requirements do not refuse it. The record stays `preparing` and `blockers` lists what is pending. A product already requested returns 200 with `Idempotency-Replayed: true` and the same record, so no `Idempotency-Key` is needed. There is one virtual account per client, product and `accountId`. `accountId` names an external account or a sub account it delivers to. Omit it for the client's wallet. A product that cannot deliver to that account returns `409 account_destination_unsupported`. A product no rail serves for this client returns `403 rail_not_available` with `details.product`. An unknown product code returns `422 validation_failed`.",
         "operationId": "open_rail_banks_post",
         "security": [
           {
@@ -3341,7 +3349,7 @@
           "virtual accounts"
         ],
         "summary": "Retrieve one virtual account",
-        "description": "Retrieve one product in the same shape as the list, with account details once active. `accountId` reads the one that delivers to that external account. A product no rail serves for this client returns `403 rail_not_available`.",
+        "description": "Retrieve one product in the same shape as the list, with account details once active. `accountId` reads the one that delivers to that external account or sub account. A product no rail serves for this client returns `403 rail_not_available`.",
         "operationId": "read_rail_banks__product__get",
         "security": [
           {
@@ -3379,10 +3387,10 @@
                   "type": "null"
                 }
               ],
-              "description": "External account whose receiving account to read. Omit it for the client's wallet.",
+              "description": "External account or sub account whose receiving account to read. Omit it for the client's wallet.",
               "title": "Accountid"
             },
-            "description": "External account whose receiving account to read. Omit it for the client's wallet."
+            "description": "External account or sub account whose receiving account to read. Omit it for the client's wallet."
           },
           {
             "name": "X-Hevn-Account",
@@ -3509,7 +3517,7 @@
           "transfers"
         ],
         "summary": "Create an incoming transfer quote",
-        "description": "Price money arriving for this client. Send `rail` for a local payment method or `originChainId` for an on-chain transfer. Returns 201 with `Location`, and the quote holds until `expiresAt`. A currency and method the client cannot be paid in returns `422 payin_not_available`. On a `rail` quote, `details.options` lists the rail and currency pairs for this client, and `payerRequired` marks those that need `payer`. An `acc_` `destinationAccount` needs `originChainId` and `refundAddress`, or the call returns `422 refund_address_required`. A `rail` to it returns `409 account_destination_unsupported`. Repeating an `Idempotency-Key` with the same terms returns the same incoming transfer, and other terms return `409 idempotency_key_reused`.",
+        "description": "Price money arriving for this client. Send `rail` for a local payment method or `originChainId` for an on-chain transfer. Returns 201 with `Location`, and the quote holds until `expiresAt`. A currency and method the client cannot be paid in returns `422 payin_not_available`. On a `rail` quote, `details.options` lists the rail and currency pairs for this client, and `payerRequired` marks those that need `payer`. An `acc_` `destinationAccount` needs `originChainId`; a `rail` to it returns `409 account_destination_unsupported`. An external account also needs `refundAddress`, or the call returns `422 refund_address_required`; a sub account is refunded like the client's wallet. Repeating an `Idempotency-Key` with the same terms returns the same incoming transfer, and other terms return `409 idempotency_key_reused`.",
         "operationId": "create_payin_payins_post",
         "security": [
           {
@@ -3773,7 +3781,7 @@
           "accounts"
         ],
         "summary": "Read a client's balances",
-        "description": "One row per account the client in `X-Hevn-Account` holds: the tokens on its smart wallet plus any `FDIC_USD` balance. Without the header the route returns `422 validation_failed`. `USDC_ARB` is USDC on Arbitrum at the same wallet address and is turned on by the client's first balance read.",
+        "description": "One row per account the client in `X-Hevn-Account` holds: the tokens on its smart wallet plus any `FDIC_USD` balance and one row per sub account in the token it holds (`USDC` or `RD`), named by `accountId`. Without the header the route returns `422 validation_failed`. `USDC_ARB` is USDC on Arbitrum at the same wallet address and is turned on by the client's first balance read.",
         "operationId": "read_balance_client_balance_get",
         "security": [
           {
@@ -3886,7 +3894,7 @@
           "transactions"
         ],
         "summary": "List transactions, newest first",
-        "description": "Cursor-paged: pass `nextCursor` back as `cursor`. There is no offset and no total. Filter values are case-sensitive and comma-separated. An unknown value returns `400 invalid_request` with the value in `details.reason`. `accountId` keeps the transactions of one external account.",
+        "description": "Cursor-paged: pass `nextCursor` back as `cursor`. There is no offset and no total. Filter values are case-sensitive and comma-separated. An unknown value returns `400 invalid_request` with the value in `details.reason`. `accountId` keeps the transactions of one external account or sub account.",
         "operationId": "list_transactions_transactions_get",
         "security": [
           {
@@ -4146,7 +4154,7 @@
           "transactions"
         ],
         "summary": "Inflow and outflow totals for the same filters",
-        "description": "Settled and pending totals in USD for the same filters as `GET /dapi/v1/transactions`. External-account income is counted only when `accountId` names that account.",
+        "description": "Settled and pending totals in USD for the same filters as `GET /dapi/v1/transactions`. External-account income is counted only when `accountId` names that account. Sub account income is always counted, and a move between the client's wallet and a sub account is left out unless `accountId` names one side.",
         "operationId": "read_summary_transactions_summary_get",
         "security": [
           {
@@ -5319,6 +5327,22 @@
             "title": "Usdvalue",
             "description": "Indicative USD value of this balance, rounded to cents.",
             "example": "500.00"
+          },
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?:acc_)?[A-Za-z0-9._:\\-]{1,216}$",
+                "examples": [
+                  "acc_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accountid",
+            "description": "Sub account that holds this balance, as an `acc_` id. Absent on the client's wallet and on an `FDIC_*` balance."
           }
         },
         "type": "object",
@@ -6144,8 +6168,38 @@
         ],
         "title": "ChallengeTokenRequest"
       },
-      "ClientAccountCreateRequest": {
+      "ClientAccountKind": {
+        "type": "string",
+        "enum": [
+          "external",
+          "sub"
+        ],
+        "title": "ClientAccountKind"
+      },
+      "ClientAccountView": {
         "properties": {
+          "accountId": {
+            "type": "string",
+            "pattern": "^(?:acc_)?[A-Za-z0-9._:\\-]{1,216}$",
+            "title": "Accountid",
+            "description": "Stable public identifier of this account, as an `acc_` id.",
+            "examples": [
+              "acc_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+            ]
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ClientAccountKind",
+            "description": "`external`: an address the client holds and signs for itself. `sub`: a further wallet of the client that HEVN opened, spent with your developer key."
+          },
+          "asset": {
+            "type": "string",
+            "enum": [
+              "USDC",
+              "RD"
+            ],
+            "title": "Asset",
+            "description": "The token the account holds: `USDC`, or `RD` for a sub account opened with `asset: RD`."
+          },
           "chain": {
             "type": "string",
             "enum": [
@@ -6157,39 +6211,62 @@
               "sol"
             ],
             "title": "WalletNetwork",
-            "description": "Network the address receives USDC on: base, arb, eth, op, pol or sol."
+            "description": "Network the address holds `asset` on. Always `base` for a sub account."
           },
           "address": {
             "type": "string",
-            "maxLength": 64,
-            "minLength": 1,
             "title": "Address",
-            "description": "Address on `chain`: a 0x address on EVM networks, a base58 address on Solana.",
-            "examples": [
-              "0x8ba1f109551bD432803012645Ac136ddd64DBA72"
-            ]
+            "description": "Address on `chain`."
           },
           "label": {
             "anyOf": [
               {
-                "type": "string",
-                "maxLength": 64
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
             "title": "Label",
-            "description": "Name shown for this address."
+            "description": "Name shown for this account."
+          },
+          "balance": {
+            "type": "string",
+            "title": "Balance",
+            "description": "`asset` held at the address on `chain`, read from the network when older than a minute and kept as last read when the network does not answer.",
+            "example": "500.00"
+          },
+          "syncedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Syncedat",
+            "description": "UTC timestamp of the last successful balance read."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat",
+            "description": "UTC timestamp when the account was added."
           }
         },
-        "additionalProperties": false,
         "type": "object",
         "required": [
+          "accountId",
+          "kind",
+          "asset",
           "chain",
-          "address"
+          "address",
+          "balance",
+          "createdAt"
         ],
-        "title": "ClientAccountCreateRequest"
+        "title": "ClientAccountView"
       },
       "ClientAddressRequest": {
         "properties": {
@@ -6297,7 +6374,7 @@
             },
             "type": "array",
             "title": "Accounts",
-            "description": "One entry per account the client holds. An `FDIC_USD` entry is read live on each call and is left out when it cannot be read."
+            "description": "One entry per account the client holds. An `FDIC_USD` entry is read live on each call and is left out when it cannot be read. Each sub account adds an entry in the token it holds (`USDC` or `RD`) that carries its `accountId`."
           },
           "totalUsd": {
             "type": "string",
@@ -6349,6 +6426,60 @@
           "email"
         ],
         "title": "ClientCreateRequest"
+      },
+      "ClientExternalAccountRequest": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "external",
+            "title": "Kind",
+            "description": "`external`, the default: an address the client holds and signs for itself.",
+            "default": "external"
+          },
+          "chain": {
+            "type": "string",
+            "enum": [
+              "base",
+              "arb",
+              "eth",
+              "op",
+              "pol",
+              "sol"
+            ],
+            "title": "WalletNetwork",
+            "description": "Network the address receives USDC on: base, arb, eth, op, pol or sol."
+          },
+          "address": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Address",
+            "description": "Address on `chain`: a 0x address on EVM networks, a base58 address on Solana.",
+            "examples": [
+              "0x8ba1f109551bD432803012645Ac136ddd64DBA72"
+            ]
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label",
+            "description": "Name shown for this address."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "chain",
+          "address"
+        ],
+        "title": "ClientExternalAccountRequest"
       },
       "ClientFailureResponse": {
         "properties": {
@@ -6568,6 +6699,45 @@
           "createdAt"
         ],
         "title": "ClientResponse"
+      },
+      "ClientSubAccountRequest": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "sub",
+            "title": "Kind",
+            "description": "`sub`: a further wallet of the client that HEVN opens on Base. It holds one token, chosen with `asset`, and is spent with your developer key exactly like the client's wallet."
+          },
+          "asset": {
+            "type": "string",
+            "enum": [
+              "USDC",
+              "RD"
+            ],
+            "title": "Asset",
+            "description": "The token the sub account holds: `USDC` (the default) or `RD`. It is chosen once and never changes; receiving accounts, payouts and moves of the account all run in this token.",
+            "default": "USDC"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label",
+            "description": "Name shown for this account. A create that repeats the label and the `asset` of a sub account the client already has returns that account instead of opening another; the same label with another `asset` opens a new account."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "ClientSubAccountRequest"
       },
       "ConfirmRequest": {
         "properties": {
@@ -7820,12 +7990,91 @@
         "title": "CountryCode",
         "description": "ISO 3166-1 alpha-2 country codes."
       },
+      "DebitOperationView": {
+        "properties": {
+          "sender": {
+            "type": "string",
+            "title": "Sender",
+            "description": "Smart wallet that executes the operation."
+          },
+          "nonce": {
+            "type": "string",
+            "title": "Nonce",
+            "description": "Operation nonce, hex."
+          },
+          "initCode": {
+            "type": "string",
+            "title": "Initcode",
+            "description": "Hex factory call that deploys `sender` with this operation. `0x` once the wallet is deployed."
+          },
+          "callData": {
+            "type": "string",
+            "title": "Calldata",
+            "description": "Hex call the wallet executes: one batch holding one token transfer."
+          },
+          "callGasLimit": {
+            "type": "string",
+            "title": "Callgaslimit",
+            "description": "Gas limit of the call, hex."
+          },
+          "verificationGasLimit": {
+            "type": "string",
+            "title": "Verificationgaslimit",
+            "description": "Gas limit of the verification step, hex."
+          },
+          "preVerificationGas": {
+            "type": "string",
+            "title": "Preverificationgas",
+            "description": "Gas paid up front for the operation, hex."
+          },
+          "maxFeePerGas": {
+            "type": "string",
+            "title": "Maxfeepergas",
+            "description": "Maximum fee per gas, hex."
+          },
+          "maxPriorityFeePerGas": {
+            "type": "string",
+            "title": "Maxpriorityfeepergas",
+            "description": "Maximum priority fee per gas, hex."
+          },
+          "paymasterAndData": {
+            "type": "string",
+            "title": "Paymasteranddata",
+            "description": "Hex paymaster address and data. `0x` when no paymaster pays the gas."
+          },
+          "entryPoint": {
+            "type": "string",
+            "title": "Entrypoint",
+            "description": "ERC-4337 v0.6 entry point contract the operation is hashed for."
+          }
+        },
+        "type": "object",
+        "required": [
+          "sender",
+          "nonce",
+          "initCode",
+          "callData",
+          "callGasLimit",
+          "verificationGasLimit",
+          "preVerificationGas",
+          "maxFeePerGas",
+          "maxPriorityFeePerGas",
+          "paymasterAndData",
+          "entryPoint"
+        ],
+        "title": "DebitOperationView"
+      },
       "DebitView": {
         "properties": {
           "address": {
             "type": "string",
             "title": "Address",
             "description": "On-chain address receiving the funding debit."
+          },
+          "sourceAddress": {
+            "type": "string",
+            "title": "Sourceaddress",
+            "description": "On-chain address of the wallet the tokens are debited from: the client's main wallet, or the sub account named as the source."
           },
           "amount": {
             "type": "string",
@@ -7847,15 +8096,21 @@
             "type": "integer",
             "title": "Chainid",
             "description": "Numeric network identifier on which the debit executes."
+          },
+          "operation": {
+            "$ref": "#/components/schemas/DebitOperationView",
+            "description": "ERC-4337 v0.6 user operation the approval signs. The `hash` inside `approval.payload` is `keccak256(abi.encode(keccak256(packed operation), entryPoint, chainId))`. Recompute it and decode `callData` to check the wallet, token, amount and receiving address before you sign."
           }
         },
         "type": "object",
         "required": [
           "address",
+          "sourceAddress",
           "amount",
           "amountAtomic",
           "token",
-          "chainId"
+          "chainId",
+          "operation"
         ],
         "title": "DebitView"
       },
@@ -8701,83 +8956,6 @@
         ],
         "title": "ExportKind"
       },
-      "ExternalAccountView": {
-        "properties": {
-          "accountId": {
-            "type": "string",
-            "pattern": "^(?:acc_)?[A-Za-z0-9._:\\-]{1,216}$",
-            "title": "Accountid",
-            "description": "Stable public identifier of this external account, as an `acc_` id.",
-            "examples": [
-              "acc_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
-            ]
-          },
-          "chain": {
-            "type": "string",
-            "enum": [
-              "base",
-              "arb",
-              "eth",
-              "op",
-              "pol",
-              "sol"
-            ],
-            "title": "WalletNetwork",
-            "description": "Network the address holds USDC on."
-          },
-          "address": {
-            "type": "string",
-            "title": "Address",
-            "description": "Address on `chain`."
-          },
-          "label": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Label",
-            "description": "Name shown for this address."
-          },
-          "balance": {
-            "type": "string",
-            "title": "Balance",
-            "description": "USDC held at the address on `chain`, read from the network when older than a minute and kept as last read when the network does not answer.",
-            "example": "500.00"
-          },
-          "syncedAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Syncedat",
-            "description": "UTC timestamp of the last successful balance read."
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Createdat",
-            "description": "UTC timestamp when the address was added."
-          }
-        },
-        "type": "object",
-        "required": [
-          "accountId",
-          "chain",
-          "address",
-          "balance",
-          "createdAt"
-        ],
-        "title": "ExternalAccountView"
-      },
       "FiatBusinessType": {
         "type": "string",
         "enum": [
@@ -9149,6 +9327,35 @@
         ],
         "title": "LedgerSyncView"
       },
+      "Page_ClientAccountView_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ClientAccountView"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "Resources in this page, in stable server-defined order."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nextcursor",
+            "description": "Opaque cursor for the next page. Send it unchanged as `cursor` with the same query. Absent on the last page."
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "Page[ClientAccountView]"
+      },
       "Page_ClientResponse_": {
         "properties": {
           "items": {
@@ -9235,35 +9442,6 @@
           "items"
         ],
         "title": "Page[EscrowView]"
-      },
-      "Page_ExternalAccountView_": {
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/ExternalAccountView"
-            },
-            "type": "array",
-            "title": "Items",
-            "description": "Resources in this page, in stable server-defined order."
-          },
-          "nextCursor": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Nextcursor",
-            "description": "Opaque cursor for the next page. Send it unchanged as `cursor` with the same query. Absent on the last page."
-          }
-        },
-        "type": "object",
-        "required": [
-          "items"
-        ],
-        "title": "Page[ExternalAccountView]"
       },
       "Page_TransactionView_": {
         "properties": {
@@ -9381,7 +9559,7 @@
               }
             ],
             "title": "Destinationaccount",
-            "description": "Account credited after settlement, `USDC` by default. One of the client's matching payment methods must settle into it, or the call returns `422 payin_not_available`. `FDIC_USD`, `FDIC_EUR` and `USDC_ARB` return `422 account_not_supported`, and `KYC_CARDS` returns `422 validation_failed`. An `acc_` id names an external account. It takes an on-chain transfer only (`originChainId`), delivered as USDC on the account's network to its address, and requires `refundAddress`.",
+            "description": "Account credited after settlement, `USDC` by default. One of the client's matching payment methods must settle into it, or the call returns `422 payin_not_available`. `FDIC_USD`, `FDIC_EUR` and `USDC_ARB` return `422 account_not_supported`, and `KYC_CARDS` returns `422 validation_failed`. An `acc_` id names an external account or a sub account. It takes an on-chain transfer only (`originChainId`), delivered as USDC on the account's network to its address. An external account requires `refundAddress`. An RD sub account is delivered RD on Base when the client has a US Account and its `RD` account is on.",
             "default": "USDC"
           },
           "refundAddress": {
@@ -9396,7 +9574,7 @@
               }
             ],
             "title": "Refundaddress",
-            "description": "Address on `originChainId` that receives the funds back when the transfer cannot be completed. Required when `destinationAccount` is an external account, and accepted only then."
+            "description": "Address on `originChainId` that receives the funds back when the transfer cannot be completed. Required when `destinationAccount` is an external account. Ignored for a sub account, which is refunded like the client's wallet, and refused without an `acc_` `destinationAccount`."
           }
         },
         "additionalProperties": false,
@@ -9752,7 +9930,7 @@
               }
             ],
             "title": "Accountid",
-            "description": "External account the transfer is delivered to. Absent for the client's wallet."
+            "description": "External account or sub account the transfer is delivered to. Absent for the client's wallet."
           },
           "expiresAt": {
             "anyOf": [
@@ -10017,7 +10195,7 @@
               }
             ],
             "title": "Sourceaccount",
-            "description": "Account the payout is paid from. `USDC` and `EURC` debit the wallet. `FDIC_USD` debits the fiat balance held for the account and returns `authorization: intent`. It returns `409 payout_not_fundable` with `details.reason: holder_signature_unsupported` when the client signs, `422 account_unavailable` without that balance, and `422 account_not_supported` when `bankId` is another account. `USDC_ARB` returns `422 account_not_supported`. An `acc_` id names an external account on Base that pays `USDC` with `authorization: wallet` and needs no developer key.",
+            "description": "Account the payout is paid from. `USDC` and `EURC` debit the wallet. `FDIC_USD` debits the fiat balance held for the account and returns `authorization: intent`. It returns `409 payout_not_fundable` with `details.reason: holder_signature_unsupported` when the client signs, `422 account_unavailable` without that balance, and `422 account_not_supported` when `bankId` is another account. `USDC_ARB` returns `422 account_not_supported`. An `acc_` id names an external account on Base that pays `USDC` with `authorization: wallet` and needs no developer key, or a sub account that pays the token it holds (`USDC` or `RD`) with `authorization: debit`, signed with your developer key like the wallet.",
             "default": "USDC"
           }
         },
@@ -10782,7 +10960,9 @@
           "source_account_unsupported",
           "account_funding_invalid",
           "account_spend_forbidden",
-          "refund_address_required"
+          "refund_address_required",
+          "safe_mode_required",
+          "account_archive_unsupported"
         ],
         "title": "PlatformErrorCode"
       },
@@ -13651,7 +13831,7 @@
               }
             ],
             "title": "Accountid",
-            "description": "External account the receiving account delivers deposits to, as USDC on its network. Omit it for the client's wallet. Only some products can deliver to an external account. The others return `409 account_destination_unsupported`."
+            "description": "External account or sub account the receiving account delivers deposits to, in the token it holds on its network: USDC, or RD for an RD sub account. Omit it for the client's wallet. Only some products can deliver to such an account. The others return `409 account_destination_unsupported`."
           }
         },
         "additionalProperties": false,
@@ -13927,7 +14107,7 @@
               }
             ],
             "title": "Accountid",
-            "description": "External account deposits are delivered to, as USDC on its network. Absent for an account that delivers to the client's wallet or holds fiat, and for one not opened yet."
+            "description": "External account or sub account deposits are delivered to, in the token it holds on its network. Absent for an account that delivers to the client's wallet or holds fiat, and for one not opened yet."
           },
           "requisites": {
             "anyOf": [
@@ -14715,6 +14895,22 @@
             "title": "Txhash",
             "description": "On-chain transaction hash, when applicable."
           },
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?:acc_)?[A-Za-z0-9._:\\-]{1,216}$",
+                "examples": [
+                  "acc_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accountid",
+            "description": "`acc_…` external account or sub account the credit was delivered to. Absent for a credit to the client's wallet."
+          },
           "pollUrl": {
             "anyOf": [
               {
@@ -14781,7 +14977,23 @@
                 "type": "null"
               }
             ],
-            "description": "Token for a faucet transfer to the client's wallet on Base. Defaults to `USDC`. Omit it with `bankId`, which sets the token."
+            "description": "Token for a faucet transfer to the client's wallet on Base. Defaults to `USDC`, or to the token the sub account in `accountId` holds. Omit it with `bankId`, which sets the token."
+          },
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?:acc_)?[A-Za-z0-9._:\\-]{1,216}$",
+                "examples": [
+                  "acc_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accountid",
+            "description": "`acc_…` sub account that receives the faucet transfer instead of the client's wallet, in the token it holds. An external account returns `409 account_destination_unsupported`: it is the client's own wallet, funded outside HEVN. Omit it with `bankId`: a bank deposit lands on the account its bank details were opened for."
           },
           "remitter": {
             "anyOf": [
@@ -14935,6 +15147,22 @@
             ],
             "title": "Refundtxhash",
             "description": "Hash of the transfer that returns the source token on `refunded`. Set while it is unconfirmed too."
+          },
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?:acc_)?[A-Za-z0-9._:\\-]{1,216}$",
+                "examples": [
+                  "acc_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accountid",
+            "description": "`acc_…` external account or sub account that funded the payout and takes its refund. Absent for a payout from the client's wallet."
           }
         },
         "type": "object",
@@ -15063,12 +15291,36 @@
       "SwapCreateRequest": {
         "properties": {
           "sourceAccount": {
-            "$ref": "#/components/schemas/AccountKey",
-            "description": "Account the money leaves. It must differ from `destinationAccount`. An `FDIC_*` account the owner does not hold returns `422 account_unavailable`."
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccountKey"
+              },
+              {
+                "type": "string",
+                "pattern": "^acc_[A-Za-z0-9._:\\-]{1,216}$",
+                "examples": [
+                  "acc_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+                ]
+              }
+            ],
+            "title": "Sourceaccount",
+            "description": "Account the money leaves. It must differ from `destinationAccount`. An `FDIC_*` account the owner does not hold returns `422 account_unavailable`. An `acc_` id names a sub account: the token it holds (USDC or RD) moves only to the wallet account of the same token (`USDC` or `RD`) or to another sub account of that token, one for one and without a fee. With a wallet account of another token (`USDC`, `EURC` or `RD`) as `destinationAccount`, the swap moves that other token, which the sub account does not hold but may have been sent, from the sub account address to the wallet, one for one and without a fee; nothing is converted. Anything else returns `409 source_account_unsupported`. The `acc_` id of an external account returns `404 account_not_found`."
           },
           "destinationAccount": {
-            "$ref": "#/components/schemas/AccountKey",
-            "description": "Account the money lands on. An `FDIC_*` account the owner does not hold returns `422 account_unavailable`."
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccountKey"
+              },
+              {
+                "type": "string",
+                "pattern": "^acc_[A-Za-z0-9._:\\-]{1,216}$",
+                "examples": [
+                  "acc_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+                ]
+              }
+            ],
+            "title": "Destinationaccount",
+            "description": "Account the money lands on. An `FDIC_*` account the owner does not hold returns `422 account_unavailable`. An `acc_` id names a sub account: it takes the token it holds (USDC or RD) only from the wallet account of the same token or from another sub account of that token, and anything else, a move across tokens included, returns `409 account_destination_unsupported`."
           },
           "amount": {
             "anyOf": [
@@ -15148,12 +15400,36 @@
       "SwapPreviewRequest": {
         "properties": {
           "sourceAccount": {
-            "$ref": "#/components/schemas/AccountKey",
-            "description": "Account the money leaves. It must differ from `destinationAccount`. An `FDIC_*` account the owner does not hold returns `422 account_unavailable`."
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccountKey"
+              },
+              {
+                "type": "string",
+                "pattern": "^acc_[A-Za-z0-9._:\\-]{1,216}$",
+                "examples": [
+                  "acc_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+                ]
+              }
+            ],
+            "title": "Sourceaccount",
+            "description": "Account the money leaves. It must differ from `destinationAccount`. An `FDIC_*` account the owner does not hold returns `422 account_unavailable`. An `acc_` id names a sub account: the token it holds (USDC or RD) moves only to the wallet account of the same token (`USDC` or `RD`) or to another sub account of that token, one for one and without a fee. With a wallet account of another token (`USDC`, `EURC` or `RD`) as `destinationAccount`, the swap moves that other token, which the sub account does not hold but may have been sent, from the sub account address to the wallet, one for one and without a fee; nothing is converted. Anything else returns `409 source_account_unsupported`. The `acc_` id of an external account returns `404 account_not_found`."
           },
           "destinationAccount": {
-            "$ref": "#/components/schemas/AccountKey",
-            "description": "Account the money lands on. An `FDIC_*` account the owner does not hold returns `422 account_unavailable`."
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccountKey"
+              },
+              {
+                "type": "string",
+                "pattern": "^acc_[A-Za-z0-9._:\\-]{1,216}$",
+                "examples": [
+                  "acc_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+                ]
+              }
+            ],
+            "title": "Destinationaccount",
+            "description": "Account the money lands on. An `FDIC_*` account the owner does not hold returns `422 account_unavailable`. An `acc_` id names a sub account: it takes the token it holds (USDC or RD) only from the wallet account of the same token or from another sub account of that token, and anything else, a move across tokens included, returns `409 account_destination_unsupported`."
           },
           "amount": {
             "anyOf": [
@@ -15211,11 +15487,35 @@
       "SwapPreviewResponse": {
         "properties": {
           "sourceAccount": {
-            "$ref": "#/components/schemas/AccountKey",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccountKey"
+              },
+              {
+                "type": "string",
+                "pattern": "^acc_[A-Za-z0-9._:\\-]{1,216}$",
+                "examples": [
+                  "acc_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+                ]
+              }
+            ],
+            "title": "Sourceaccount",
             "description": "Account the money would leave."
           },
           "destinationAccount": {
-            "$ref": "#/components/schemas/AccountKey",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccountKey"
+              },
+              {
+                "type": "string",
+                "pattern": "^acc_[A-Za-z0-9._:\\-]{1,216}$",
+                "examples": [
+                  "acc_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+                ]
+              }
+            ],
+            "title": "Destinationaccount",
             "description": "Account the money would land on."
           },
           "quote": {
@@ -15350,10 +15650,18 @@
                 "$ref": "#/components/schemas/AccountKey"
               },
               {
+                "type": "string",
+                "pattern": "^acc_[A-Za-z0-9._:\\-]{1,216}$",
+                "examples": [
+                  "acc_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+                ]
+              },
+              {
                 "type": "null"
               }
             ],
-            "description": "Account the money leaves."
+            "title": "Sourceaccount",
+            "description": "Account the money leaves: an account key, or the `acc_` id of a sub account."
           },
           "destinationAccount": {
             "anyOf": [
@@ -15361,10 +15669,18 @@
                 "$ref": "#/components/schemas/AccountKey"
               },
               {
+                "type": "string",
+                "pattern": "^acc_[A-Za-z0-9._:\\-]{1,216}$",
+                "examples": [
+                  "acc_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+                ]
+              },
+              {
                 "type": "null"
               }
             ],
-            "description": "Account the money lands on."
+            "title": "Destinationaccount",
+            "description": "Account the money lands on: an account key, or the `acc_` id of a sub account."
           },
           "quote": {
             "anyOf": [
@@ -15523,11 +15839,35 @@
             "description": "Caller-supplied key that makes an identical retry return this result."
           },
           "sourceAccount": {
-            "$ref": "#/components/schemas/AccountKey",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccountKey"
+              },
+              {
+                "type": "string",
+                "pattern": "^acc_[A-Za-z0-9._:\\-]{1,216}$",
+                "examples": [
+                  "acc_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+                ]
+              }
+            ],
+            "title": "Sourceaccount",
             "description": "Account the money leaves."
           },
           "destinationAccount": {
-            "$ref": "#/components/schemas/AccountKey",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccountKey"
+              },
+              {
+                "type": "string",
+                "pattern": "^acc_[A-Za-z0-9._:\\-]{1,216}$",
+                "examples": [
+                  "acc_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+                ]
+              }
+            ],
+            "title": "Destinationaccount",
             "description": "Account the money lands on."
           },
           "quote": {
@@ -15829,7 +16169,7 @@
               }
             ],
             "title": "Accountid",
-            "description": "External account this transaction moved. Null for any other account."
+            "description": "External account or sub account this transaction moved. Null for the client's wallet."
           },
           "createdAt": {
             "type": "string",
@@ -16152,7 +16492,7 @@
               }
             ],
             "title": "Accountid",
-            "description": "External account this transaction moved. Null for any other account."
+            "description": "External account or sub account this transaction moved. Null for the client's wallet."
           },
           "createdAt": {
             "type": "string",
@@ -16480,8 +16820,8 @@
       "description": "Create and manage business or individual customer accounts."
     },
     {
-      "name": "external accounts",
-      "description": "Register addresses a client holds on supported networks to receive and pay USDC through."
+      "name": "client accounts",
+      "description": "Register addresses a client holds on supported networks, and open sub accounts of the client, to receive and pay USDC through."
     },
     {
       "name": "verification",

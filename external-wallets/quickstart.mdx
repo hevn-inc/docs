@@ -1,0 +1,332 @@
+---
+title: "Quickstart"
+description: "Create a client, register its wallet address and request a virtual account that delivers to it in the sandbox."
+---
+
+Create one client, register a wallet address for it and receive one emulated bank payin on that address in the sandbox. Start by logging in with `POST /dapi/v1/auth/challenge` and `POST /dapi/v1/auth/token`.
+
+## Before you start
+
+1. Sign up at [`https://sandbox.gethevn.com`](https://sandbox.gethevn.com).
+2. Open **Settings → Partner program → Developer** and create a developer key. Set its [IP allowlist](/developers/authentication#the-ip-allowlist) to your machine's egress address.
+3. Save the private key to `$HEVN_KEY_PEM` with mode `0600`.
+4. Ask HEVN to [enable client creation](/external-wallets/overview#access) for your sandbox account.
+5. Create a wallet on Base Sepolia whose key you hold. It stands in for your customer's wallet. Export its address as `HEVN_WALLET`.
+6. Set the environment and install the dependencies.
+
+import Env from "/snippets/env.mdx";
+import Install from "/snippets/install.mdx";
+import SandboxCaps from "/snippets/sandbox-caps.mdx";
+
+<Env />
+
+<Install />
+
+<SandboxCaps />
+
+## Steps
+
+<Steps>
+  <Step title="Log in">
+    Run the login code in [Sessions](/developers/authentication#sessions). Export `accessToken` as `HEVN_ACCESS_TOKEN`. The Python, Node and Go tabs use the [reference client](/developers/reference/client).
+  </Step>
+
+  <Step title="Create the client">
+    Call `POST /dapi/v1/clients` with the company's legal name and email. Do not send `X-Hevn-Account`.
+
+    <CodeGroup>
+
+    ```bash cURL
+    curl -s -X POST "$HEVN_API/clients" \
+      -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+      -H "Idempotency-Key: quickstart-client-1" \
+      -H "Content-Type: application/json" \
+      -d '{"name":"Example Trading LLC","email":"ops@example-trading.example","phone":"+13125550142"}'
+    ```
+
+    ```python Python
+    created = hevn.post("/clients", {
+        "name": "Example Trading LLC",
+        "email": "ops@example-trading.example",
+        "phone": "+13125550142",
+    }, idempotency_key="quickstart-client-1")
+    client = hevn.acting_as(created["id"])
+    ```
+
+    ```javascript Node
+    const created = await hevn.post("/clients", {
+      name: "Example Trading LLC",
+      email: "ops@example-trading.example",
+      phone: "+13125550142",
+    }, { idempotencyKey: "quickstart-client-1" });
+    const client = hevn.actingAs(created.id);
+    ```
+
+    ```go Go
+    created, err := api.Post("/clients", hevn.Body{
+    	"name":  "Example Trading LLC",
+    	"email": "ops@example-trading.example",
+    	"phone": "+13125550142",
+    }, hevn.IdempotencyKey("quickstart-client-1"))
+    client := api.ActingAs(created.Str("id"))
+    ```
+
+    </CodeGroup>
+
+    ```json Response 202
+    { "id": "cl_7YQ2Kf3mN8", "status": "provisioning", "name": "Example Trading LLC",
+      "kybStatus": "notStarted", "pollUrl": "/dapi/v1/client", … }
+    ```
+
+    Export the id as `HEVN_CLIENT_ID`. A retry with the same `Idempotency-Key` returns the same client. Fields: [Create a client](/api-reference/accounts/create-a-client).
+
+    | Error | Cause |
+    | --- | --- |
+    | `403 client_creation_not_enabled` | HEVN has not enabled client creation for your account. |
+    | `400 account_scope_conflict` | The request has `X-Hevn-Account`. |
+    | `409 idempotency_key_reused` | The key was used with another body. |
+  </Step>
+
+  <Step title="Register the address">
+    Call `POST /dapi/v1/client/accounts` with the client id in `X-Hevn-Account`.
+
+    <CodeGroup>
+
+    ```bash cURL
+    export HEVN_ACCOUNT_ID=$(curl -s -X POST "$HEVN_API/client/accounts" \
+      -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+      -H "X-Hevn-Account: $HEVN_CLIENT_ID" \
+      -H "Content-Type: application/json" \
+      -d "{\"chain\":\"base\",\"address\":\"$HEVN_WALLET\",\"label\":\"Treasury wallet\"}" | jq -r .accountId)
+    ```
+
+    ```python Python
+    account = client.post("/client/accounts", {
+        "chain": "base", "address": os.environ["HEVN_WALLET"], "label": "Treasury wallet",
+    })
+    ```
+
+    ```javascript Node
+    const account = await client.post("/client/accounts", {
+      chain: "base", address: process.env.HEVN_WALLET, label: "Treasury wallet",
+    });
+    ```
+
+    ```go Go
+    account, err := client.Post("/client/accounts", hevn.Body{
+    	"chain": "base", "address": os.Getenv("HEVN_WALLET"), "label": "Treasury wallet",
+    })
+    ```
+
+    </CodeGroup>
+
+    ```json Response 201
+    { "accountId": "acc_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41", "kind": "external", "asset": "USDC",
+      "chain": "base", "address": "0x8ba1f109551bD432803012645Ac136ddd64DBA72", "balance": "0.0", … }
+    ```
+
+    While HEVN reviews the client request, the call returns `404 account_not_found`. Repeat it with the same body. Rules and refusals are in [External accounts](/external-wallets/external-accounts).
+  </Step>
+
+  <Step title="Wait for the client">
+    Poll `GET /dapi/v1/client` every two seconds until `status` is `ready`.
+
+    <CodeGroup>
+
+    ```bash cURL
+    curl -s "$HEVN_API/client" \
+      -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+      -H "X-Hevn-Account: $HEVN_CLIENT_ID" | jq '{id, status, kybStatus}'
+    ```
+
+    ```python Python
+    ready = poll_until(lambda: client.get("/client"),
+                       lambda seen: seen["status"] != "provisioning")
+    ```
+
+    ```javascript Node
+    const ready = await pollUntil(() => client.get("/client"),
+      (seen) => seen.status !== "provisioning");
+    ```
+
+    ```go Go
+    ready, err := hevn.PollUntil(
+    	func() (hevn.Payload, error) { return client.Get("/client") },
+    	func(seen hevn.Payload) bool { return seen.Str("status") != "provisioning" },
+    	2*time.Minute,
+    )
+    ```
+
+    </CodeGroup>
+
+    ```json Response
+    { "id": "cl_7YQ2Kf3mN8", "status": "ready", "kybStatus": "notStarted", … }
+    ```
+
+    The statuses are in [Statuses](/developers/clients#statuses).
+  </Step>
+
+  <Step title="Verify the client">
+    Write the KYB document with `PUT /dapi/v1/client/kyb` as in [Write the document](/developers/clients#write-the-document). When it returns `ready: true`, call `POST /dapi/v1/client/kyb/complete`, then approve the application with `POST /dapi/v1/sandbox/kyb/status`.
+
+    <CodeGroup>
+
+    ```bash cURL
+    curl -s -X POST "$HEVN_API/client/kyb/complete" \
+      -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" -H "X-Hevn-Account: $HEVN_CLIENT_ID"
+
+    curl -s -X POST "$HEVN_API/sandbox/kyb/status" \
+      -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" -H "X-Hevn-Account: $HEVN_CLIENT_ID" \
+      -H "Content-Type: application/json" -d '{"status":"approved"}'
+    ```
+
+    ```python Python
+    application = client.post("/client/kyb/complete")
+    kyb = client.post("/sandbox/kyb/status", {"status": "approved"})
+    ```
+
+    ```javascript Node
+    const application = await client.post("/client/kyb/complete");
+    const kyb = await client.post("/sandbox/kyb/status", { status: "approved" });
+    ```
+
+    ```go Go
+    application, err := client.Post("/client/kyb/complete", nil)
+    kyb, err := client.Post("/sandbox/kyb/status", hevn.Body{"status": "approved"})
+    ```
+
+    </CodeGroup>
+
+    In production HEVN reviews the application ([Track the application](/developers/clients#track-the-application)).
+  </Step>
+
+  <Step title="Request a virtual account">
+    Call `POST /dapi/v1/banks` with a product and the `accountId`, then poll `GET /dapi/v1/banks/{product}` with the same `accountId` until `status` is `active`.
+
+    <CodeGroup>
+
+    ```bash cURL
+    curl -s -X POST "$HEVN_API/banks" \
+      -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" -H "X-Hevn-Account: $HEVN_CLIENT_ID" \
+      -H "Content-Type: application/json" \
+      -d "{\"product\":\"us\",\"accountId\":\"$HEVN_ACCOUNT_ID\"}"
+
+    export HEVN_BANK_ID=$(curl -s "$HEVN_API/banks/us?accountId=$HEVN_ACCOUNT_ID" \
+      -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" -H "X-Hevn-Account: $HEVN_CLIENT_ID" | jq -r .id)
+    ```
+
+    ```python Python
+    client.post("/banks", {"product": "us", "accountId": account["accountId"]})
+    bank = poll_until(lambda: client.get("/banks/us", {"accountId": account["accountId"]}),
+                      lambda seen: seen.get("status") != "preparing")
+    ```
+
+    ```javascript Node
+    await client.post("/banks", { product: "us", accountId: account.accountId });
+    const bank = await pollUntil(() => client.get("/banks/us", { accountId: account.accountId }),
+      (seen) => seen.status !== "preparing");
+    ```
+
+    ```go Go
+    _, err = client.Post("/banks", hevn.Body{"product": "us", "accountId": account.Str("accountId")})
+    bank, err := hevn.PollUntil(
+    	func() (hevn.Payload, error) {
+    		return client.Get("/banks/us", hevn.Query{"accountId": account.Str("accountId")})
+    	},
+    	func(seen hevn.Payload) bool { return seen.Str("status") != "preparing" },
+    	2*time.Minute,
+    )
+    ```
+
+    </CodeGroup>
+
+    ```json Response
+    { "product": "us", "status": "active", "id": "bnk_5Hq2…", "accountId": "acc_9f2c…",
+      "requisites": { … }, "blockers": [], … }
+    ```
+
+    While `status` is `preparing`, read `blockers[]` ([What still blocks it](/developers/virtual-accounts#what-still-blocks-it)). A product that cannot deliver to the address returns `409 account_destination_unsupported`.
+  </Step>
+
+  <Step title="Emulate a bank payin">
+    Call [`POST /dapi/v1/sandbox/deposits`](/developers/sandbox#mint-money) with the `bankId`. Do not send `accountId` or `token`.
+
+    <CodeGroup>
+
+    ```bash cURL
+    curl -s -X POST "$HEVN_API/sandbox/deposits" \
+      -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" -H "X-Hevn-Account: $HEVN_CLIENT_ID" \
+      -H "Idempotency-Key: quickstart-wire-1" -H "Content-Type: application/json" \
+      -d "{\"amount\":\"1.00\",\"bankId\":\"$HEVN_BANK_ID\",\"remitter\":\"Payer Inc\"}"
+    ```
+
+    ```python Python
+    credit = client.post("/sandbox/deposits",
+                         {"amount": "1.00", "bankId": bank["id"], "remitter": "Payer Inc"},
+                         idempotency_key="quickstart-wire-1")
+    ```
+
+    ```javascript Node
+    const credit = await client.post("/sandbox/deposits",
+      { amount: "1.00", bankId: bank.id, remitter: "Payer Inc" },
+      { idempotencyKey: "quickstart-wire-1" });
+    ```
+
+    ```go Go
+    credit, err := client.Post("/sandbox/deposits",
+    	hevn.Body{"amount": "1.00", "bankId": bank.Str("id"), "remitter": "Payer Inc"},
+    	hevn.IdempotencyKey("quickstart-wire-1"))
+    ```
+
+    </CodeGroup>
+
+    ```json Response: 200
+    { "depositId": "sbx_…", "status": "settled", "token": "USDC", "amount": "1.00", "currency": "USD",
+      "accountId": "acc_9f2c…", "txHash": "0x08fa…", "transactionId": "txn_9e4…", … }
+    ```
+
+    On `202`, repeat the request with the same `Idempotency-Key`. The testnet USDC is sent to `$HEVN_WALLET`.
+  </Step>
+
+  <Step title="Read the ledger and balance">
+    Call `GET /dapi/v1/transactions` with `accountId`, then `GET /dapi/v1/client/accounts/{accountId}`.
+
+    <CodeGroup>
+
+    ```bash cURL
+    curl -s "$HEVN_API/transactions?accountId=$HEVN_ACCOUNT_ID&limit=5" \
+      -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" -H "X-Hevn-Account: $HEVN_CLIENT_ID" \
+      | jq '.items[] | {id, status, isIncome, accountId, to}'
+
+    curl -s "$HEVN_API/client/accounts/$HEVN_ACCOUNT_ID" \
+      -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" -H "X-Hevn-Account: $HEVN_CLIENT_ID" \
+      | jq '{balance, syncedAt}'
+    ```
+
+    ```python Python
+    rows = client.get("/transactions", {"accountId": account["accountId"], "limit": 5})["items"]
+    seen = client.get(f"/client/accounts/{account['accountId']}")
+    print(seen["balance"], seen.get("syncedAt"))
+    ```
+
+    ```javascript Node
+    const { items: rows } = await client.get("/transactions", { accountId: account.accountId, limit: 5 });
+    const seen = await client.get(`/client/accounts/${account.accountId}`);
+    console.log(seen.balance, seen.syncedAt);
+    ```
+
+    ```go Go
+    page, err := client.Get("/transactions", hevn.Query{"accountId": account.Str("accountId"), "limit": "5"})
+    seen, err := client.Get("/client/accounts/" + account.Str("accountId"))
+    fmt.Println(seen.Str("balance"), seen.Str("syncedAt"))
+    ```
+
+    </CodeGroup>
+
+    `balance` is refreshed when the stored value is older than a minute. `GET /dapi/v1/client/balance` has no row for the account.
+  </Step>
+</Steps>
+
+To pay out from the address, fund it with testnet USDC and follow [Payouts](/external-wallets/money-movement#payouts). The sandbox faucet route does not credit an external account.
+
+<Card title="Next: External accounts" icon="wallet" href="/external-wallets/external-accounts" />
