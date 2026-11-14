@@ -63,7 +63,7 @@ HEVN also reviews each `POST /dapi/v1/clients` request, unless your integrator a
 | Register the address | `POST /dapi/v1/client/accounts` | [External accounts](/external-wallets/external-accounts) |
 | Verify the client | `PUT /dapi/v1/client/kyb`, then `POST /dapi/v1/client/kyb/complete` | [Clients and verification](/developers/clients#write-the-document) |
 | Take money in | `POST /dapi/v1/banks` with `accountId`, `POST /dapi/v1/payins` with `destinationAccount` and `refundAddress` | [Money movement](/external-wallets/money-movement) |
-| Pay money out | `POST /dapi/v1/contacts`, `POST /dapi/v1/payouts` with `sourceAccount`, then the wallet's transfer | [Money movement](/external-wallets/money-movement#payouts) |
+| Pay money out | `POST /dapi/v1/contacts`, `POST /dapi/v1/payouts` with `sourceAccount` and, for a bank contact, `bankId`, then the wallet's transfer | [Money movement](/external-wallets/money-movement#payouts) |
 | Read balance and ledger | `GET /dapi/v1/client/accounts`, `GET /dapi/v1/transactions` with `accountId` | [Balance and ledger](/external-wallets/money-movement#balance-and-ledger) |
 
 <Card title="Next: Quickstart" icon="rocket" href="/external-wallets/quickstart" />

@@ -159,7 +159,7 @@ import SignPayloadSnippet from "/snippets/sign-payload.mdx";
 An approval is single-use and ends at `approval.expiresAt`. The windows are in [Routes](#routes).
 
 - Run the steps in one pass. A payload queued for a person to approve later expires.
-- To re-open, call the prepare route again with the same `Idempotency-Key`. While the payment has not moved, it returns an approval on the same booked payment, at the same price. A replay while the approval is still open returns the same approval and the same operation. A payout that already moved comes back with no `approval`.
+- To re-open, call the prepare route again with the same `Idempotency-Key`. While the payment has not moved, it returns an approval on the same booked payment, at the same price. A replay while the approval is still open returns the same approval and the same operation. A payout or swap that already moved, failed or expired comes back as it stands with no `approval` to sign.
 - Re-opening has no attempt limit. Each new approval uses the same on-chain slot. See [Why a retry cannot pay twice](/developers/conventions#why-a-retry-cannot-pay-twice).
 
 ## Retrying a confirm
@@ -170,13 +170,14 @@ The first confirm with a valid signature uses the approval. A second confirm on 
 | --- | --- | --- |
 | `200` `status: "settled"` | Done | Store `transactionHash`. |
 | `200` `status: "failed"` | The operation reverted on chain. | Book a new payment with a new `Idempotency-Key`. A re-open of this one returns `payment_slot_consumed`. |
-| `202` `status: "submitted"` | Sent, no receipt yet | Read `pollUrl` until `status` is `settled` or `failed`. |
+| `202` `status: "submitted"` | Sent, no receipt yet. The approval is used. | Read `pollUrl` until `status` is `settled` or `failed`. Do not confirm again. |
 | Timeout or network error | Unknown | Read the payout or swap. If `status` is `awaitingSignature`, re-open with the same `Idempotency-Key`. |
-| `503` `user_operation_rejected` or `user_operation_unavailable` | The operation was not accepted, or its state could not be read. | As for a timeout. |
+| `503` `user_operation_rejected` or `user_operation_unavailable` | The operation was not accepted, or its state could not be read. `details.reason` is `network_unavailable` when the network could not be reached. | As for a timeout. The same call with the same key is safe to repeat. |
 | `503` `bundler_rejected` or `bundler_unavailable` | An escrow action was rejected, or the chain was unreachable. | Confirm the escrow action again with backoff. |
 | `409` `funding_attempt_expired` (payout with `debit`), `410` `approval_expired` (payout with `intent`), `409` `swap_not_confirmable` (swap) | No open approval: it expired, or a confirm already used it. | As for a timeout. |
 | `409` `funding_in_progress` | An attempt is live. | Wait, then send the same call again. |
-| `409` `already_funded` | A swap re-open found that the money moved. | Success. Read `details.transactionHash`. |
+| `409` `already_funded` | The money already moved. | Success. Read `details.transactionHash`. |
+| `200` from the prepare route with no `approval` | A re-open found that the payout or swap already moved, failed or expired. | Read `status`. There is no approval to sign. |
 | `409` `payment_slot_consumed` | An operation for this payment already landed or reverted. | Stop re-opening. Read the payout and book a new one if it is `failed`. |
 | `400` `signature_invalid` | Wrong bytes, wrong encoding, or a key that is not on your account. The approval stays usable. | Fix the signing and confirm again. |
 

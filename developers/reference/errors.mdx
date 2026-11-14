@@ -21,6 +21,8 @@ An error from `/dapi/v1` is a JSON envelope with a stable `code`. Branch on `err
 | `message` | One sentence to log or show an operator. The wording can change. |
 | `details` | camelCase data for the slug. Includes `requestId` on a `5xx`. Omitted when empty. |
 
+`message` and `details` contain no network address. A URL in either is replaced with `[address removed]`.
+
 Each response has an `X-Request-ID` header. Log it and quote it to support. The [HTTP client](/developers/reference/client) maps the envelope to a typed error.
 
 ## Field errors
@@ -80,10 +82,10 @@ A slug marked "Reserved" is in the published enum, but the API does not return i
 | `invalid_cursor` | 400 | The cursor is from another query or sort. Restart without `cursor`. |
 | `invalid_id` | 400 | The id has the wrong prefix. See `details.expectedPrefix`. |
 | `idempotency_key_invalid` | 400 | The header breaks the [key format](/developers/conventions#idempotency-key). |
-| `idempotency_key_reused` | 409 | The key was used with different terms, for example another `sourceAccount` or `accountId`. `details` has the `payoutId` or `escrowId`. |
+| `idempotency_key_reused` | 409 | The key was used with different terms, for example another `sourceAccount`, `bankId` or `accountId`. `details` has the `payoutId`, `swapId`, `escrowId` or `depositId`. |
 | `unauthenticated` | 401 | The bearer token is missing, invalid or expired. |
 | `token_expired` | 401 | Reserved. An expired token returns `unauthenticated`. |
-| `provider_unavailable` | 503 | The partner bank or sandbox faucet is unavailable. |
+| `provider_unavailable` | 503 | The partner bank or sandbox faucet is unavailable, or the sandbox could not read a balance. With `details.retryable: true`, send the same call again. |
 | `database_unavailable` | 503 | Reserved. |
 
 ## Authentication and signing
@@ -178,7 +180,7 @@ Contact, payout booking and swap routes return these slugs. Confirm errors are u
 | `quote_expired` | 410 | The price expired. Book again with the same `Idempotency-Key`. |
 | `swap_not_found` | 404 | Unknown swap id for this client. |
 | `swap_route_unavailable` | 422 | The sandbox does not serve a swap between two account keys. |
-| `swap_not_confirmable` | 409 | The swap awaits no signature. Read the swap. |
+| `swap_not_confirmable` | 409 | The swap awaits no signature: its approval was used by an earlier confirm, or expired. Read the swap. |
 | `intent_not_signable` | 409 | Reserved. The quote is not signed by intent. |
 
 `payout_not_fundable` with `details.reason` `holder_signature_unsupported` means the holder cannot approve an `FDIC_USD` payout in the sign-in window. A contact on another chain or token without routing returns `409 payout_not_fundable`.
@@ -202,6 +204,8 @@ Contact, payout booking and swap routes return these slugs. Confirm errors are u
 | `refund_address_required` | 422 | A payin to an external account was sent without `refundAddress`. |
 | `safe_mode_required` | 409 | A sub account was requested on an account whose wallet is not protected by co-signing. |
 | `account_archive_unsupported` | 409 | `DELETE` was called on a sub account. A sub account cannot be archived. |
+| `payout_bank_required` | 422 | A payout to a bank contact was sent without `bankId`. Required for each `sourceAccount` except `FDIC_USD` ([Virtual account of a payout](/developers/payouts#virtual-account-of-a-payout)). |
+| `payout_bank_mismatch` | 409 | The virtual account in `bankId` was not opened on the account in `sourceAccount`. |
 
 A sub account requested for a client returns `403 account_not_controlled` ([Acting as a client](#acting-as-a-client)). `POST /dapi/v1/payouts/{payoutId}/confirm` on a payout with `authorization: "wallet"` returns `400 invalid_request` with `details.reason = "funded_by_wallet_transfer"`.
 
@@ -234,7 +238,7 @@ An `accountId` with another prefix returns `400 invalid_id`. A `sourceAccount` o
 
 ## Funding a payment
 
-`POST /dapi/v1/payouts/{payoutId}/confirm` returns these slugs. The sandbox settlement routes also return `quote_not_submitted` and `payout_not_fundable`. See [Retrying a confirm](/developers/signing#retrying-a-confirm).
+`POST /dapi/v1/payouts/{payoutId}/confirm` and `POST /dapi/v1/swaps/{swapId}/confirm` return these slugs, and so can the calls that prepare a payout or swap. The sandbox settlement routes also return `quote_not_submitted` and `payout_not_fundable`. See [Retrying a confirm](/developers/signing#retrying-a-confirm).
 
 | Slug | Status | Cause |
 | --- | --- | --- |
@@ -252,7 +256,7 @@ An `accountId` with another prefix returns `400 invalid_id`. A `sourceAccount` o
 | `smart_wallet_not_deployed` | 409 | The client's wallet is not on chain yet. Wait for `status: "ready"`. |
 | `wallet_owner_unverified` | 409 | The wallet's owner set lacks the signer. Contact support. |
 | `user_operation_rejected` | 503 | The bundler rejected the operation. Confirm again. |
-| `user_operation_unavailable` | 503 | The bundler or paymaster is unavailable. Confirm again. |
+| `user_operation_unavailable` | 503 | The bundler or paymaster is unavailable. `details.reason` is `network_unavailable` when the network could not be reached. Send the same call again with the same `Idempotency-Key`, or confirm again. |
 
 ## KYB and documents
 
@@ -300,6 +304,7 @@ Values are in [Sandbox limits](/developers/sandbox#limits).
 | Slug | Status | Cause |
 | --- | --- | --- |
 | `sandbox_amount_limit_exceeded` | 422 | `details.operation` is above `details.maximum`. |
-| `sandbox_faucet_balance_too_high` | 409 | The wallet holds `details.threshold` or more. Spend first. |
+| `sandbox_faucet_balance_too_high` | 409 | The main wallet and its sub accounts together hold `details.threshold` or more of `details.token`. `details.balance` is that total. Spend first. |
+| `sandbox_account_limit_exceeded` | 409 | The account has the maximum number of sub accounts the sandbox allows. No `details`. |
 
 <Card title="Next: HTTP client" icon="arrow-right" href="/developers/reference/client" />

@@ -654,7 +654,7 @@
           "client accounts"
         ],
         "summary": "List accounts",
-        "description": "Every active external account and sub account of the client selected by `X-Hevn-Account`, oldest first; `kind` tells them apart. An external account is an address the client holds on one of the supported networks; it holds USDC only, and HEVN keeps no transaction history for it beyond the transfers HEVN itself arranges. A sub account is a further wallet of the client on Base that HEVN opened: it holds one token (`asset`: USDC or RD), has its own ledger, and is spent with your developer key like the client's wallet.",
+        "description": "Every active external account and sub account of the client selected by `X-Hevn-Account`, oldest first; `kind` tells them apart. An external account is an address the client holds on one of the supported networks; it holds USDC only, and HEVN keeps no transaction history for it beyond the transfers HEVN itself arranges. A sub account is a further wallet of your own account on Base that HEVN opened: it holds one token (`asset`: USDC or RD), has its own ledger, and is spent with your developer key like the account's wallet. Only your own account has sub accounts.",
         "operationId": "list_accounts_client_accounts_get",
         "security": [
           {
@@ -3200,7 +3200,7 @@
           "virtual accounts"
         ],
         "summary": "List virtual accounts and available payment methods",
-        "description": "List the products this client can request, requested or not, and the virtual accounts already requested. A product no rail serves for this client is absent. Records that were closed or refused are omitted.",
+        "description": "List the products this client can request, requested or not, and the virtual accounts already requested, on the client's wallet and on its external and sub accounts. A product no rail serves for this client is absent. Records that were closed or refused are omitted. With `accountId` the list is narrowed to the virtual accounts opened on that external account or sub account: every record has `opened: true` and that `accountId`, products not requested on it are not listed, and an account with none answers an empty list. An unknown or foreign `accountId` returns `404 account_not_found`, as on `GET /dapi/v1/banks/{product}`.",
         "operationId": "list_rails_banks_get",
         "security": [
           {
@@ -3208,6 +3208,28 @@
           }
         ],
         "parameters": [
+          {
+            "name": "accountId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^(?:acc_)?[A-Za-z0-9._:\\-]{1,216}$",
+                  "examples": [
+                    "acc_9f2c1ab84d7e4f1fa3c65b0e7d9a2c41"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "External account or sub account (`acc_`) the virtual account delivers to. On a single read, omit it for the client's wallet. On the list, it narrows the list to that account; omit it for the full list.",
+              "title": "Accountid"
+            },
+            "description": "External account or sub account (`acc_`) the virtual account delivers to. On a single read, omit it for the client's wallet. On the list, it narrows the list to that account; omit it for the full list."
+          },
           {
             "name": "X-Hevn-Account",
             "in": "header",
@@ -3387,10 +3409,10 @@
                   "type": "null"
                 }
               ],
-              "description": "External account or sub account whose receiving account to read. Omit it for the client's wallet.",
+              "description": "External account or sub account (`acc_`) the virtual account delivers to. On a single read, omit it for the client's wallet. On the list, it narrows the list to that account; omit it for the full list.",
               "title": "Accountid"
             },
-            "description": "External account or sub account whose receiving account to read. Omit it for the client's wallet."
+            "description": "External account or sub account (`acc_`) the virtual account delivers to. On a single read, omit it for the client's wallet. On the list, it narrows the list to that account; omit it for the full list."
           },
           {
             "name": "X-Hevn-Account",
@@ -4001,10 +4023,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Only the transactions of this external account (`acc_` id). External-account income is left out of the summary unless this filter names it.",
+              "description": "Only the transactions of this external account or sub account (`acc_` id). External-account income is left out of the summary unless this filter names it.",
               "title": "Accountid"
             },
-            "description": "Only the transactions of this external account (`acc_` id). External-account income is left out of the summary unless this filter names it."
+            "description": "Only the transactions of this external account or sub account (`acc_` id). External-account income is left out of the summary unless this filter names it."
           },
           {
             "name": "incomeOnly",
@@ -4261,10 +4283,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Only the transactions of this external account (`acc_` id). External-account income is left out of the summary unless this filter names it.",
+              "description": "Only the transactions of this external account or sub account (`acc_` id). External-account income is left out of the summary unless this filter names it.",
               "title": "Accountid"
             },
-            "description": "Only the transactions of this external account (`acc_` id). External-account income is left out of the summary unless this filter names it."
+            "description": "Only the transactions of this external account or sub account (`acc_` id). External-account income is left out of the summary unless this filter names it."
           },
           {
             "name": "incomeOnly",
@@ -4539,10 +4561,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Only the transactions of this external account (`acc_` id). External-account income is left out of the summary unless this filter names it.",
+              "description": "Only the transactions of this external account or sub account (`acc_` id). External-account income is left out of the summary unless this filter names it.",
               "title": "Accountid"
             },
-            "description": "Only the transactions of this external account (`acc_` id). External-account income is left out of the summary unless this filter names it."
+            "description": "Only the transactions of this external account or sub account (`acc_` id). External-account income is left out of the summary unless this filter names it."
           },
           {
             "name": "incomeOnly",
@@ -4915,7 +4937,7 @@
           "sandbox"
         ],
         "summary": "Emulate an incoming deposit: an account transfer with bankId, a token transfer without",
-        "description": "With `bankId`, books an unquoted payin to that virtual account at a fixed rate. Without it, sends a faucet transfer of `token` to the client's wallet. A `202` means the transfer is unconfirmed. Repeat the same request until `status` is `settled`, and the amount is credited once. An identical request without `Idempotency-Key` replays the first credit.",
+        "description": "With `bankId`, books an unquoted payin to that virtual account at a fixed rate. Without it, sends a faucet transfer of `token` to the client's wallet, or to the sub account in `accountId`. A `202` means the transfer is unconfirmed. Repeat the same request until `status` is `settled`, and the amount is credited once. An identical request without `Idempotency-Key` replays the first credit.",
         "operationId": "credit_deposit_sandbox_deposits_post",
         "security": [
           {
@@ -5133,7 +5155,7 @@
           "sandbox"
         ],
         "summary": "Move an emulated outgoing transfer to its next reported status",
-        "description": "`submitted`, `settled` and `refunded` need a funded payout, otherwise the call returns `409 payout_not_fundable`. `failed` does not return the debited amount. `refunded` returns the source token to the client's wallet, and the call returns `202` until that transfer lands, so repeat it until it returns `200`. A backward move returns `409 conflict`.",
+        "description": "`submitted`, `settled` and `refunded` need a funded payout, otherwise the call returns `409 payout_not_fundable`. `failed` does not return the debited amount. `refunded` returns the source token to the account that funded the payout, and the call returns `202` until that transfer lands, so repeat it until it returns `200`. A backward move returns `409 conflict`.",
         "operationId": "set_payout_status_sandbox_payouts__payoutId__status_post",
         "security": [
           {
@@ -6189,7 +6211,7 @@
           },
           "kind": {
             "$ref": "#/components/schemas/ClientAccountKind",
-            "description": "`external`: an address the client holds and signs for itself. `sub`: a further wallet of the client that HEVN opened, spent with your developer key."
+            "description": "`external`: an address the client holds and signs for itself. `sub`: a further wallet of your own account that HEVN opened, spent with your developer key."
           },
           "asset": {
             "type": "string",
@@ -6706,7 +6728,7 @@
             "type": "string",
             "const": "sub",
             "title": "Kind",
-            "description": "`sub`: a further wallet of the client that HEVN opens on Base. It holds one token, chosen with `asset`, and is spent with your developer key exactly like the client's wallet."
+            "description": "`sub`: a further wallet of your own account that HEVN opens on Base. It holds one token, chosen with `asset`, and is spent with your developer key exactly like the account's wallet."
           },
           "asset": {
             "type": "string",
@@ -6729,7 +6751,7 @@
               }
             ],
             "title": "Label",
-            "description": "Name shown for this account. A create that repeats the label and the `asset` of a sub account the client already has returns that account instead of opening another; the same label with another `asset` opens a new account."
+            "description": "Name shown for this account. A create that repeats the label and the `asset` of a sub account the account already has returns that account instead of opening another; the same label with another `asset` opens a new account."
           }
         },
         "additionalProperties": false,
@@ -10124,7 +10146,7 @@
               }
             ],
             "title": "Publickey",
-            "description": "Base64 DER SubjectPublicKeyInfo of the registered P-256 developer key that signs a payout from your account. Without it that payout returns `422 validation_failed` with `details.field: publicKey`. Not used when the client signs or `sourceAccount` is an `acc_` id."
+            "description": "Base64 DER SubjectPublicKeyInfo of the registered P-256 developer key that signs a payout from your account, from its wallet or from a sub account. Without it that payout returns `422 validation_failed` with `details.field: publicKey`. Not used when the client signs or `sourceAccount` is an external account."
           },
           "paymentReference": {
             "anyOf": [
@@ -10179,7 +10201,7 @@
               }
             ],
             "title": "Bankid",
-            "description": "Client account (`bnk_`) to pay through, from `options[].bankId` of the contact's capabilities. Omit it to let HEVN pick an active one for the contact's currency. An inactive or unknown id returns `400`."
+            "description": "Client account (`bnk_`) to pay through. For a payout from the wallet, take it from `options[].bankId` of the contact's capabilities; for an `acc_` source, from `GET /dapi/v1/banks?accountId=`. Required for a fiat payout, whatever `sourceAccount` is: without it the request returns `422 payout_bank_required`. The only exception is `sourceAccount: FDIC_USD`, which already names the client account holding that balance. It must have been opened on `sourceAccount` (`409 payout_bank_mismatch` otherwise). An inactive or unknown id returns `400`. Not used for an on-chain or email contact."
           },
           "sourceAccount": {
             "anyOf": [
@@ -10953,6 +10975,7 @@
           "intent_not_signable",
           "sandbox_amount_limit_exceeded",
           "sandbox_faucet_balance_too_high",
+          "sandbox_account_limit_exceeded",
           "account_address_taken",
           "account_address_refused",
           "account_not_spendable",
@@ -10962,7 +10985,9 @@
           "account_spend_forbidden",
           "refund_address_required",
           "safe_mode_required",
-          "account_archive_unsupported"
+          "account_archive_unsupported",
+          "payout_bank_required",
+          "payout_bank_mismatch"
         ],
         "title": "PlatformErrorCode"
       },
@@ -13802,7 +13827,7 @@
             },
             "type": "array",
             "title": "Rails",
-            "description": "One record per product this client can request, requested or not, plus records opened on external accounts. A product no rail serves for this client is absent."
+            "description": "One record per product this client can request, requested or not, plus records opened on external and sub accounts. A product no rail serves for this client is absent. With `accountId`, only the records opened on that account."
           }
         },
         "type": "object",
@@ -14977,7 +15002,7 @@
                 "type": "null"
               }
             ],
-            "description": "Token for a faucet transfer to the client's wallet on Base. Defaults to `USDC`, or to the token the sub account in `accountId` holds. Omit it with `bankId`, which sets the token."
+            "description": "Token for a faucet transfer on Base, to the client's wallet or to the sub account in `accountId`. Defaults to `USDC`, or to the token that sub account holds. Omit it with `bankId`, which sets the token."
           },
           "accountId": {
             "anyOf": [
@@ -15831,7 +15856,7 @@
           },
           "status": {
             "$ref": "#/components/schemas/SwapState",
-            "description": "`awaitingSignature` on create."
+            "description": "`awaitingSignature` on create. A retry with the same `Idempotency-Key` of a swap that is no longer awaiting its signature answers its current status with nothing to sign: `submitted` or `settled` once its funding left, `failed` when it failed or expired unfunded."
           },
           "idempotencyKey": {
             "type": "string",
@@ -15875,12 +15900,26 @@
             "description": "Price, fee and conversion terms fixed for this swap."
           },
           "authorization": {
-            "$ref": "#/components/schemas/AuthorizationKind",
-            "description": "`debit`: the approval covers a transfer of tokens from the wallet that funds the swap, and `debit` is set. `intent`: the approval covers a signature over the swap's terms that the swap settles against, and `intent` is set."
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AuthorizationKind"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "`debit`: the approval covers a transfer of tokens from the wallet that funds the swap, and `debit` is set. `intent`: the approval covers a signature over the swap's terms that the swap settles against, and `intent` is set. Absent, together with `approval`, on a retry of a swap that is no longer awaiting its signature."
           },
           "approval": {
-            "$ref": "#/components/schemas/ApprovalView",
-            "description": "Authorization to sign with the developer key before settlement."
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApprovalView"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Authorization to sign with the developer key before settlement. Absent on a retry of a swap that is no longer awaiting its signature: `debit` and `intent` are absent too and there is nothing to confirm."
           },
           "debit": {
             "anyOf": [
@@ -15913,8 +15952,7 @@
           "sourceAccount",
           "destinationAccount",
           "quote",
-          "authorization",
-          "approval"
+          "authorization"
         ],
         "title": "SwapResponse"
       },
@@ -16821,7 +16859,7 @@
     },
     {
       "name": "client accounts",
-      "description": "Register addresses a client holds on supported networks, and open sub accounts of the client, to receive and pay USDC through."
+      "description": "Register addresses a client holds on supported networks to receive and pay USDC through, and open sub accounts of your own account that hold USDC or RD."
     },
     {
       "name": "verification",

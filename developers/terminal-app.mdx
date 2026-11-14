@@ -1,0 +1,82 @@
+---
+title: "Terminal app"
+description: "Run a full-screen terminal app for your own HEVN account, built on the Node client."
+---
+
+The terminal app is a full-screen app for your own integrator account, built on the Node client in [hevn-inc/dapi-sdk](https://github.com/hevn-inc/dapi-sdk). Run it from the `cli/` directory of that repository with `npm start`.
+
+It reads balances, sub accounts, contacts, virtual accounts and the ledger, and it books payouts, moves and swaps that your developer key signs. Like the Node client, it is unsupported ([HTTP client](/developers/reference/client)).
+
+## Scope
+
+The app operates the account the developer key belongs to: its main wallet and its [sub accounts](/sub-accounts/overview).
+
+| The app does | The app does not |
+| --- | --- |
+| Open sub accounts and request virtual accounts for your account | Create or link clients |
+| Save contacts and pay them from the main wallet or a sub account | Submit verification |
+| Move and swap between your accounts | Act for a client with `X-Hevn-Account` |
+| Price a payin and list and export transactions | Operate escrow |
+
+## Run
+
+```bash
+git clone https://github.com/hevn-inc/dapi-sdk
+cd dapi-sdk/cli
+npm install
+export HEVN_KEY_PEM=./hevn-sandbox.pem HEVN_EMAIL=you@example.com
+npm start
+```
+
+The app needs Node 22.18 or newer and an interactive terminal. It has no build step.
+
+| Command | Result |
+| --- | --- |
+| `npm start` | Starts the app with the variables of the process environment. |
+| `npm start -- --env-file ../.env` | Reads the variables from the file you name. An unknown option stops the app. |
+| `npm run preview` | Runs the app on a built-in demo account, with no key and no network. |
+
+## Environment
+
+| Variable | Meaning |
+| --- | --- |
+| `HEVN_KEY_PEM` | The developer key: the PEM text or a path to its file. The app does not write or print it. |
+| `HEVN_EMAIL` | The email of the account the key belongs to. |
+| `HEVN_ENV` | `sandbox` (the default) or `production`. Another value stops the app before it starts. |
+| `HEVN_API_URL` | Optional. Another deployment of the API. |
+| `NO_COLOR` | Turns colors off. |
+| `HEVN_NO_MOTION` | Turns the splash and animations off, as `--no-motion` does. |
+| `HEVN_ASCII` | Forces ASCII borders and glyphs. |
+
+A value set in the process environment wins over the file named by `--env-file`. No file is loaded from the working directory unless you name it.
+
+The header shows the API host and the environment: a `sandbox` mark, or a red production banner. The production API host counts as production whatever `HEVN_ENV` is.
+
+<Warning>
+  With `HEVN_ENV=production` the app moves real money. Check the header before you sign.
+</Warning>
+
+## Signing
+
+Each payout, move and swap opens a prompt with the source account and its address, the destination, the amount and token, the fee ceiling and the minimum received. `Esc` cancels. `Enter` signs in the sandbox. In production you press `y`, or type the amount when the debit is not exact.
+
+| Payment | Checked before the key signs |
+| --- | --- |
+| A payout from a sub account, a move, or a payout to a Base address in the same token | The operation itself: the typed amount of the source token, from the source address, to the address shown ([Debit contents](/developers/signing#debit-contents)) |
+| Another payout from the main wallet, or a swap | The order is bound to your wallet, and `quote` matches the typed amount, the fee ceiling and the minimum received |
+
+A payout to a bank contact is sent through a virtual account of the paying account, and the app sends its `bankId` ([Virtual account of a payout](/developers/payouts#virtual-account-of-a-payout)). With no such virtual account, the app stops before the review and offers to request one.
+
+Each action has one `Idempotency-Key`, kept for its retries. Once a signature is posted, the app offers a retry with the same key or the ledger, until the payment has a final status ([Retrying a confirm](/developers/signing#retrying-a-confirm)).
+
+## Sandbox tools
+
+In the sandbox the app adds three tools. They call the routes in [Sandbox](/developers/sandbox).
+
+| Tool | Route |
+| --- | --- |
+| Faucet credit to the main wallet or a sub account | `POST /dapi/v1/sandbox/deposits` without `bankId` |
+| Emulated bank transfer to a virtual account | `POST /dapi/v1/sandbox/deposits` with `bankId` |
+| Verification of your own account | `POST /dapi/v1/sandbox/kyb/status` ([Verify your own account](/developers/sandbox#verify-your-own-account)) |
+
+<Card title="Next: Sub accounts" icon="arrow-right" href="/sub-accounts/overview" />

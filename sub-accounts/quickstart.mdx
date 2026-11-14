@@ -124,7 +124,7 @@ The Python, Node and Go tabs use the [reference client](/developers/reference/cl
       "accountId": "acc_9f2c…", "requisites": { … }, "blockers": [], … }
     ```
 
-    While `status` is `preparing`, `blockers[]` lists what is pending ([What still blocks it](/developers/virtual-accounts#what-still-blocks-it)). The sandbox accepts `us` and `swift` for a sub account. Fields: [Request a receiving account for a product](/api-reference/virtual-accounts/request-a-receiving-account-for-a-product).
+    While `status` is `preparing`, `blockers[]` lists what is pending ([What still blocks it](/developers/virtual-accounts#what-still-blocks-it)). A new sandbox account is unverified, so [verify your own account](/developers/sandbox#verify-your-own-account) to clear the blocker. The sandbox accepts `us` and `swift` for a sub account. Fields: [Request a receiving account for a product](/api-reference/virtual-accounts/request-a-receiving-account-for-a-product).
   </Step>
 
   <Step title="Fund the sub account">
@@ -166,7 +166,7 @@ The Python, Node and Go tabs use the [reference client](/developers/reference/cl
       "txHash": "0x08fa…", "transactionId": "txn_9e4…", … }
     ```
 
-    On `202`, repeat the same request until `status` is `settled`. To emulate a bank transfer to an `active` virtual account, send `{"amount":"1.00","bankId":"bnk_88Hq3T"}` and omit `accountId`. Fields: [Emulate an incoming deposit](/api-reference/sandbox/emulate-an-incoming-deposit:-an-account-transfer-with-bankid-a-token-transfer-without).
+    On `202`, repeat the same request until `status` is `settled`. The faucet returns `409 sandbox_faucet_balance_too_high` while your main wallet and sub accounts together hold `1` USDC or more. To emulate a bank transfer to an `active` virtual account, send `{"amount":"1.00","bankId":"bnk_88Hq3T"}` and omit `accountId`. Fields: [Emulate an incoming deposit](/api-reference/sandbox/emulate-an-incoming-deposit:-an-account-transfer-with-bankid-a-token-transfer-without).
   </Step>
 
   <Step title="Read the balance">
@@ -207,7 +207,7 @@ The Python, Node and Go tabs use the [reference client](/developers/reference/cl
   </Step>
 
   <Step title="Book a payout from it">
-    Save a USDC contact on Base with `POST /dapi/v1/contacts`, then call `POST /dapi/v1/payouts` with the sub account as `sourceAccount`. Use a Base Sepolia address you hold.
+    Save a USDC contact on Base with `POST /dapi/v1/contacts`, then call `POST /dapi/v1/payouts` with the sub account as `sourceAccount`. Use a Base Sepolia address you hold. A wallet contact takes no `bankId`. A bank contact needs the `id` of the sub account's virtual account as `bankId` ([Payouts](/sub-accounts/money-movement#payouts)).
 
     <CodeGroup>
 

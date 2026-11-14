@@ -88,6 +88,7 @@ client.Post("/payouts", payout, hevn.IdempotencyKey(key))
 | Case | Result |
 | --- | --- |
 | Same key, same request | `200` with `Idempotency-Replayed: true` and the first resource |
+| Same key, after a payout or swap has moved, failed or expired | `200` with the resource as it stands and no `approval`. Read it. There is no approval to sign. |
 | Same key, different body | `409 idempotency_key_reused`. `details` names the key's resource. |
 | Malformed key | `400 idempotency_key_invalid` |
 | No key | HEVN derives one from the request and returns it as `idempotencyKey`. An identical repeat is a replay. Later retries can send the returned value as `Idempotency-Key`. |

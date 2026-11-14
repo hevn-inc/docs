@@ -127,7 +127,7 @@ A virtual account record has `destinationAccount`, the account key its rail sett
 
 | Contact | The paying account sends to | Then |
 | --- | --- | --- |
-| Bank | The funding address for this payout | The partner bank pays the beneficiary's bank. |
+| Bank | The funding address for this payout | The partner bank pays the beneficiary's bank. The request names the virtual account it is sent through in `bankId` ([Payouts](/developers/payouts#virtual-account-of-a-payout)). |
 | Wallet on Base | The contact's address, from the `sourceAccount` you name | No conversion, so both quote amounts are equal. |
 | Wallet on another chain or token | A one-time address for the route | The payout is routed across chains and priced in `quote` ([Payouts](/developers/payouts#a-routed-payout-is-priced)). |
 | Email of a HEVN account | The wallet of the HEVN account with that email | See [Payouts](/developers/payouts). |

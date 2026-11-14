@@ -7,6 +7,8 @@ A sub account is a further Base smart wallet of your integrator account, with it
 
 A typical use is one sub account per customer of yours, each with a wallet address and account details. Your developer key signs payouts and moves from a sub account as it does for your main wallet ([Signing](/developers/signing)).
 
+To open and operate sub accounts by hand, run the [terminal app](/developers/terminal-app).
+
 ```json Response 201, Location: /dapi/v1/client/accounts/acc_9f2c…
 { "accountId": "acc_9f2c…", "kind": "sub", "asset": "USDC", "chain": "base",
   "address": "0x51c7…", "label": "customer-1042", "balance": "0.0",
@@ -56,6 +58,7 @@ An `Idempotency-Key` does not change the result. A body field other than `kind`,
 | `409 safe_mode_required` | The main wallet of your account is not protected by co-signing. |
 | `409 account_address_taken` | No address could be allocated after a retry. Send the request again. |
 | `409 account_destination_unsupported` | `asset` is `RD` in the [sandbox](/sub-accounts/money-movement#sandbox). |
+| `409 sandbox_account_limit_exceeded` | The account already has 20 sub accounts in the [sandbox](/developers/sandbox#limits). |
 | `409 account_archive_unsupported` | `DELETE /dapi/v1/client/accounts/{accountId}` on a sub account. A sub account cannot be archived or deleted. |
 | `404 account_not_found` | The `acc_…` id is unknown or belongs to another account. |
 
@@ -67,6 +70,7 @@ An `Idempotency-Key` does not change the result. A body field other than `kind`,
 | Tokens | `USDC` or `RD`. No EURC sub account. |
 | Spend limits and dual approval | Not evaluated per sub account. The transfer policy of your account applies to each source. |
 | Escrow and cards issued by a partner | Not available on a sub account |
+| Payout to a bank contact | Sent through a virtual account opened on the sub account, named in `bankId` ([Payouts](/sub-accounts/money-movement#payouts)) |
 | Archive | None |
 | A token the sub account does not hold | Left out of `balance`. It can be moved to your main wallet ([Other tokens](/sub-accounts/money-movement#other-tokens)). |
 

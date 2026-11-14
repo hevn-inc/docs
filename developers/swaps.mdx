@@ -82,7 +82,19 @@ When `authorization` is `debit`, compare `debit.sourceAddress`, `debit.address`,
 
 Sign `approval.payload` and post it to `POST /dapi/v1/swaps/{swapId}/confirm` ([Signing](/developers/signing)).
 
-Confirm returns `202` with a `pollUrl`. Read `GET /dapi/v1/swaps/{swapId}` until `status` is `settled` or `failed`. While the approval is open, retry as described in [Retrying a confirm](/developers/signing#retrying-a-confirm). Once the approval is used or expired, confirm returns `409 swap_not_confirmable`, so read the swap.
+Confirm returns `202` with `status: "submitted"` and a `pollUrl`. Read `GET /dapi/v1/swaps/{swapId}`, the route in `pollUrl`, until `status` is `settled` or `failed`. A read made right after the confirm can still return `awaitingSignature`, so read again.
+
+Do not confirm a second time. Once the approval is used or expired, confirm returns `409 swap_not_confirmable`. A confirm that failed before the approval was used is retried as described in [Retrying a confirm](/developers/signing#retrying-a-confirm).
+
+### Retries
+
+A retry of `POST /dapi/v1/swaps` with the same `Idempotency-Key` and body returns the same `swp_…` with `200` and `Idempotency-Replayed: true`.
+
+| Swap | Replay returns |
+| --- | --- |
+| Awaiting its signature | An `approval` on the same swap, at the same quote. Sign and confirm it. |
+| Confirmed, settled, failed or expired | The swap as it stands: `status` is `submitted`, `settled` or `failed`, and `authorization`, `approval`, `debit` and `intent` are absent. Read the swap. There is no approval to sign. |
+| Any, with another body | `409 idempotency_key_reused` |
 
 ## Read a swap
 
@@ -129,8 +141,8 @@ The response and `GET /dapi/v1/swaps/{swapId}` return the ids as sent. The exit 
 
 | `status` | Meaning | Next |
 | --- | --- | --- |
-| `awaitingSignature` | Created and not yet confirmed. | Sign and confirm. |
-| `submitted` | Confirmed and settling. | Read the swap. |
+| `awaitingSignature` | Created and not yet confirmed, or confirmed a moment ago. | Sign and confirm. After a confirm, read the swap again. |
+| `submitted` | Confirmed and settling. | Read the swap. Do not confirm again. |
 | `settled` | Settlement completed. | n/a |
 | `failed` | The swap did not settle. | Read `failure.code`. |
 
@@ -144,7 +156,7 @@ The response and `GET /dapi/v1/swaps/{swapId}` return the ids as sent. The exit 
 | `403 account_not_controlled` | `POST /dapi/v1/swaps` or its confirm was called with a client in `X-Hevn-Account`. | Swap your own accounts. A client's accounts cannot be swapped through the API. |
 | `409 account_destination_unsupported`, `409 source_account_unsupported` | The pair is not a move a sub account can make. | See [Sub account moves](#sub-account-moves). |
 | `404 account_not_found` | The `acc_…` id is unknown or names an external account. | Use a sub account of your own. |
-| `409 swap_not_confirmable` | The approval was used or has expired. | Read the swap. |
+| `409 swap_not_confirmable` | The approval was used or has expired. A second confirm after `submitted` returns it. | Read the swap. |
 
 Other codes: [Errors](/developers/reference/errors).
 

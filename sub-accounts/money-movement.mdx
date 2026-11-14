@@ -3,39 +3,48 @@ title: "Money movement"
 description: "Payouts, moves, payins, virtual accounts and the ledger of a sub account."
 ---
 
-A sub account is named by its `acc_…` id in the fields that take an account key of your main wallet. Send the id as `sourceAccount` on `POST /dapi/v1/payouts` to pay a contact from it.
+A sub account is named by its `acc_…` id in the fields that take an account key of your main wallet. Send the id as `sourceAccount` on `POST /dapi/v1/payouts` to pay a contact from it, with a `bankId` of the sub account when the contact is a bank contact.
 
 The examples bind `me` to your own `cl_…` id, as in the [Quickstart](/sub-accounts/quickstart). For a session that acts for a client, the signed routes return `403 account_not_controlled`.
 
 ## Payouts
 
-Call `POST /dapi/v1/payouts` with the contact, the amount, the sub account as `sourceAccount` and your `publicKey`.
+Call `POST /dapi/v1/payouts` with the contact, the amount, the sub account as `sourceAccount` and your `publicKey`. A bank contact also needs `bankId`: an `active` virtual account opened on that sub account, listed by `GET /dapi/v1/banks?accountId=acc_…`.
 
 <CodeGroup>
 
 ```bash cURL
+curl -s "$HEVN_API/banks?accountId=acc_9f2c…" \
+  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" | jq -r '.rails[] | select(.status == "active") | .id'
+
 curl -s -X POST "$HEVN_API/payouts" \
   -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
   -H "Idempotency-Key: redemption-1188" \
   -H "Content-Type: application/json" \
   -d '{"contactId":"ct_3K9…","amount":"250.00","sourceAccount":"acc_9f2c…",
-       "publicKey":"'"$HEVN_PUBLIC_KEY"'"}'
+       "bankId":"bnk_88Hq3T","publicKey":"'"$HEVN_PUBLIC_KEY"'"}'
 ```
 
 ```python Python
+opened = me.get("/banks", {"accountId": "acc_9f2c…"})["rails"]
+bank = next(rail for rail in opened if rail["status"] == "active")
 payout = me.post("/payouts", {
     "contactId": "ct_3K9…",
     "amount": "250.00",
     "sourceAccount": "acc_9f2c…",
+    "bankId": bank["id"],
     "publicKey": key.public_key,
 }, idempotency_key="redemption-1188")
 ```
 
 ```javascript Node
+const { rails: opened } = await me.get("/banks", { accountId: "acc_9f2c…" });
+const bank = opened.find((rail) => rail.status === "active");
 const payout = await me.post("/payouts", {
   contactId: "ct_3K9…",
   amount: "250.00",
   sourceAccount: "acc_9f2c…",
+  bankId: bank.id,
   publicKey: key.publicKey,
 }, { idempotencyKey: "redemption-1188" });
 ```
@@ -45,6 +54,7 @@ payout, err := me.Post("/payouts", hevn.Body{
 	"contactId":     "ct_3K9…",
 	"amount":        "250.00",
 	"sourceAccount": "acc_9f2c…",
+	"bankId":        "bnk_88Hq3T", // a virtual account from GET /banks?accountId=acc_9f2c…
 	"publicKey":     key.PublicKey,
 }, hevn.IdempotencyKey("redemption-1188"))
 ```
@@ -68,9 +78,13 @@ Check `debit`, sign `approval.payload` and call `POST /dapi/v1/payouts/{payoutId
 | Case | Result |
 | --- | --- |
 | No `publicKey` | `422 validation_failed`, with `details.field` set to `publicKey` |
+| A bank contact and no `bankId` | `422 payout_bank_required`. Request a virtual account on the sub account first ([Virtual accounts](#virtual-accounts)). |
+| A `bankId` of your main wallet or of another sub account | `409 payout_bank_mismatch` |
+| A wallet contact | No `bankId` is needed. |
 | A route that is not one token transfer to a funding address | `409 source_account_unsupported` |
-| A replay of the key with another `sourceAccount` | `409 idempotency_key_reused` |
+| A replay of the key with another `sourceAccount` or `bankId` | `409 idempotency_key_reused` |
 | A replay while the approval is open | The same `approval` and `operation` |
+| A replay after the payout moved | The payout as it stands, with no `approval` to sign. |
 
 Statuses and the other refusals are in [Payouts](/developers/payouts#track-it-to-completion).
 
@@ -118,7 +132,7 @@ move, err := me.Post("/swaps", hevn.Body{
 
 </CodeGroup>
 
-The response has `authorization: "debit"` for the account the money leaves. `debit.sourceAddress` is that account's address and `debit.address` is the address of the receiving account. Sign and confirm with `POST /dapi/v1/swaps/{swapId}/confirm`, then read `GET /dapi/v1/swaps/{swapId}`, which returns both account ids ([Swaps](/developers/swaps#create-and-confirm)).
+The response has `authorization: "debit"` for the account the money leaves. `debit.sourceAddress` is that account's address and `debit.address` is the address of the receiving account. Sign and confirm once with `POST /dapi/v1/swaps/{swapId}/confirm`. The confirm returns `202` with `status: "submitted"`, so read `GET /dapi/v1/swaps/{swapId}`, its `pollUrl`, until `status` is `settled` or `failed`. A second confirm returns `409 swap_not_confirmable`, and a replay of the create call after the confirm returns the move as it stands with no `approval` ([Swaps](/developers/swaps#retries)).
 
 | `sourceAccount` | `destinationAccount` | Result |
 | --- | --- | --- |
@@ -201,6 +215,7 @@ Call `POST /dapi/v1/banks` with `product` and `accountId` to request a virtual a
 | First `POST /dapi/v1/banks` for a product and `accountId` | `201` with `Location: /dapi/v1/banks/{product}?accountId=acc_…` |
 | The same request again | `200` with `Idempotency-Replayed: true` |
 | `GET /dapi/v1/banks/{product}?accountId=acc_…` | The virtual account of that sub account. Without `accountId` the route returns the one of your main wallet. |
+| `GET /dapi/v1/banks?accountId=acc_…` | The virtual accounts opened on that sub account. An `active` one is the `bankId` of a [payout](#payouts) to a bank contact. |
 | A product that cannot deliver the token to the address | `409 account_destination_unsupported` on `POST`, `403 rail_not_available` on `GET` |
 
 A product is accepted when its rail delivers the token of the sub account on chain to an address ([Deliver to an account](/developers/virtual-accounts#deliver-to-an-account)). Statuses, blockers and account details are in [Virtual accounts](/developers/virtual-accounts).
@@ -229,6 +244,6 @@ A sub account opened with `asset: "RD"` follows the rules above with RD in place
 
 ## Sandbox
 
-In the sandbox a sub account holds USDC, and you fund it through a virtual account or the faucet. The differences from production, with the products, limits and refusals, are in [Accounts](/developers/sandbox#accounts).
+In the sandbox a sub account holds USDC, and you fund it through a virtual account or the faucet. An account opens at most 20 sub accounts there, and the faucet counts your main wallet and sub accounts together. The differences from production, with the products, limits and refusals, are in [Accounts](/developers/sandbox#accounts).
 
 <Card title="Next: Signing" icon="arrow-right" href="/developers/signing" />

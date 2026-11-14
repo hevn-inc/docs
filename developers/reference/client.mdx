@@ -15,7 +15,7 @@ import PollSnippet from "/snippets/poll.mdx";
 The guides call one small HTTP client, shown here in Python, Node and Go. Copy it into your project, then [log in](#log-in) with `POST /dapi/v1/auth/challenge` and `POST /dapi/v1/auth/token`.
 
 <Note>
-  A fuller Node version is at [hevn-inc/dapi-sdk](https://github.com/hevn-inc/dapi-sdk). It also checks that the payload you sign matches the payment you requested. The package is unsupported, so use it as a model for your client.
+  A fuller Node version is at [hevn-inc/dapi-sdk](https://github.com/hevn-inc/dapi-sdk). It also checks that the payload you sign matches the payment you requested. The package is unsupported, so use it as a model for your client. Its `cli/` directory holds a [terminal app](/developers/terminal-app) for your own account.
 </Note>
 
 ## Surface
@@ -294,7 +294,7 @@ func Bearer(token string) func(*http.Request) {
 
 ## Confirm until it settles
 
-`confirm_until_settled` follows [Retrying a confirm](/developers/signing#retrying-a-confirm). On `funding_attempt_expired` it raises `ReopenRequired` (Go returns `ErrReopenRequired`). Re-open with the same `Idempotency-Key`.
+`confirm_until_settled` follows [Retrying a confirm](/developers/signing#retrying-a-confirm). It confirms once. After `submitted` it reads the `pollUrl` of the receipt until the payout or swap leaves `awaitingSignature` and `submitted`, because a second confirm is refused. On `funding_attempt_expired` it raises `ReopenRequired` (Go returns `ErrReopenRequired`). Re-open with the same `Idempotency-Key`.
 
 <ConfirmLoopSnippet />
 

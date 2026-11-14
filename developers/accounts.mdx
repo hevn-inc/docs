@@ -29,6 +29,7 @@ A balance on the main wallet has an account key and no `acc_…` id.
 | Who signs a spend | The customer's wallet. HEVN and your developer key hold no key to it. | Your developer key, co-signed by HEVN |
 | Payout `authorization` | `wallet`. The response has `transfer`, and there is no confirm call. | `debit`. Sign `approval.payload` and confirm. |
 | Payout source | A Base account, paying USDC | The token the account holds |
+| Payout to a bank contact | `bankId` of a virtual account opened on the external account | `bankId` of a virtual account opened on the sub account |
 | Swaps and moves | `404 account_not_found` | A move to or from the main wallet or another sub account of the same token, one for one, no fee |
 | Payins | On-chain (`originChainId`). `refundAddress` is required. | On-chain (`originChainId`). No `refundAddress`. |
 | Virtual accounts | Products whose rail delivers USDC to the address | Products whose rail delivers the account's token to the address |
@@ -81,7 +82,8 @@ The list is ordered oldest first and holds both kinds ([List accounts](/api-refe
 | `sourceAccount` | `POST /dapi/v1/payouts` | An account key, an external account on Base or a sub account ([Payouts](/developers/payouts#authorization)) |
 | `sourceAccount`, `destinationAccount` | `POST /dapi/v1/swaps`, `POST /dapi/v1/swaps/preview` | An account key or a sub account ([Swaps](/developers/swaps#sub-account-moves)) |
 | `destinationAccount` | `POST /dapi/v1/payins` | An account key, an external account or a sub account ([Payins](/developers/payins#deliver-to-an-account)) |
-| `accountId` | `POST /dapi/v1/banks`, `GET /dapi/v1/banks/{product}` | An external account or a sub account ([Virtual accounts](/developers/virtual-accounts#deliver-to-an-account)) |
+| `accountId` | `POST /dapi/v1/banks`, `GET /dapi/v1/banks`, `GET /dapi/v1/banks/{product}` | An external account or a sub account ([Virtual accounts](/developers/virtual-accounts#deliver-to-an-account)) |
+| `bankId` | `POST /dapi/v1/payouts` | With an `acc_…` id as `sourceAccount`, a virtual account opened on that account ([Payouts](/developers/payouts#virtual-account-of-a-payout)) |
 | `accountId` | `GET /dapi/v1/transactions`, `/summary`, `/export` | An external account or a sub account, archived ones included ([Balances and transactions](/developers/balances-and-transactions#filters)) |
 | `accountId` | `POST /dapi/v1/sandbox/deposits` | A sub account ([Sandbox](/developers/sandbox#accounts)) |
 

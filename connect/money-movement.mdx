@@ -14,7 +14,7 @@ Send the client's `cl_…` id in `X-Hevn-Account` on the routes below ([Acting a
 | Virtual account | `POST /dapi/v1/banks`. The rail delivers the settlement token to the client's wallet. | [Virtual accounts](/developers/virtual-accounts) |
 | Quoted payin | `POST /dapi/v1/payins`. It settles on the client's wallet. | [Payins](/developers/payins) |
 | Transfer on Base | USDC or EURC sent to `baseSmartWallet` is in the balance once it confirms. | [Payins](/developers/payins) |
-| Payout from `USDC` or `EURC` | `POST /dapi/v1/payouts` returns `authorization: "client"` and no `approval`. The holder approves it. | [Payouts](/developers/payouts) |
+| Payout from `USDC` or `EURC` | `POST /dapi/v1/payouts` returns `authorization: "client"` and no `approval`. The holder approves it. A bank contact needs `bankId`. | [Payouts](/developers/payouts) |
 | Balance and ledger | `GET /dapi/v1/client/balance` and `GET /dapi/v1/transactions` read the client's wallet. | [Balances and transactions](/developers/balances-and-transactions) |
 | Swap | `POST /dapi/v1/swaps/preview` prices one. `POST /dapi/v1/swaps` is [refused](#refusals). | [Swaps](/developers/swaps) |
 | Escrow, sub account | [Refused](#refusals). | n/a |
@@ -25,6 +25,8 @@ Verification comes first for bank rails. A virtual account lists `kyb_required` 
 
 Save a contact with `POST /dapi/v1/contacts` ([Payouts](/developers/payouts)), then call `POST /dapi/v1/payouts` with the contact and one amount. Do not send `publicKey`.
 
+A bank contact needs `bankId`, the client's virtual account the payout is sent through. Read it from `options[].bankId` of `GET /dapi/v1/contacts/{contactId}/capabilities` ([Check capabilities](/developers/payouts#check-capabilities)). Without it the call returns `422 payout_bank_required`. A wallet contact takes none.
+
 <CodeGroup>
 ```bash cURL
 curl -s -X POST "$HEVN_API/payouts" \
@@ -32,21 +34,27 @@ curl -s -X POST "$HEVN_API/payouts" \
   -H "X-Hevn-Account: $HEVN_CLIENT_ID" \
   -H "Idempotency-Key: order-A-1187" \
   -H "Content-Type: application/json" \
-  -d '{"contactId":"ct_3K9…","amount":"500.00","paymentReference":"INV-2026-114"}'
+  -d '{"contactId":"ct_3K9…","amount":"500.00","bankId":"bnk_88Hq3T","paymentReference":"INV-2026-114"}'
 ```
 
 ```python Python
+capabilities = client.get(f"/contacts/{contact['id']}/capabilities", {"amount": "500.00"})
+option = next(o for o in capabilities["options"] if o["available"] and o.get("bankId"))
 payout = client.post("/payouts", {
     "contactId": contact["id"],
     "amount": "500.00",
+    "bankId": option["bankId"],
     "paymentReference": "INV-2026-114",
 }, idempotency_key="order-A-1187")
 ```
 
 ```javascript Node
+const capabilities = await client.get(`/contacts/${contact.id}/capabilities`, { amount: "500.00" });
+const option = capabilities.options.find((o) => o.available && o.bankId);
 const payout = await client.post("/payouts", {
   contactId: contact.id,
   amount: "500.00",
+  bankId: option.bankId,
   paymentReference: "INV-2026-114",
 }, { idempotencyKey: "order-A-1187" });
 ```
@@ -55,6 +63,7 @@ const payout = await client.post("/payouts", {
 payout, err := client.Post("/payouts", hevn.Body{
 	"contactId":        contact.Str("id"),
 	"amount":           "500.00",
+	"bankId":           "bnk_88Hq3T", // options[].bankId of the contact's capabilities
 	"paymentReference": "INV-2026-114",
 }, hevn.IdempotencyKey("order-A-1187"))
 ```

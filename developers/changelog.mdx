@@ -5,6 +5,21 @@ description: "Dated changes to /dapi/v1, newest first, with the migration for ea
 
 Changes to `/dapi/v1`, newest first. An entry marked Breaking requires a code change and lists the migration.
 
+<Update label="2026-11-14" description="Bank payouts name their virtual account · swap replays · sandbox limits">
+  Breaking: a payout to a bank contact requires `bankId`.
+
+  - `POST /dapi/v1/payouts` to a bank contact takes `bankId` for each `sourceAccount` except `FDIC_USD`. HEVN no longer picks a virtual account by the contact's currency. Without it the call returns `422 payout_bank_required`. A virtual account opened on another account returns `409 payout_bank_mismatch` ([Payouts](/developers/payouts#virtual-account-of-a-payout)).
+  - `GET /dapi/v1/banks` takes `accountId` and returns the virtual accounts opened on that external account or sub account ([Virtual accounts](/developers/virtual-accounts#list-products)).
+  - A retry of `POST /dapi/v1/swaps` with the same `Idempotency-Key`, for a swap that no longer awaits its signature, returns the swap as it stands with no `authorization` or `approval` ([Swaps](/developers/swaps#retries)). A second confirm returns `409 swap_not_confirmable`, so read `pollUrl` after `submitted`.
+  - A swap reads as `submitted` once its funding transaction is recorded.
+  - Error bodies contain no network address. A transport failure returns `503 user_operation_unavailable` with `details.reason: "network_unavailable"` ([Errors](/developers/reference/errors#funding-a-payment)).
+  - Sandbox: `approved` on `POST /dapi/v1/sandbox/kyb/status` also opens the client's requested virtual accounts. The faucet counts the main wallet and its sub accounts together. A faucet `Idempotency-Key` reused with another amount, token or destination is refused. An account opens at most 20 sub accounts, then `409 sandbox_account_limit_exceeded` ([Sandbox](/developers/sandbox#limits)).
+  - Documentation: the table of required KYB slots is corrected. `articles_of_association` is required and `director_structure` is not ([Clients](/developers/clients#write-the-document)).
+  - The SDK repository has a [terminal app](/developers/terminal-app) for your own account.
+
+  To migrate: read `options[].bankId` from the contact's capabilities for a payout from the main wallet, or an `active` virtual account from `GET /dapi/v1/banks?accountId=acc_…` for a payout from an `acc_…` account, and send it as `bankId`.
+</Update>
+
 <Update label="2026-11-13" description="Client creation, accounts, sub accounts · documentation tabs">
   - `POST /dapi/v1/clients` creates a company client with no wallet at HEVN and returns `202` with the client in `provisioning`. HEVN enables it per integrator ([External wallets](/external-wallets/overview), [Clients](/developers/clients#statuses)).
   - New resource `/dapi/v1/client/accounts`: `POST`, `GET`, `GET /{accountId}` and `DELETE /{accountId}`. It holds external accounts and sub accounts, both named by an `acc_…` id ([Accounts](/developers/accounts)).

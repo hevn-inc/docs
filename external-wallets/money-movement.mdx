@@ -49,7 +49,7 @@ Statuses, `blockers[]` and the account details are in [Virtual accounts](/develo
 | --- | --- |
 | Key | One virtual account per client, product and `accountId`. A repeat returns `200` with `Idempotency-Replayed: true`. |
 | Products | A product is accepted when its rail delivers USDC on chain to the address ([Deliver to an account](/developers/virtual-accounts#deliver-to-an-account)). Another product returns `409 account_destination_unsupported`. |
-| Read | `GET /dapi/v1/banks/{product}?accountId=acc_…`. A product that cannot deliver to the account returns `403 rail_not_available`. `GET /dapi/v1/banks` lists the record with `accountId` set. |
+| Read | `GET /dapi/v1/banks/{product}?accountId=acc_…`. A product that cannot deliver to the account returns `403 rail_not_available`. `GET /dapi/v1/banks` lists the record with `accountId` set, and `GET /dapi/v1/banks?accountId=acc_…` lists the records of one account. |
 | Delivery | The address does not change. To deliver elsewhere, register another address and request a virtual account on it. |
 | Close | [Archiving](/external-wallets/external-accounts#archive-an-account) the account closes its virtual accounts. |
 
@@ -113,7 +113,7 @@ Give the payer `address`, `chainId`, `amount` and `memo` from the instructions c
 
 ## Payouts
 
-Save a [contact](/developers/payouts#save-a-contact), then call `POST /dapi/v1/payouts` with the account as `sourceAccount`. `publicKey` is not used.
+Save a [contact](/developers/payouts#save-a-contact), then call `POST /dapi/v1/payouts` with the account as `sourceAccount`. For a bank contact, send `bankId`: an `active` virtual account opened on that external account ([Virtual accounts](#virtual-accounts)). `publicKey` is not used.
 
 <CodeGroup>
 
@@ -123,7 +123,8 @@ curl -s -X POST "$HEVN_API/payouts" \
   -H "X-Hevn-Account: $HEVN_CLIENT_ID" \
   -H "Idempotency-Key: order-1188" \
   -H "Content-Type: application/json" \
-  -d "{\"contactId\":\"ct_3K9…\",\"amount\":\"250.00\",\"sourceAccount\":\"$HEVN_ACCOUNT_ID\"}"
+  -d "{\"contactId\":\"ct_3K9…\",\"amount\":\"250.00\",\"sourceAccount\":\"$HEVN_ACCOUNT_ID\",
+       \"bankId\":\"$HEVN_BANK_ID\"}"
 ```
 
 ```python Python
@@ -131,6 +132,7 @@ payout = client.post("/payouts", {
     "contactId": contact["id"],
     "amount": "250.00",
     "sourceAccount": account["accountId"],
+    "bankId": bound["id"],
 }, idempotency_key="order-1188")
 transfer = payout.get("transfer")
 ```
@@ -140,6 +142,7 @@ const payout = await client.post("/payouts", {
   contactId: contact.id,
   amount: "250.00",
   sourceAccount: account.accountId,
+  bankId: bound.id,
 }, { idempotencyKey: "order-1188" });
 const transfer = payout.transfer;
 ```
@@ -149,6 +152,7 @@ payout, err := client.Post("/payouts", hevn.Body{
 	"contactId":     contact.Str("id"),
 	"amount":        "250.00",
 	"sourceAccount": account.Str("accountId"),
+	"bankId":        bound.Str("id"),
 }, hevn.IdempotencyKey("order-1188"))
 ```
 
@@ -177,7 +181,7 @@ payout, err := client.Post("/payouts", hevn.Body{
 }
 ```
 
-`approval`, `debit` and `intent` are absent. Fields: [Create an outgoing transfer](/api-reference/transfers/create-an-outgoing-transfer).
+`approval`, `debit` and `intent` are absent. `bound` is the virtual account read in [Virtual accounts](#virtual-accounts), and `GET /dapi/v1/banks?accountId=acc_…` lists each one opened on the account. A wallet contact takes no `bankId`. Fields: [Create an outgoing transfer](/api-reference/transfers/create-an-outgoing-transfer).
 
 ### Send the transfer
 
@@ -219,12 +223,14 @@ Poll `GET /dapi/v1/payouts/{payoutId}`. The statuses are in [Track it to complet
 | --- | --- |
 | Replay with the same `Idempotency-Key` before funding | The same payout and the same `transfer`. |
 | Replay after funding | The payout as it stands, with no `transfer`. |
-| Same key, another `sourceAccount` | `409 idempotency_key_reused` |
+| Same key, another `sourceAccount` or `bankId` | `409 idempotency_key_reused` |
 
 ### Refusals
 
 | Error | Cause |
 | --- | --- |
+| `422 payout_bank_required` | A bank contact was sent without `bankId`. |
+| `409 payout_bank_mismatch` | The virtual account in `bankId` was opened on the client's main wallet or on another account. |
 | `409 source_account_unsupported` | The account is not on `base`, or the payout is not a USDC payout funded from the account's balance. |
 | `404 account_not_found` | Unknown or archived `acc_…` id. |
 | `403 transfer_policy_denied` | The client's transfer policy refuses the payout. `transferPolicy` is on `GET /dapi/v1/client`. |

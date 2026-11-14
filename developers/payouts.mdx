@@ -75,14 +75,51 @@ The identifiers each method needs in `bank.fields` are in [Rails](/developers/re
 
 ### Check capabilities
 
-Both calls are optional. `POST /dapi/v1/payouts` applies the same checks.
+Call `GET /dapi/v1/contacts/{contactId}/capabilities` to list the options that can pay the contact from the main wallet. Each option of a bank contact has `bankId`, the virtual account the payout is sent through.
 
-- [Retrieve contact channels](/api-reference/contacts/retrieve-contact-channels) lists the options that can pay the contact, with limits, fees, the payout fields each one requires and blockers ([Contact blockers](/developers/reference/errors#contact-blockers), [Fees](/developers/reference/rails#fees)).
-- [Create an outgoing transfer quote](/api-reference/transfers/create-an-outgoing-transfer-quote) prices a payment method and amount without a contact.
+<CodeGroup>
+```bash cURL
+curl -s "$HEVN_API/contacts/ct_3K9…/capabilities?amount=500.00" \
+  -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
+  -H "X-Hevn-Account: $HEVN_CLIENT_ID"
+```
+
+```python Python
+capabilities = client.get(f"/contacts/{contact['id']}/capabilities", {"amount": "500.00"})
+option = next(o for o in capabilities["options"] if o["available"] and o.get("bankId"))
+```
+
+```javascript Node
+const capabilities = await client.get(`/contacts/${contact.id}/capabilities`, { amount: "500.00" });
+const option = capabilities.options.find((o) => o.available && o.bankId);
+```
+
+```go Go
+capabilities, err := client.Get("/contacts/"+contact.Str("id")+"/capabilities", hevn.Query{"amount": "500.00"})
+var option hevn.Payload
+for _, o := range capabilities.List("options") {
+	if o.Str("bankId") != "" {
+		option = o
+		break
+	}
+}
+```
+</CodeGroup>
+
+```json Response 200
+{ "contactId": "ct_3K9…", "available": true,
+  "options": [ { "bankId": "bnk_88Hq3T", "method": "sepa", "currency": "EUR",
+                 "available": true, "blockers": [], … } ],
+  "blockers": [] }
+```
+
+An option also has limits, fees, the payout fields it requires and blockers ([Retrieve contact channels](/api-reference/contacts/retrieve-contact-channels), [Contact blockers](/developers/reference/errors#contact-blockers), [Fees](/developers/reference/rails#fees)). `POST /dapi/v1/payouts` applies the same checks.
+
+[Create an outgoing transfer quote](/api-reference/transfers/create-an-outgoing-transfer-quote) prices a payment method and amount without a contact. That call is optional.
 
 ## Book the payout
 
-Call `POST /dapi/v1/payouts` with the contact and one amount.
+Call `POST /dapi/v1/payouts` with the contact, one amount and, for a bank contact, the `bankId` ([Virtual account of a payout](#virtual-account-of-a-payout)).
 
 <CodeGroup>
 ```bash cURL
@@ -91,13 +128,14 @@ curl -s -X POST "$HEVN_API/payouts" \
   -H "X-Hevn-Account: $HEVN_CLIENT_ID" \
   -H "Idempotency-Key: order-A-1187" \
   -H "Content-Type: application/json" \
-  -d '{"contactId":"ct_3K9…","amount":"500.00","paymentReference":"INV-2026-114"}'
+  -d '{"contactId":"ct_3K9…","amount":"500.00","bankId":"bnk_88Hq3T","paymentReference":"INV-2026-114"}'
 ```
 
 ```python Python
 payout = client.post("/payouts", {
     "contactId": contact["id"],
     "amount": "500.00",
+    "bankId": option["bankId"],
     "paymentReference": "INV-2026-114",
 }, idempotency_key="order-A-1187")
 ```
@@ -106,6 +144,7 @@ payout = client.post("/payouts", {
 const payout = await client.post("/payouts", {
   contactId: contact.id,
   amount: "500.00",
+  bankId: option.bankId,
   paymentReference: "INV-2026-114",
 }, { idempotencyKey: "order-A-1187" });
 ```
@@ -114,6 +153,7 @@ const payout = await client.post("/payouts", {
 payout, err := client.Post("/payouts", hevn.Body{
 	"contactId":        contact.Str("id"),
 	"amount":           "500.00",
+	"bankId":           option.Str("bankId"),
 	"paymentReference": "INV-2026-114",
 }, hevn.IdempotencyKey("order-A-1187"))
 ```
@@ -138,13 +178,32 @@ The body fields and the response are on [Create an outgoing transfer](/api-refer
 
 The example is a payout for a client linked through HEVN Connect. Other paying accounts return another `authorization` and the fields that go with it.
 
+### Virtual account of a payout
+
+A payout to a bank contact is sent through a virtual account of the paying account, named in `bankId`. The virtual account must be `active` and opened on the account named in `sourceAccount`.
+
+| `sourceAccount` | `bankId` |
+| --- | --- |
+| None, or an account key of the main wallet such as `USDC` or `EURC` | `options[].bankId` from the contact's [capabilities](#check-capabilities) |
+| An `acc_…` id | A virtual account opened with that `accountId`. List them with `GET /dapi/v1/banks?accountId=acc_…` ([Deliver to an account](/developers/virtual-accounts#deliver-to-an-account)). |
+| `FDIC_USD` | Omit it. The balance is held on one virtual account. |
+
+A wallet contact or an email contact takes no `bankId`.
+
+| Request | Result |
+| --- | --- |
+| A bank contact and no `bankId` | `422 payout_bank_required` |
+| A `bankId` opened on another account: the main wallet's for an `acc_…` source, or an `acc_…` account's for the main wallet | `409 payout_bank_mismatch` |
+| An unknown `bankId`, or one that is not `active` | `400 invalid_request` |
+| `FDIC_USD` with the `bankId` of another virtual account | `422 account_not_supported` |
+
 ### Retries
 
 Send an `Idempotency-Key` with each booking. Key format, replay windows and bookings without a key are in [Idempotency-Key](/developers/conventions#idempotency-key).
 
-A retry with the same key and terms returns the same `po_…` and quote. Until the payout is funded, a replay returns what the booking returned: an `approval` with `debit` or `intent`, `authorization: "client"` again (create a new `sign` session), or the same `transfer` with `wallet`. Once the payout is funded, a replay returns it with none of these. The rules for a changed request are on [Create an outgoing transfer](/api-reference/transfers/create-an-outgoing-transfer).
+A retry with the same key and terms returns the same `po_…` and quote. Until the payout is funded, a replay returns what the booking returned: an `approval` with `debit` or `intent`, `authorization: "client"` again (create a new `sign` session), or the same `transfer` with `wallet`. Once the payout is funded, a replay returns it as it stands with none of these and no approval to sign, so read its `status`. The rules for a changed request are on [Create an outgoing transfer](/api-reference/transfers/create-an-outgoing-transfer).
 
-A retry under the same key with another `sourceAccount` returns `409 idempotency_key_reused`. Without a key, a request with another `sourceAccount` books a new payout.
+A retry under the same key with another `sourceAccount` or `bankId` returns `409 idempotency_key_reused`. Without a key, a request with another `sourceAccount` books a new payout.
 
 <Warning>
   Reuse the key when you retry. A new key books a second payout.
@@ -191,7 +250,7 @@ The fields of the read, `attention` and `transactionId` among them, are on [Retr
 
 ## Pay from your own account
 
-Book without `X-Hevn-Account`, or with your `cl_…` in it, and add `publicKey`. To pay from a sub account, also send its `acc_…` id as `sourceAccount`.
+Book without `X-Hevn-Account`, or with your `cl_…` in it, and add `publicKey`. A bank contact needs `bankId` from its capabilities, read for your own account. To pay from a sub account, send its `acc_…` id as `sourceAccount` and a `bankId` opened on it ([Sub accounts](/sub-accounts/money-movement#payouts)).
 
 <CodeGroup>
 ```bash cURL
@@ -199,23 +258,29 @@ curl -s -X POST "$HEVN_API/payouts" \
   -H "Authorization: Bearer $HEVN_ACCESS_TOKEN" \
   -H "Idempotency-Key: treasury-2026-09-17" \
   -H "Content-Type: application/json" \
-  -d '{"contactId":"ct_3K9…","amount":"500.00",
+  -d '{"contactId":"ct_3K9…","amount":"500.00","bankId":"bnk_88Hq3T",
        "publicKey":"'"$HEVN_PUBLIC_KEY"'","paymentReference":"INV-2026-114"}'
 ```
 
 ```python Python
+capabilities = hevn.get(f"/contacts/{contact['id']}/capabilities", {"amount": "500.00"})
+option = next(o for o in capabilities["options"] if o["available"] and o.get("bankId"))
 payout = hevn.post("/payouts", {
     "contactId": contact["id"],
     "amount": "500.00",
+    "bankId": option["bankId"],
     "publicKey": key.public_key,
     "paymentReference": "INV-2026-114",
 }, idempotency_key="treasury-2026-09-17")
 ```
 
 ```javascript Node
+const capabilities = await hevn.get(`/contacts/${contact.id}/capabilities`, { amount: "500.00" });
+const option = capabilities.options.find((o) => o.available && o.bankId);
 const payout = await hevn.post("/payouts", {
   contactId: contact.id,
   amount: "500.00",
+  bankId: option.bankId,
   publicKey: key.publicKey,
   paymentReference: "INV-2026-114",
 }, { idempotencyKey: "treasury-2026-09-17" });
@@ -225,6 +290,7 @@ const payout = await hevn.post("/payouts", {
 payout, err := api.Post("/payouts", hevn.Body{
 	"contactId":        contact.Str("id"),
 	"amount":           "500.00",
+	"bankId":           "bnk_88Hq3T", // options[].bankId of the contact's capabilities
 	"publicKey":        key.PublicKey,
 	"paymentReference": "INV-2026-114",
 }, hevn.IdempotencyKey("treasury-2026-09-17"))
@@ -249,7 +315,7 @@ Check `debit` and its `operation` ([Debit contents](/developers/signing#debit-co
 
 ## Pay a wallet
 
-A wallet contact uses the same payout body, authorization and read. The payout has `kind: "onchain"`.
+A wallet contact uses the same payout body without `bankId`, and the same authorization and read. The payout has `kind: "onchain"`.
 
 ### Save an address as a contact
 
@@ -315,7 +381,7 @@ The ledger row of a settled wallet payout has `isIncome: false` and `type: "cryp
 
 ## Bank-held balance
 
-Send `"sourceAccount": "FDIC_USD"` to pay from the balance the partner bank holds for the account. The wallet is not debited, and you sign the payout terms.
+Send `"sourceAccount": "FDIC_USD"` to pay from the balance the partner bank holds for the account. The wallet is not debited, you sign the payout terms, and no `bankId` is needed.
 
 <CodeGroup>
 ```bash cURL
@@ -373,6 +439,8 @@ To move the balance to your wallet, use [Swaps](/developers/swaps).
 | `code` | Status | Cause and fix |
 | --- | --- | --- |
 | `invalid_request` | 400 | The terms are not accepted, for example an amount below the minimum, a direction that cannot be priced, or account details the method does not accept. The reason is in `message`. |
+| `payout_bank_required` | 422 | A bank contact was sent without `bankId`. Send the virtual account the payout goes through ([Virtual account of a payout](#virtual-account-of-a-payout)). |
+| `payout_bank_mismatch` | 409 | `bankId` was not opened on the account in `sourceAccount`. |
 | `payout_not_fundable` | 409 | With `details.reason = "holder_signature_unsupported"`, pay from `USDC` or `EURC`. Otherwise book again with a new key on a rail that can be funded. |
 | `provider_unavailable` | 503 | The partner bank is unavailable. Retry with the same key. |
 | `account_not_controlled` | 403 | The paying wallet belongs to a client and its holder does not sign through HEVN Connect. See [Authorization](#authorization). |

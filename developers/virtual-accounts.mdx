@@ -103,7 +103,8 @@ bank, err := client.Post("/banks", hevn.Body{"product": "us", "accountId": "acc_
 | --- | --- |
 | Key | One virtual account per account and product. A repeat returns `200` with `Idempotency-Replayed: true`. |
 | Read | `GET /dapi/v1/banks/{product}?accountId=acc_…`. Without the query the route reads the main wallet's virtual account. |
-| List | `GET /dapi/v1/banks` returns these records next to the main wallet's. Each has `accountId`. |
+| List | `GET /dapi/v1/banks` returns these records next to the main wallet's. Each has `accountId`. `GET /dapi/v1/banks?accountId=acc_…` returns the virtual accounts opened on that account alone. |
+| Payouts | A payout to a bank contact from the account names one of these virtual accounts in `bankId` ([Payouts](/developers/payouts#virtual-account-of-a-payout)). |
 | Token | The partner bank delivers the token the account holds, on the account's network. |
 | Products | Those with a rail that settles that token on chain to the address. Another product returns `409 account_destination_unsupported` on `POST` and `403 rail_not_available` on `GET`. |
 | Destination | Fixed. A virtual account keeps the address it was opened for. |
@@ -152,6 +153,8 @@ catalogue, err := client.Get("/banks")
   ]
 }
 ```
+
+With `accountId`, the `acc_…` id of an external account or a sub account, the list holds the virtual accounts opened on that account. Each record has `opened: true`, products not requested on the account are left out, and an account with none returns an empty `rails`. An unknown id returns `404 account_not_found`.
 
 Fields are in [List virtual accounts](/api-reference/virtual-accounts/list-virtual-accounts-and-available-payment-methods). Products are listed in the [rail reference](/developers/reference/rails#products), and fees in [Fees](/developers/reference/rails#fees).
 

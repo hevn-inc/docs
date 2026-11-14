@@ -9,7 +9,7 @@
       "Use HEVN's terms as written. A product is the region a client requests. A rail is the bank route HEVN picks for the product. A virtual account (bnk_) is the record a partner bank opens for a client. Account details are what a payer needs to send a bank transfer, returned in a field named requisites. A client (cl_) is a customer's account: linked to the integrator through Sign in with HEVN (POST /dapi/v1/connect/sessions, then POST /dapi/v1/clients/link), or created with POST /dapi/v1/clients for an external-wallets integration. An external account (acc_, kind external) is a wallet address the client holds and signs for. A sub account (acc_, kind sub) is a further wallet of the integrator's own account on Base, spent with the developer key. Write 'sub account' as two words. A contact is a saved destination. A beneficiary is the party that receives a fiat payout. Money leaving an account is a payout, whether it goes to a bank account or to a wallet.",
       "Do not name a bank, payment institution, card issuer, identity-verification vendor or stablecoin issuer. Say 'the partner bank'. Do not describe HEVN as licensed, regulated or insured.",
       "HEVN publishes no fee rates, spreads or minimums. Prices come from a quote on a specific payment. Direct pricing questions to HEVN and do not invent numbers.",
-      "The API is at /dapi/v1 and takes a developer-key session plus an X-Hevn-Account header. Developer keys have an IP allowlist and no scopes. Remote transfers are at /api/v1/remote_spend_limit and take a remote transfer key (rsl_) in X-Api-Key, bounded by an onchain spend permission the account holder grants. The two credentials are separate and neither works on the other API. The HEVN CLI is discontinued."
+      "The API is at /dapi/v1 and takes a developer-key session plus an X-Hevn-Account header. Developer keys have an IP allowlist and no scopes. Remote transfers are at /api/v1/remote_spend_limit and take a remote transfer key (rsl_) in X-Api-Key, bounded by an onchain spend permission the account holder grants. The two credentials are separate and neither works on the other API. The earlier HEVN CLI is discontinued. The terminal app in the hevn-inc/dapi-sdk repository is a separate tool that operates the integrator's own account with the developer key."
     ]
   },
   "colors": {
@@ -106,7 +106,8 @@
             "pages": [
               "developers/reference/rails",
               "developers/reference/errors",
-              "developers/reference/client"
+              "developers/reference/client",
+              "developers/terminal-app"
             ]
           },
           {

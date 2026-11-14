@@ -9,20 +9,27 @@ class ReopenRequired(Exception):
 
 
 def confirm_until_settled(self, confirm_path: str, signature: str, *, deadline=180.0):
-    """A method on Hevn. confirm_path is "/payouts/po_…/confirm" or an escrow action's confirm."""
-    started, delay = time.monotonic(), 1.0
+    """A method on Hevn. confirm_path is "/payouts/po_…/confirm", "/swaps/swp_…/confirm" or an escrow action's confirm."""
+    started, delay, poll_path = time.monotonic(), 1.0, None
     while True:
         try:
-            receipt = self.post(confirm_path, {"signature": signature})
-            if receipt["status"] != "submitted":
-                return receipt
+            if poll_path is None:
+                receipt = self.post(confirm_path, {"signature": signature})
+                if receipt["status"] != "submitted":
+                    return receipt
+                # The signature is used. Read pollUrl from here on: a second confirm is refused.
+                poll_path = receipt["pollUrl"].removeprefix("/dapi/v1")
+            else:
+                seen = self.get(poll_path)
+                if seen["status"] not in ("awaitingSignature", "submitted"):
+                    return seen
             reason = "submitted"
         except HevnError as error:
             if error.code == "already_funded":
                 return {"status": "settled", "transactionHash": error.details.get("transactionHash")}
             if error.code == "funding_attempt_expired":
                 raise ReopenRequired(confirm_path) from error
-            if error.code not in CONFIRM_AGAIN:
+            if error.code not in CONFIRM_AGAIN and (poll_path is None or error.status < 500):
                 raise
             reason = error.code
         if time.monotonic() - started > deadline:
@@ -36,21 +43,29 @@ const CONFIRM_AGAIN = new Set(["funding_in_progress", "bundler_rejected", "bundl
 
 export class ReopenRequired extends Error {}
 
-// A method on Hevn. confirmPath is "/payouts/po_…/confirm" or an escrow action's confirm.
+// A method on Hevn. confirmPath is "/payouts/po_…/confirm", "/swaps/swp_…/confirm" or an escrow action's confirm.
 export async function confirmUntilSettled(confirmPath, signature, { deadline = 180_000 } = {}) {
   const until = Date.now() + deadline;
   let delay = 1_000;
+  let pollPath = null;
   for (;;) {
     let reason = "submitted";
     try {
-      const receipt = await this.post(confirmPath, { signature });
-      if (receipt.status !== "submitted") return receipt;
+      if (pollPath === null) {
+        const receipt = await this.post(confirmPath, { signature });
+        if (receipt.status !== "submitted") return receipt;
+        // The signature is used. Read pollUrl from here on: a second confirm is refused.
+        pollPath = receipt.pollUrl.replace(/^\/dapi\/v1/, "");
+      } else {
+        const seen = await this.get(pollPath);
+        if (!["awaitingSignature", "submitted"].includes(seen.status)) return seen;
+      }
     } catch (error) {
       if (error.code === "already_funded") {
         return { status: "settled", transactionHash: error.details.transactionHash };
       }
       if (error.code === "funding_attempt_expired") throw new ReopenRequired(confirmPath);
-      if (!CONFIRM_AGAIN.has(error.code)) throw error;
+      if (!CONFIRM_AGAIN.has(error.code) && (pollPath === null || !(error.status >= 500))) throw error;
       reason = error.code;
     }
     if (Date.now() > until) throw new Error(`${confirmPath} still ${reason}`);
@@ -67,23 +82,34 @@ var confirmAgain = map[string]bool{
 
 var ErrReopenRequired = errors.New("hevn: approval expired, re-open with the same Idempotency-Key")
 
-// confirmPath is "/payouts/po_…/confirm" or an escrow action's confirm.
+// confirmPath is "/payouts/po_…/confirm", "/swaps/swp_…/confirm" or an escrow action's confirm.
 func (c *Client) ConfirmUntilSettled(confirmPath, signature string) (Payload, error) {
-	until, delay := time.Now().Add(3*time.Minute), time.Second
+	until, delay, pollPath := time.Now().Add(3*time.Minute), time.Second, ""
 	for {
-		receipt, err := c.Post(confirmPath, Body{"signature": signature})
+		var seen Payload
+		var err error
+		if pollPath == "" {
+			seen, err = c.Post(confirmPath, Body{"signature": signature})
+		} else {
+			seen, err = c.Get(pollPath)
+		}
 		var apiErr *APIError
 		switch {
-		case err == nil && receipt.Str("status") != "submitted":
-			return receipt, nil
-		case err == nil: // submitted: no receipt yet, confirm again
+		case err == nil && pollPath == "" && seen.Str("status") != "submitted":
+			return seen, nil
+		case err == nil && pollPath == "":
+			// The signature is used. Read pollUrl from here on: a second confirm is refused.
+			pollPath = strings.TrimPrefix(seen.Str("pollUrl"), "/dapi/v1")
+		case err == nil && seen.Str("status") != "awaitingSignature" && seen.Str("status") != "submitted":
+			return seen, nil
+		case err == nil: // still settling: read again
 		case !errors.As(err, &apiErr):
 			return nil, err
 		case apiErr.Code == "already_funded":
 			return Payload{"status": "settled", "transactionHash": apiErr.Details["transactionHash"]}, nil
 		case apiErr.Code == "funding_attempt_expired":
 			return nil, ErrReopenRequired
-		case !confirmAgain[apiErr.Code]:
+		case !confirmAgain[apiErr.Code] && (pollPath == "" || apiErr.Status < 500):
 			return nil, err
 		}
 		if time.Now().After(until) {
