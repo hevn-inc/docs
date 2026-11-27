@@ -1,6 +1,7 @@
 ---
-title: "Money movement"
-description: "Payouts, moves, payins, virtual accounts and the ledger of a sub account."
+title: "Sub accounts money movement: payouts and moves"
+sidebarTitle: "Money movement"
+description: "Payouts, moves, payins, virtual accounts and the balance and ledger of a sub account, all signed with your developer key on your integrator account."
 ---
 
 A sub account is named by its `acc_…` id in the fields that take an account key of your main wallet. Send the id as `sourceAccount` on `POST /dapi/v1/payouts` to pay a contact from it, with a `bankId` of the sub account when the contact is a bank contact.

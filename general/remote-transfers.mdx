@@ -1,6 +1,7 @@
 ---
-title: "Remote transfers"
-description: "Let a program send USDC from your HEVN account with a key capped by an onchain spend permission."
+title: "Remote transfers: send USDC with a capped API key"
+sidebarTitle: "Remote transfers"
+description: "Let a program send USDC from your HEVN account with a remote transfer key capped by an onchain spend permission, and manage its limit and revocation."
 ---
 
 A remote transfer key lets a program send USDC from your HEVN account (a profile plus a Base smart wallet) with no approval step. Create the key in the app, then call `GET /get_balance` to confirm the key and its allowance.
