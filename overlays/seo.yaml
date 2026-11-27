@@ -1,0 +1,591 @@
+# SEO metadata for the generated REST API pages.
+# title and description set the HTML <title> and meta description. sidebarTitle
+# repeats the operation summary so the navigation label and URL do not change.
+# x-mint.metadata.description replaces the page subtitle, so each operation's
+# own description is copied into x-mint.content to keep it on the page.
+overlay: 1.1.0
+info:
+  title: HEVN REST API SEO metadata
+  version: 1.0.0
+extends: ../openapi.json
+actions:
+  - target: "$.paths['/auth/challenge'].post"
+    update:
+      x-mint:
+        metadata:
+          title: "Start a developer key login with an auth challenge"
+          sidebarTitle: "Start a developer-key login and receive the payload to sign"
+          description: "Start a developer key login and receive the payload to sign, then exchange the signature once at POST /auth/token before the challenge expires."
+        content: ""
+  - target: "$.paths['/auth/challenge'].post['x-mint'].content"
+    copy: "$.paths['/auth/challenge'].post.description"
+  - target: "$.paths['/auth/token'].post"
+    update:
+      x-mint:
+        metadata:
+          title: "Exchange a signed login challenge for API tokens"
+          sidebarTitle: "Exchange a signed login challenge for a session"
+          description: "Exchange a signed developer key challenge for an access token and a refresh token, with the errors for a used, expired or unsupported login."
+        content: ""
+  - target: "$.paths['/auth/token'].post['x-mint'].content"
+    copy: "$.paths['/auth/token'].post.description"
+  - target: "$.paths['/auth/refresh'].post"
+    update:
+      x-mint:
+        metadata:
+          title: "Refresh an API session and act for a client account"
+          sidebarTitle: "Exchange a refresh token for a session, optionally acting for an account"
+          description: "Send the refresh token as the bearer to get a new access token, optionally for a userId. A deleted key or a source IP off its allowlist returns 403."
+        content: ""
+  - target: "$.paths['/auth/refresh'].post['x-mint'].content"
+    copy: "$.paths['/auth/refresh'].post.description"
+  - target: "$.paths['/clients'].post"
+    update:
+      x-mint:
+        metadata:
+          title: "Create a client for an external wallets integration"
+          sidebarTitle: "Create a client"
+          description: "Open a company client through the API, register its wallet addresses as external accounts, and poll until the client moves from provisioning to ready."
+        content: ""
+  - target: "$.paths['/clients'].post['x-mint'].content"
+    copy: "$.paths['/clients'].post.description"
+  - target: "$.paths['/clients'].get"
+    update:
+      x-mint:
+        metadata:
+          title: "List the clients linked to your integrator account"
+          sidebarTitle: "List clients"
+          description: "List every client linked to your integrator account, newest first, whether linked through HEVN Connect or created through the API, to recover an id."
+        content: ""
+  - target: "$.paths['/clients'].get['x-mint'].content"
+    copy: "$.paths['/clients'].get.description"
+  - target: "$.paths['/clients/link'].post"
+    update:
+      x-mint:
+        metadata:
+          title: "Link a HEVN account as a client with a sign-in code"
+          sidebarTitle: "Connect an existing account"
+          description: "Exchange the code the HEVN sign-in window returned for access to the holder's account as a client, and see which link errors to restart or not retry."
+        content: ""
+  - target: "$.paths['/clients/link'].post['x-mint'].content"
+    copy: "$.paths['/clients/link'].post.description"
+  - target: "$.paths['/client'].get"
+    update:
+      x-mint:
+        metadata:
+          title: "Retrieve the client selected by X-Hevn-Account"
+          sidebarTitle: "Retrieve one account"
+          description: "Retrieve the client selected by the X-Hevn-Account header. Unknown, malformed and foreign account ids all return the same not-found response."
+        content: ""
+  - target: "$.paths['/client'].get['x-mint'].content"
+    copy: "$.paths['/client'].get.description"
+  - target: "$.paths['/client'].patch"
+    update:
+      x-mint:
+        metadata:
+          title: "Update a client's phone number and postal address"
+          sidebarTitle: "Update a client profile"
+          description: "Update the phone and postal address of the client selected by X-Hevn-Account. Keys you do not send stay unchanged, and other company data goes in KYB."
+        content: ""
+  - target: "$.paths['/client'].patch['x-mint'].content"
+    copy: "$.paths['/client'].patch.description"
+  - target: "$.paths['/client/accounts'].get"
+    update:
+      x-mint:
+        metadata:
+          title: "List a client's external accounts and sub accounts"
+          sidebarTitle: "List accounts"
+          description: "List every active external account and sub account of the client selected by X-Hevn-Account, oldest first, with the kind field telling them apart."
+        content: ""
+  - target: "$.paths['/client/accounts'].get['x-mint'].content"
+    copy: "$.paths['/client/accounts'].get.description"
+  - target: "$.paths['/client/accounts'].post"
+    update:
+      x-mint:
+        metadata:
+          title: "Add an external account or open a sub account"
+          sidebarTitle: "Add an account"
+          description: "Register a wallet address the client holds as an external account, or open a sub account of your own account on Base with kind sub in one token."
+        content: ""
+  - target: "$.paths['/client/accounts'].post['x-mint'].content"
+    copy: "$.paths['/client/accounts'].post.description"
+  - target: "$.paths['/client/accounts/{accountId}'].get"
+    update:
+      x-mint:
+        metadata:
+          title: "Retrieve one external account or sub account by id"
+          sidebarTitle: "Retrieve one account"
+          description: "Retrieve one active external account or sub account of the client by its acc_ id. Unknown and archived ids return the same not-found response."
+        content: ""
+  - target: "$.paths['/client/accounts/{accountId}'].get['x-mint'].content"
+    copy: "$.paths['/client/accounts/{accountId}'].get.description"
+  - target: "$.paths['/client/accounts/{accountId}'].delete"
+    update:
+      x-mint:
+        metadata:
+          title: "Archive an external account and its virtual accounts"
+          sidebarTitle: "Archive an external account"
+          description: "Archive an external account and close every virtual account opened on it. Adding the address again creates a new account. Sub accounts return 409."
+        content: ""
+  - target: "$.paths['/client/accounts/{accountId}'].delete['x-mint'].content"
+    copy: "$.paths['/client/accounts/{accountId}'].delete.description"
+  - target: "$.paths['/connect/sessions'].post"
+    update:
+      x-mint:
+        metadata:
+          title: "Create a HEVN sign-in window session for a customer"
+          sidebarTitle: "Create a sign-in window session"
+          description: "Issue a short-lived URL for the HEVN sign-in window to link an account, approve a payout that waits for the holder, or verify a linked individual."
+        content: ""
+  - target: "$.paths['/connect/sessions'].post['x-mint'].content"
+    copy: "$.paths['/connect/sessions'].post.description"
+  - target: "$.paths['/client/kyb'].put"
+    update:
+      x-mint:
+        metadata:
+          title: "Provide KYB applicant information for a client"
+          sidebarTitle: "Provide applicant information"
+          description: "Save company, people and document details for a business client's KYB submission. The write is safe to repeat without an Idempotency-Key and starts no review."
+        content: ""
+  - target: "$.paths['/client/kyb'].put['x-mint'].content"
+    copy: "$.paths['/client/kyb'].put.description"
+  - target: "$.paths['/client/kyb'].get"
+    update:
+      x-mint:
+        metadata:
+          title: "Retrieve a client's KYB verification submission"
+          sidebarTitle: "Retrieve the verification submission"
+          description: "Read the editable KYB applicant information, related people, filed documents, missing requirements and the latest review status of a client."
+        content: ""
+  - target: "$.paths['/client/kyb'].get['x-mint'].content"
+    copy: "$.paths['/client/kyb'].get.description"
+  - target: "$.paths['/client/kyb/complete'].post"
+    update:
+      x-mint:
+        metadata:
+          title: "Complete a KYB verification submission for review"
+          sidebarTitle: "Complete the verification submission"
+          description: "Send an immutable snapshot of the client's KYB submission for review. Missing entries return 422 kyb_incomplete, and a replay returns the application."
+        content: ""
+  - target: "$.paths['/client/kyb/complete'].post['x-mint'].content"
+    copy: "$.paths['/client/kyb/complete'].post.description"
+  - target: "$.paths['/documents'].post"
+    update:
+      x-mint:
+        metadata:
+          title: "Upload a KYB document file and get its doc_ id"
+          sidebarTitle: "Upload a document"
+          description: "Store a base64 file and return the doc_ id that the KYB document references as uploadId. The same bytes in the same slot return the first id."
+        content: ""
+  - target: "$.paths['/documents'].post['x-mint'].content"
+    copy: "$.paths['/documents'].post.description"
+  - target: "$.paths['/documents/{documentId}/content'].put"
+    update:
+      x-mint:
+        metadata:
+          title: "Fill the typed fields read off a KYB document"
+          sidebarTitle: "Fill the typed fields read off a document"
+          description: "Write the recognised fields of an uploaded KYB document by its doc_ id, so the verification gate accepts the submission, with the 422 field errors."
+        content: ""
+  - target: "$.paths['/documents/{documentId}/content'].put['x-mint'].content"
+    copy: "$.paths['/documents/{documentId}/content'].put.description"
+  - target: "$.paths['/escrow'].post"
+    update:
+      x-mint:
+        metadata:
+          title: "Open an escrow and return the payer's approval"
+          sidebarTitle: "Open an escrow and return the payer's approval"
+          description: "Create an escrow draft and return the approval the payer signs on its own wallet to fund it, with the idempotency outcomes for a repeated request."
+        content: ""
+  - target: "$.paths['/escrow'].post['x-mint'].content"
+    copy: "$.paths['/escrow'].post.description"
+  - target: "$.paths['/escrow'].get"
+    update:
+      x-mint:
+        metadata:
+          title: "List the escrows your account operates, newest first"
+          sidebarTitle: "List the escrows this account operates"
+          description: "List the escrow agreements the authenticated account operates, newest first, with cursor pagination and filters by status, sender and receiver."
+        content: ""
+  - target: "$.paths['/escrow'].get['x-mint'].content"
+    copy: "$.paths['/escrow'].get.description"
+  - target: "$.paths['/escrow/{escrowId}'].get"
+    update:
+      x-mint:
+        metadata:
+          title: "Read one escrow with balances, deadlines and actions"
+          sidebarTitle: "Read one escrow"
+          description: "Retrieve one escrow with its current balances, deadlines, the actions available now and the last on-chain state that HEVN reconciled for the deal."
+        content: ""
+  - target: "$.paths['/escrow/{escrowId}'].get['x-mint'].content"
+    copy: "$.paths['/escrow/{escrowId}'].get.description"
+  - target: "$.paths['/escrow/{escrowId}/sync'].post"
+    update:
+      x-mint:
+        metadata:
+          title: "Reconcile one escrow with its current on-chain state"
+          sidebarTitle: "Reconcile one escrow with the chain"
+          description: "Reconcile one escrow with current on-chain state and return it with consistent set. The chain is read at most once per 15 seconds per deal."
+        content: ""
+  - target: "$.paths['/escrow/{escrowId}/sync'].post['x-mint'].content"
+    copy: "$.paths['/escrow/{escrowId}/sync'].post.description"
+  - target: "$.paths['/escrow/{escrowId}/actions'].post"
+    update:
+      x-mint:
+        metadata:
+          title: "Prepare an escrow action and get the payload to sign"
+          sidebarTitle: "Prepare an escrow action and return the payload to sign"
+          description: "Prepare an escrow action such as a capture, void or refund and return the immutable payload to sign, without broadcasting it, plus 400 and 409 refusals."
+        content: ""
+  - target: "$.paths['/escrow/{escrowId}/actions'].post['x-mint'].content"
+    copy: "$.paths['/escrow/{escrowId}/actions'].post.description"
+  - target: "$.paths['/escrow/{escrowId}/actions/{idempotencyKey}/confirm'].post"
+    update:
+      x-mint:
+        metadata:
+          title: "Submit the signature for a prepared escrow action"
+          sidebarTitle: "Submit the signature for a prepared escrow action"
+          description: "Submit the signature for a prepared escrow action. The call returns 200 once the action is mined, or 202 with pollUrl while it is still submitted."
+        content: ""
+  - target: "$.paths['/escrow/{escrowId}/actions/{idempotencyKey}/confirm'].post['x-mint'].content"
+    copy: "$.paths['/escrow/{escrowId}/actions/{idempotencyKey}/confirm'].post.description"
+  - target: "$.paths['/payouts'].post"
+    update:
+      x-mint:
+        metadata:
+          title: "Create a payout to a bank account or a wallet"
+          sidebarTitle: "Create an outgoing transfer"
+          description: "Validate the contact, fix the payout terms and return how to authorize them, with the Idempotency-Key rules for retries and the paying account options."
+        content: ""
+  - target: "$.paths['/payouts'].post['x-mint'].content"
+    copy: "$.paths['/payouts'].post.description"
+  - target: "$.paths['/payouts/preview'].post"
+    update:
+      x-mint:
+        metadata:
+          title: "Preview a payout quote with its fees and minimum"
+          sidebarTitle: "Create an outgoing transfer quote"
+          description: "Estimate the delivered amount, minimum and fees of a payout for a payment method and a source amount. The preview takes no contact and has no side effects."
+        content: ""
+  - target: "$.paths['/payouts/preview'].post['x-mint'].content"
+    copy: "$.paths['/payouts/preview'].post.description"
+  - target: "$.paths['/payouts/{payoutId}/confirm'].post"
+    update:
+      x-mint:
+        metadata:
+          title: "Confirm a payout with the developer key signature"
+          sidebarTitle: "Authorize an outgoing transfer"
+          description: "Verify the developer key signature against the payout approval and fund it. A retry cannot change its terms, and a wallet-funded payout has no confirm."
+        content: ""
+  - target: "$.paths['/payouts/{payoutId}/confirm'].post['x-mint'].content"
+    copy: "$.paths['/payouts/{payoutId}/confirm'].post.description"
+  - target: "$.paths['/payouts/{payoutId}'].get"
+    update:
+      x-mint:
+        metadata:
+          title: "Retrieve a payout with its quote and current status"
+          sidebarTitle: "Retrieve an outgoing transfer"
+          description: "Retrieve the current lifecycle of a payout, including its quote, contact, settlement result and any failure that you can act on before retrying."
+        content: ""
+  - target: "$.paths['/payouts/{payoutId}'].get['x-mint'].content"
+    copy: "$.paths['/payouts/{payoutId}'].get.description"
+  - target: "$.paths['/swaps'].post"
+    update:
+      x-mint:
+        metadata:
+          title: "Create a swap or a move between your own accounts"
+          sidebarTitle: "Create a transfer between the client's own accounts"
+          description: "Price and reserve a swap between two accounts of your integrator account, or a move to or from a sub account, and return 201 with the approval to sign."
+        content: ""
+  - target: "$.paths['/swaps'].post['x-mint'].content"
+    copy: "$.paths['/swaps'].post.description"
+  - target: "$.paths['/swaps/preview'].post"
+    update:
+      x-mint:
+        metadata:
+          title: "Preview the best swap price between two accounts"
+          sidebarTitle: "Price a transfer between the client's own accounts"
+          description: "Compare the routes that serve a pair of accounts and return the best swap price. The preview has no side effects and accepts a client in X-Hevn-Account."
+        content: ""
+  - target: "$.paths['/swaps/preview'].post['x-mint'].content"
+    copy: "$.paths['/swaps/preview'].post.description"
+  - target: "$.paths['/swaps/{swapId}/confirm'].post"
+    update:
+      x-mint:
+        metadata:
+          title: "Confirm a swap with the developer key signature"
+          sidebarTitle: "Authorize a transfer between the client's own accounts"
+          description: "Verify the developer key signature against the swap approval and start settlement with 202 and pollUrl, or get 409 swap_not_confirmable once it is used."
+        content: ""
+  - target: "$.paths['/swaps/{swapId}/confirm'].post['x-mint'].content"
+    copy: "$.paths['/swaps/{swapId}/confirm'].post.description"
+  - target: "$.paths['/swaps/{swapId}'].get"
+    update:
+      x-mint:
+        metadata:
+          title: "Retrieve a swap with its quote and lifecycle status"
+          sidebarTitle: "Retrieve a transfer between the client's own accounts"
+          description: "Retrieve the current lifecycle of a swap or a move, the quote it was fixed at and any failure you can act on, for example after you confirm it."
+        content: ""
+  - target: "$.paths['/swaps/{swapId}'].get['x-mint'].content"
+    copy: "$.paths['/swaps/{swapId}'].get.description"
+  - target: "$.paths['/contacts'].post"
+    update:
+      x-mint:
+        metadata:
+          title: "Create a contact for payouts to a bank or a wallet"
+          sidebarTitle: "Create a contact"
+          description: "Save a reusable contact from account details, a wallet address or an email. Details that match a saved contact return 200 and the existing contact."
+        content: ""
+  - target: "$.paths['/contacts'].post['x-mint'].content"
+    copy: "$.paths['/contacts'].post.description"
+  - target: "$.paths['/contacts'].get"
+    update:
+      x-mint:
+        metadata:
+          title: "List saved contacts for payouts with cursor paging"
+          sidebarTitle: "List saved contacts"
+          description: "List the saved contacts of the selected account with opaque cursor pagination, to pick the destination of a payout to a bank account or a wallet."
+        content: ""
+  - target: "$.paths['/contacts'].get['x-mint'].content"
+    copy: "$.paths['/contacts'].get.description"
+  - target: "$.paths['/contacts/{contactId}'].get"
+    update:
+      x-mint:
+        metadata:
+          title: "Retrieve one saved contact by its ct_ contact id"
+          sidebarTitle: "Retrieve one contact"
+          description: "Retrieve one saved contact by its ct_ id, with its account details or wallet address and without internal routing or infrastructure identifiers."
+        content: ""
+  - target: "$.paths['/contacts/{contactId}'].get['x-mint'].content"
+    copy: "$.paths['/contacts/{contactId}'].get.description"
+  - target: "$.paths['/contacts/{contactId}'].patch"
+    update:
+      x-mint:
+        metadata:
+          title: "Update a saved contact without changing its details"
+          sidebarTitle: "Update a contact"
+          description: "Update the fields you send on a saved contact and keep the rest. Account identifiers, method and currency cannot change, so save a new contact for those."
+        content: ""
+  - target: "$.paths['/contacts/{contactId}'].patch['x-mint'].content"
+    copy: "$.paths['/contacts/{contactId}'].patch.description"
+  - target: "$.paths['/contacts/{contactId}'].delete"
+    update:
+      x-mint:
+        metadata:
+          title: "Delete a saved contact and return the removed record"
+          sidebarTitle: "Delete a contact"
+          description: "Remove a saved contact and return the removed record. Payouts already booked to the contact stay readable through the payout routes afterwards."
+        content: ""
+  - target: "$.paths['/contacts/{contactId}'].delete['x-mint'].content"
+    copy: "$.paths['/contacts/{contactId}'].delete.description"
+  - target: "$.paths['/contacts/{contactId}/capabilities'].get"
+    update:
+      x-mint:
+        metadata:
+          title: "Retrieve a contact's payout channels, limits and fees"
+          sidebarTitle: "Retrieve contact channels"
+          description: "Return the payment options for a contact with limits, fees, the payout fields each one requires and its blockers. The read is point in time and fixes no quote."
+        content: ""
+  - target: "$.paths['/contacts/{contactId}/capabilities'].get['x-mint'].content"
+    copy: "$.paths['/contacts/{contactId}/capabilities'].get.description"
+  - target: "$.paths['/banks'].get"
+    update:
+      x-mint:
+        metadata:
+          title: "List virtual accounts and products a client can use"
+          sidebarTitle: "List virtual accounts and available payment methods"
+          description: "List the products a client can request and the virtual accounts already requested on its wallet, external accounts and sub accounts, by accountId."
+        content: ""
+  - target: "$.paths['/banks'].get['x-mint'].content"
+    copy: "$.paths['/banks'].get.description"
+  - target: "$.paths['/banks'].post"
+    update:
+      x-mint:
+        metadata:
+          title: "Request a virtual account for a product such as eu"
+          sidebarTitle: "Request a receiving account for a product"
+          description: "Request one virtual account per call by product. It stays preparing while blockers lists what is pending, and a repeat returns the same record."
+        content: ""
+  - target: "$.paths['/banks'].post['x-mint'].content"
+    copy: "$.paths['/banks'].post.description"
+  - target: "$.paths['/banks/{product}'].get"
+    update:
+      x-mint:
+        metadata:
+          title: "Retrieve one virtual account and its account details"
+          sidebarTitle: "Retrieve one virtual account"
+          description: "Retrieve one product in the list shape, with the account details once the virtual account is active, or the one that delivers to an accountId."
+        content: ""
+  - target: "$.paths['/banks/{product}'].get['x-mint'].content"
+    copy: "$.paths['/banks/{product}'].get.description"
+  - target: "$.paths['/banks/{product}/rate'].get"
+    update:
+      x-mint:
+        metadata:
+          title: "Retrieve the payin conversion rate for a product"
+          sidebarTitle: "Retrieve the receiving conversion rate"
+          description: "Return the indicative conversion rate and fixed fee of an incoming payment on one product. Each payin is priced by its own quote, not by this rate."
+        content: ""
+  - target: "$.paths['/banks/{product}/rate'].get['x-mint'].content"
+    copy: "$.paths['/banks/{product}/rate'].get.description"
+  - target: "$.paths['/payins'].post"
+    update:
+      x-mint:
+        metadata:
+          title: "Create a payin quote for a bank or on-chain payment"
+          sidebarTitle: "Create an incoming transfer quote"
+          description: "Price money arriving for a client, with a rail for a local payment method or originChainId for an on-chain transfer. The quote holds until expiresAt."
+        content: ""
+  - target: "$.paths['/payins'].post['x-mint'].content"
+    copy: "$.paths['/payins'].post.description"
+  - target: "$.paths['/payins/{payinId}/instructions'].post"
+    update:
+      x-mint:
+        metadata:
+          title: "Open a payin and retrieve the payer's instructions"
+          sidebarTitle: "Open the incoming transfer and retrieve funding instructions"
+          description: "Open a quoted payin and return what the payer needs to send the money. A repeat returns the same instructions, and an expired quote returns 410."
+        content: ""
+  - target: "$.paths['/payins/{payinId}/instructions'].post['x-mint'].content"
+    copy: "$.paths['/payins/{payinId}/instructions'].post.description"
+  - target: "$.paths['/payins/{payinId}'].get"
+    update:
+      x-mint:
+        metadata:
+          title: "Retrieve a payin quote and its funding lifecycle"
+          sidebarTitle: "Retrieve an incoming transfer"
+          description: "Retrieve a payin quote and its current funding lifecycle. Use the instructions operation while the payer still needs the payment details to pay."
+        content: ""
+  - target: "$.paths['/payins/{payinId}'].get['x-mint'].content"
+    copy: "$.paths['/payins/{payinId}'].get.description"
+  - target: "$.paths['/client/balance'].get"
+    update:
+      x-mint:
+        metadata:
+          title: "Read a client's balances by account and sub account"
+          sidebarTitle: "Read a client's balances"
+          description: "Read one balance row per account the client holds: tokens on its smart wallet, any FDIC_USD balance, and one row per sub account in the token it holds."
+        content: ""
+  - target: "$.paths['/client/balance'].get['x-mint'].content"
+    copy: "$.paths['/client/balance'].get.description"
+  - target: "$.paths['/transactions/sync'].post"
+    update:
+      x-mint:
+        metadata:
+          title: "Refresh a client's transaction ledger from sources"
+          sidebarTitle: "Refresh the client's ledger from its sources"
+          description: "Refresh the client's ledger from the payment networks and chains its money moved over, and return how many entries changed. The route is rate-limited."
+        content: ""
+  - target: "$.paths['/transactions/sync'].post['x-mint'].content"
+    copy: "$.paths['/transactions/sync'].post.description"
+  - target: "$.paths['/transactions'].get"
+    update:
+      x-mint:
+        metadata:
+          title: "List ledger transactions newest first with filters"
+          sidebarTitle: "List transactions, newest first"
+          description: "List ledger transactions newest first with cursor paging and case-sensitive, comma-separated filters, including accountId for one external or sub account."
+        content: ""
+  - target: "$.paths['/transactions'].get['x-mint'].content"
+    copy: "$.paths['/transactions'].get.description"
+  - target: "$.paths['/transactions/summary'].get"
+    update:
+      x-mint:
+        metadata:
+          title: "Get inflow and outflow totals for transaction filters"
+          sidebarTitle: "Inflow and outflow totals for the same filters"
+          description: "Return settled and pending inflow and outflow totals in USD for the same filters as the transaction list, and how external and sub accounts are counted."
+        content: ""
+  - target: "$.paths['/transactions/summary'].get['x-mint'].content"
+    copy: "$.paths['/transactions/summary'].get.description"
+  - target: "$.paths['/transactions/export'].get"
+    update:
+      x-mint:
+        metadata:
+          title: "Export transactions as a CSV, XLSX or PDF file"
+          sidebarTitle: "Export transactions, a statement, a confirmation or a receipt"
+          description: "Stream a CSV, XLSX or PDF file of the filtered transaction list, or with kind=statement, confirmation or receipt, and the parameters each kind needs."
+        content: ""
+  - target: "$.paths['/transactions/export'].get['x-mint'].content"
+    copy: "$.paths['/transactions/export'].get.description"
+  - target: "$.paths['/transactions/{transactionId}'].get"
+    update:
+      x-mint:
+        metadata:
+          title: "Retrieve one ledger transaction with counterparties"
+          sidebarTitle: "Retrieve one transaction"
+          description: "Retrieve one ledger transaction with its detailed counterparties, payment references and attachments visible to the account in X-Hevn-Account."
+        content: ""
+  - target: "$.paths['/transactions/{transactionId}'].get['x-mint'].content"
+    copy: "$.paths['/transactions/{transactionId}'].get.description"
+  - target: "$.paths['/chains'].get"
+    update:
+      x-mint:
+        metadata:
+          title: "List supported chains and tokens with contracts"
+          sidebarTitle: "List supported chains and tokens"
+          description: "List every chain and token the HEVN API names, with each token's contract address and decimals, and the settlement chain and tokens for payouts."
+        content: ""
+  - target: "$.paths['/chains'].get['x-mint'].content"
+    copy: "$.paths['/chains'].get.description"
+  - target: "$.paths['/rates'].get"
+    update:
+      x-mint:
+        metadata:
+          title: "Retrieve a market reference rate between currencies"
+          sidebarTitle: "Retrieve a market reference rate"
+          description: "Convert one currency or token into another at the current market rate, before any payment exists. A payment settles at the rate of its own quote."
+        content: ""
+  - target: "$.paths['/rates'].get['x-mint'].content"
+    copy: "$.paths['/rates'].get.description"
+  - target: "$.paths['/sandbox/treasury'].get"
+    update:
+      x-mint:
+        metadata:
+          title: "Read the sandbox treasury that funds emulated credits"
+          sidebarTitle: "Read the sandbox treasury that funds emulated credits"
+          description: "Return the shared testnet faucet account that pays emulated sandbox credits and receives the funds of emulated payouts, regardless of X-Hevn-Account."
+        content: ""
+  - target: "$.paths['/sandbox/treasury'].get['x-mint'].content"
+    copy: "$.paths['/sandbox/treasury'].get.description"
+  - target: "$.paths['/sandbox/deposits'].post"
+    update:
+      x-mint:
+        metadata:
+          title: "Emulate a sandbox payin or a faucet token transfer"
+          sidebarTitle: "Emulate an incoming deposit: an account transfer with bankId, a token transfer without"
+          description: "With bankId, book an unquoted payin to a virtual account in the sandbox. Without it, send a faucet token transfer to the client's wallet or a sub account."
+        content: ""
+  - target: "$.paths['/sandbox/deposits'].post['x-mint'].content"
+    copy: "$.paths['/sandbox/deposits'].post.description"
+  - target: "$.paths['/sandbox/payins/{payinId}/complete'].post"
+    update:
+      x-mint:
+        metadata:
+          title: "Emulate the payer's transfer for a sandbox payin"
+          sidebarTitle: "Emulate the arrival of the funds a pay-in is waiting for"
+          description: "Emulate the payer's transfer for a quoted sandbox payin opened with the instructions route. A 202 means the transfer is unconfirmed, so repeat the call."
+        content: ""
+  - target: "$.paths['/sandbox/payins/{payinId}/complete'].post['x-mint'].content"
+    copy: "$.paths['/sandbox/payins/{payinId}/complete'].post.description"
+  - target: "$.paths['/sandbox/payouts/{payoutId}/status'].post"
+    update:
+      x-mint:
+        metadata:
+          title: "Move a sandbox payout to its next reported status"
+          sidebarTitle: "Move an emulated outgoing transfer to its next reported status"
+          description: "Move an emulated payout to submitted, settled, refunded or failed in the sandbox, with the 409 errors for an unfunded payout or a backward move."
+        content: ""
+  - target: "$.paths['/sandbox/payouts/{payoutId}/status'].post['x-mint'].content"
+    copy: "$.paths['/sandbox/payouts/{payoutId}/status'].post.description"
+  - target: "$.paths['/sandbox/kyb/status'].post"
+    update:
+      x-mint:
+        metadata:
+          title: "Approve or reject a client's KYB in the sandbox"
+          sidebarTitle: "Decide the client's latest KYB application, as the compliance reviewer would"
+          description: "Move a client's latest KYB application to approved, rfi or rejected in the sandbox, as a reviewer would, and return the KYB submission body."
+        content: ""
+  - target: "$.paths['/sandbox/kyb/status'].post['x-mint'].content"
+    copy: "$.paths['/sandbox/kyb/status'].post.description"

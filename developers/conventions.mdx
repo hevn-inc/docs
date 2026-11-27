@@ -1,6 +1,7 @@
 ---
-title: "Conventions"
-description: "Money format, ids, casing, idempotency, pagination, status codes, errors, rate limits and lifetimes on all /dapi/v1 routes."
+title: "HEVN API conventions: ids, idempotency and limits"
+sidebarTitle: "Conventions"
+description: "Money format, ids, casing, idempotency keys, pagination, status codes, errors, rate limits and lifetimes that apply to every /dapi/v1 route of the API."
 ---
 
 All `/dapi/v1` routes share one format for money, ids, casing, idempotency and pagination, and one set of limits. Send amounts as decimal strings, and send an `Idempotency-Key` with `POST /dapi/v1/payouts` and other writes that book a payment.

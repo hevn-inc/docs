@@ -97,7 +97,8 @@ beneficiary and the client.
 - Ending: the last table, or one `<Card title="Next: …">` with no body text. No recap.
 - Name the status and the error code together: `422 validation_failed`.
 - Bold is for UI labels (Click **Settings**), three spans per page at most. Code formatting is for files, commands, paths, fields and endpoints.
-- Frontmatter `description`: one sentence of 20 words at most.
+- Frontmatter `description`: one sentence of 120 to 160 characters, the meta description length search engines show.
+- Frontmatter `title`: 43 to 53 characters, so it renders as 50 to 60 with the " - HEVN" suffix, and unique site-wide. `sidebarTitle` holds the short navigation label. REST API pages set both in `overlays/seo.yaml`.
 
 ## Topic owners
 

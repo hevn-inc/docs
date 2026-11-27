@@ -1,6 +1,7 @@
 ---
-title: "Signing"
-description: "Prepare, check, sign and confirm a payment from your integrator account or its sub accounts with the developer key."
+title: "Signing payments with the HEVN developer key"
+sidebarTitle: "Signing"
+description: "Prepare, check, sign and confirm a payment from your integrator account or its sub accounts with the developer key, including debit contents and retries."
 ---
 
 Signing is how your developer key approves a payment from your integrator account or one of its sub accounts. Open the payment with `POST /dapi/v1/payouts`, sign `approval.payload`, and post the signature to the confirm route.

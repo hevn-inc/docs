@@ -1,6 +1,7 @@
 ---
-title: "Money movement"
-description: "Take payins and book payouts for a linked client, and what the developer key cannot sign."
+title: "HEVN Connect money movement: payins and payouts"
+sidebarTitle: "Money movement"
+description: "Take payins and book payouts for a client linked through HEVN Connect, have the holder approve each payout, and see what the developer key cannot sign."
 ---
 
 A linked client's money is held on its Base smart wallet, and the holder signs each payout from it. Book a payout with `POST /dapi/v1/payouts` and the client's id in `X-Hevn-Account`, then open a `sign` session for the holder.
